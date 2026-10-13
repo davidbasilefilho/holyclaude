@@ -1,9 +1,15 @@
-import { isAbsolute, relative, resolve } from "node:path"
+import { isAbsolute, relative, resolve, sep } from "node:path"
 import { Effect } from "effect"
 import { InvalidPath } from "./errors.ts"
 
 const FORBIDDEN_CHARACTERS = /[:*?"<>|]/
 const CONTROL_CHARACTERS = /\p{Cc}/u
+
+// Windows resolves these to devices whatever the case, the extension or the spaces before it
+// ("NUL.txt" and "NUL .txt" are still NUL). COM and LPT also take the superscript digits Microsoft
+// lists as reserved.
+const RESERVED_DEVICE_NAME =
+  /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$) *(?:\..*)?$/i
 
 const segmentProblem = (segment: string): string | undefined => {
   if (segment === "") return "empty segment"
@@ -11,6 +17,7 @@ const segmentProblem = (segment: string): string | undefined => {
   if (segment.endsWith(".") || segment.endsWith(" ")) return "trailing dot or space"
   if (CONTROL_CHARACTERS.test(segment)) return "control character"
   if (FORBIDDEN_CHARACTERS.test(segment)) return 'one of : * ? " < > |'
+  if (RESERVED_DEVICE_NAME.test(segment)) return "Windows reserved device name"
   return undefined
 }
 
@@ -56,8 +63,8 @@ export const anyOverlap = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): 
 
 /**
  * Lexical containment check of a normalized path against the writable roots. Relative roots and the
- * path are resolved against the same base. The rules in {@link normalizePath} already forbid
- * escapes, so this guards against a rule regression.
+ * path are resolved against the same base. {@link normalizePath} only keeps a path from escaping the
+ * project, so this is what keeps it inside the writable roots.
  */
 export const isInsideRoots = (
   path: string,
@@ -67,6 +74,8 @@ export const isInsideRoots = (
   const target = resolve(base, path)
   return roots.some((root) => {
     const inside = relative(resolve(base, root), target)
-    return inside !== ".." && !inside.startsWith("../") && !isAbsolute(inside)
+    // `relative` joins with the platform separator (a backslash on Windows), so test the first
+    // segment rather than a "../" prefix. A path on another drive comes back absolute.
+    return inside.split(sep)[0] !== ".." && !isAbsolute(inside)
   })
 }
