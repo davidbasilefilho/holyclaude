@@ -1,0 +1,17 @@
+{
+  "name": "holyclaude",
+  "owner": {
+    "name": "davidbasilefilho"
+  },
+  "metadata": {
+    "description": "Marketplace for the holyclaude plugin."
+  },
+  "plugins": [
+    {
+      "name": "holyclaude",
+      "source": "./plugin",
+      "description": "An Opus root that coordinates Haiku and Sonnet specialists through Intents and Assignments with revisioned dispatch, independent review and evidence-based acceptance.",
+      "version": "0.1.0"
+    }
+  ]
+}
