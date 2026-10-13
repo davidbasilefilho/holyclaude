@@ -1,0 +1,18 @@
+{
+  "name": "@holyclaude/cli",
+  "version": "0.1.0",
+  "description": "The holyclaude command line: Intent and Assignment state, plugin hooks.",
+  "license": "Apache-2.0",
+  "bin": {
+    "holyclaude": "./src/main.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.js"
+  },
+  "dependencies": {
+    "@holyclaude/core": "workspace:*",
+    "@toon-format/toon": "^4.0.0",
+    "effect": "^4.0.0"
+  }
+}

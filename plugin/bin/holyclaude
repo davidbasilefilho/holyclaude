@@ -1,0 +1,19 @@
+#!/bin/sh
+# Runs the bundled holyclaude CLI with Bun. Without Bun, hooks exit 0 silently so sessions go on.
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+here=$(cd "$(dirname "$self")" && pwd -P)
+bun=$(command -v bun 2>/dev/null)
+[ -z "$bun" ] && [ -x "${BUN_INSTALL:-$HOME/.bun}/bin/bun" ] && bun="${BUN_INSTALL:-$HOME/.bun}/bin/bun"
+if [ -z "$bun" ] || [ ! -f "$here/holyclaude.js" ]; then
+  [ "$1" = hook ] && exit 0
+  printf 'error: BunMissing\nmessage: Bun or holyclaude.js was not found\nhint: Install Bun from https://bun.sh, then rerun this command.\n' >&2
+  exit 127
+fi
+exec "$bun" "$here/holyclaude.js" "$@"
