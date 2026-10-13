@@ -111,6 +111,15 @@ export class StateLocked extends Data.TaggedError("StateLocked")<{
   }
 }
 
+/** The state lock stopped being this writer's before the commit, so the write was abandoned. */
+export class LockLost extends Data.TaggedError("LockLost")<{
+  readonly lockFile: string
+}> {
+  override get message() {
+    return `Lock ${this.lockFile} was taken over before the write was committed; nothing was written. Retry the operation`
+  }
+}
+
 /** Reading or writing the state file failed. */
 export class StateIo extends Data.TaggedError("StateIo")<{
   readonly path: string
