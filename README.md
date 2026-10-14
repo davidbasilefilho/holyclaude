@@ -133,6 +133,20 @@ which review Assignments call; it is neither vendored nor wrapped.
 
 - The worker VCS-write hook is a guardrail for well-meaning workers, not a sandbox. Interpreters,
   scripts and PowerShell script blocks are out of its reach.
+- The guard treats a call as a specialist's when its payload carries an `agent_id` that is not null,
+  absent or empty, whatever the type of the value; every other call is the main thread's and passes
+  untouched, at any size. It denies a specialist call it cannot judge: a command or file path over
+  1 MiB, a file tool that names no path, a call that names no tool, or one its policy cannot read.
+  A file tool is judged by every path it names. Only the command and the paths are measured, so a
+  large Write into an allowed path passes and padding elsewhere in the payload neither hides a
+  call nor blocks it.
+- A payload with no readable `agent_id` is allowed: empty stdin, text that is not valid JSON and
+  JSON that is not an object cannot be attributed to anyone, so the guard does not see a specialist
+  whose payload does not parse. The guard also fails open when the hook cannot run: stdin cannot be
+  read, or the hook crashes or runs past its 30 second timeout. The content of a specialist's call
+  is not expected to cause that. Each judged field is capped at 1 MiB and the shell scanner's
+  nesting is bounded, and the slowest input found at the cap took about 3.3 seconds on the
+  development machine, so a machine about nine times slower would still lose the guard on it.
 - Without Bun on `PATH` the hooks exit silently and the guard is off.
 - The hook runs on every tool call and costs about 0.35 to 3.6 seconds per call, varying with load: one run on the Windows machine
   where it was measured gave a median of about 0.35 seconds and another gave 1.6 to 3.6 seconds.

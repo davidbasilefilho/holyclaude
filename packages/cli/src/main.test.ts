@@ -74,3 +74,51 @@ describe("--version", () => {
     expect(out).toBe(`${manifest.version}\n`)
   })
 })
+
+describe("hook pre-tool-use", () => {
+  /** Runs the hook as Claude Code does: the payload on stdin, the decision on stdout. */
+  const hook = async (stdin: string) => {
+    const result = await $`${process.execPath} ${MAIN} hook pre-tool-use < ${Buffer.from(stdin)}`
+      .env({ ...process.env, HOLYCLAUDE_STATE_FILE: stateFile })
+      .nothrow()
+      .quiet()
+    return { code: result.exitCode, out: result.stdout.toString() }
+  }
+  const payload = (input: object, extra: object = {}) =>
+    JSON.stringify({ agent_id: "agent-1", tool_name: "Bash", tool_input: input, ...extra })
+  const MEGABYTE = 1024 * 1024
+  const padding = "x".repeat(MEGABYTE + 200_000)
+  const reasonOf = (out: string): string =>
+    JSON.parse(out).hookSpecificOutput.permissionDecisionReason
+
+  test("a subagent write padded past 1 MB outside its command is still denied, with exit code 0", async () => {
+    const { code, out } = await hook(payload({ command: "git commit -m x" }, { padding }))
+    expect(code).toBe(0)
+    expect(reasonOf(out)).toContain("git commit writes VCS state")
+  })
+
+  test("a subagent command over 1 MB is denied with the reason", async () => {
+    const { code, out } = await hook(payload({ command: `git status ${padding}` }))
+    expect(code).toBe(0)
+    expect(reasonOf(out)).toContain("cannot be checked")
+  })
+
+  test("a subagent write of over 1 MB into an allowed path passes", async () => {
+    const write = { file_path: "packages/cli/src/big.ts", content: padding }
+    expect(await hook(payload(write, { tool_name: "Write" }))).toEqual({ code: 0, out: "" })
+  })
+
+  test("a non-string agent_id is a subagent and null is the main thread", async () => {
+    const write = { command: "git commit -m x" }
+    expect(JSON.parse((await hook(payload(write, { agent_id: 7 }))).out)).toMatchObject({
+      hookSpecificOutput: { permissionDecision: "deny" },
+    })
+    expect(await hook(payload(write, { agent_id: null }))).toEqual({ code: 0, out: "" })
+  })
+
+  test("a main-thread payload past 1 MB and an unreadable payload are allowed", async () => {
+    const write = { command: "git commit -m x", description: padding }
+    for (const stdin of [payload(write, { agent_id: undefined }), "", "{"])
+      expect(await hook(stdin)).toEqual({ code: 0, out: "" })
+  })
+})

@@ -1,8 +1,4 @@
-import { withinLimit } from "@holyclaude/core"
 import { Effect, Option, Schema } from "effect"
-
-/** Largest hook payload read, in bytes. Hook payloads carry whole tool inputs. */
-const MAX_HOOK_BYTES = 1024 * 1024
 
 /**
  * A hook payload as JSON: an object whose fields are read one by one below. Claude Code owns this
@@ -25,11 +21,15 @@ export interface ToolInput {
 
 /**
  * The fields of a hook payload the CLI reads, each undefined when absent or of another type. The
- * guard decides from `agent_id`, `tool_name` and `tool_input` alone; the rest only feed the
+ * guard decides from `agent`, `tool_name` and `tool_input` alone; the rest only feed the
  * observation, which is best effort.
  */
 export interface HookInput {
-  readonly agent_id: string | undefined
+  /**
+   * The subagent that made the call, or undefined for the main thread. `id` is its `agent_id`, or
+   * undefined when that is not a string.
+   */
+  readonly agent: { readonly id: string | undefined } | undefined
   readonly tool_name: string | undefined
   readonly tool_input: ToolInput | undefined
   readonly agent_type: string | undefined
@@ -54,14 +54,25 @@ const toolInput = (value: unknown): ToolInput | undefined => {
       }
 }
 
+/**
+ * Whether an `agent_id` marks a subagent's call. Null, absent and the empty string say there is no
+ * agent, as the main thread's calls do; any other value is an agent, even one of an unexpected
+ * type, so a drifted payload is judged instead of passed.
+ */
+const isAgentId = (value: unknown): boolean => value !== undefined && value !== null && value !== ""
+
 const decode = Schema.decodeUnknownEffect(Envelope)
 
-/** Decodes the JSON Claude Code writes to a hook's stdin. */
+/**
+ * Decodes the JSON Claude Code writes to a hook's stdin, whatever its size. Fails when the text is
+ * not a JSON object.
+ */
 export const decodeHookInput = (text: string) =>
-  withinLimit("Hook input", text, MAX_HOOK_BYTES).pipe(
-    Effect.flatMap(decode),
+  decode(text).pipe(
     Effect.map((envelope): HookInput => ({
-      agent_id: lenient(Schema.String, envelope["agent_id"]),
+      agent: isAgentId(envelope["agent_id"])
+        ? { id: lenient(Schema.String, envelope["agent_id"]) }
+        : undefined,
       tool_name: lenient(Schema.String, envelope["tool_name"]),
       tool_input: toolInput(envelope["tool_input"]),
       agent_type: lenient(Schema.String, envelope["agent_type"]),
@@ -78,8 +89,9 @@ export const effortOf = (input: HookInput): string | undefined => {
 
 /** The subagent's transcript: the session directory's `subagents/agent-<id>.jsonl`. */
 export const subagentTranscript = (input: HookInput): string | undefined => {
-  const { transcript_path: path, agent_id: agent } = input
-  if (path === undefined || agent === undefined || agent === "") return undefined
+  const { transcript_path: path } = input
+  const agent = input.agent?.id
+  if (path === undefined || agent === undefined) return undefined
   if (path.includes("/subagents/")) return path
   return `${path.replace(/\.jsonl$/, "")}/subagents/agent-${agent}.jsonl`
 }

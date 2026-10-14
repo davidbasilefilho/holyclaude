@@ -21,6 +21,13 @@ interface Heredoc {
   readonly expand: boolean
 }
 
+/**
+ * Deepest nesting of text scanned again on its own (a heredoc body's substitution, a backtick).
+ * Each level reads the rest of the script once more, so the depth bounds the scan's cost at depth
+ * times the script's length; real scripts nest two or three deep.
+ */
+const MAX_NESTING = 3
+
 const WORD_END = /[\s;&|()<>]/
 const ANSI_ESCAPES: Readonly<Record<string, string>> = {
   n: "\n",
@@ -86,9 +93,11 @@ const bodySubstitutions = (body: string): ReadonlyArray<string> => {
 /**
  * Splits a shell script into its simple commands. Pipelines, lists, subshells, command and process
  * substitutions, backticks, heredocs and quoting are understood; every simple command found at any
- * nesting depth is returned, so a caller can judge each one. Anything unterminated fails the scan.
+ * nesting depth is returned, so a caller can judge each one. Anything unterminated, or nested past
+ * {@link MAX_NESTING}, fails the scan. `nesting` counts the scans this one is inside of.
  */
-export const scanScript = (source: string): Scan => {
+export const scanScript = (source: string, nesting = 0): Scan => {
+  if (nesting > MAX_NESTING) return { ok: false, reason: "substitutions nested too deeply" }
   const commands: Simple[] = []
   const pending: Heredoc[] = []
   let failure: string | undefined
@@ -116,7 +125,7 @@ export const scanScript = (source: string): Scan => {
   }
 
   const absorb = (script: string) => {
-    const nested = scanScript(script)
+    const nested = scanScript(script, nesting + 1)
     if (nested.ok) commands.push(...nested.commands)
     else fail(nested.reason)
   }

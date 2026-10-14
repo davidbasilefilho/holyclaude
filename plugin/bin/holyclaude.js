@@ -7725,7 +7725,6 @@ var latestObserved = (records, agentId) => records.findLast((record) => record.k
 var latestOverride = (records, assignmentId, agentId) => records.findLast((record) => record.kind === "override" && record.assignment_id === assignmentId && record.agent_id === agentId);
 
 // src/hook/input.ts
-var MAX_HOOK_BYTES = 1024 * 1024;
 var Envelope = fromJsonString2(Record(String4, Unknown2));
 var Effort2 = Union2([
   Struct({ level: optionalKey2(String4) }),
@@ -7740,9 +7739,10 @@ var toolInput = (value) => {
     notebook_path: lenient(String4, fields["notebook_path"])
   };
 };
+var isAgentId = (value) => value !== undefined && value !== null && value !== "";
 var decode2 = decodeUnknownEffect2(Envelope);
-var decodeHookInput = (text) => withinLimit("Hook input", text, MAX_HOOK_BYTES).pipe(flatMap2(decode2), map4((envelope) => ({
-  agent_id: lenient(String4, envelope["agent_id"]),
+var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
+  agent: isAgentId(envelope["agent_id"]) ? { id: lenient(String4, envelope["agent_id"]) } : undefined,
   tool_name: lenient(String4, envelope["tool_name"]),
   tool_input: toolInput(envelope["tool_input"]),
   agent_type: lenient(String4, envelope["agent_type"]),
@@ -7754,8 +7754,9 @@ var effortOf = (input) => {
   return typeof effort === "string" ? effort : effort?.level;
 };
 var subagentTranscript = (input) => {
-  const { transcript_path: path, agent_id: agent } = input;
-  if (path === undefined || agent === undefined || agent === "")
+  const { transcript_path: path } = input;
+  const agent = input.agent?.id;
+  if (path === undefined || agent === undefined)
     return;
   if (path.includes("/subagents/"))
     return path;
@@ -7763,6 +7764,7 @@ var subagentTranscript = (input) => {
 };
 
 // src/hook/shell.ts
+var MAX_NESTING = 3;
 var WORD_END = /[\s;&|()<>]/;
 var ANSI_ESCAPES = {
   n: `
@@ -7817,7 +7819,9 @@ var bodySubstitutions = (body) => {
   }
   return found;
 };
-var scanScript = (source) => {
+var scanScript = (source, nesting = 0) => {
+  if (nesting > MAX_NESTING)
+    return { ok: false, reason: "substitutions nested too deeply" };
   const commands = [];
   const pending = [];
   let failure;
@@ -7843,7 +7847,7 @@ var scanScript = (source) => {
     failure ??= reason;
   };
   const absorb = (script) => {
-    const nested = scanScript(script);
+    const nested = scanScript(script, nesting + 1);
     if (nested.ok)
       commands.push(...nested.commands);
     else
@@ -8143,13 +8147,17 @@ var scanScript = (source) => {
 
 // src/hook/policy.ts
 var MAX_DEPTH = 6;
+var MAX_JUDGED_BYTES = 1024 * 1024;
 var REASONS = {
   git: (sub) => `git ${sub} writes VCS state, and VCS writes belong to the root. Describe the change in your report (files and intent) and the root commits it. git status, diff, log, show, blame and fetch are open to you.`,
   gh: (sub) => `gh ${sub} is a write or an unlisted gh command, and gh writes belong to the root. Put the finding in your report. Open to you: gh pr view|checks|diff|list|status, run view|list, issue view|list, repo view, and gh api for plain reads.`,
   holyclaude: (sub) => `holyclaude ${sub} changes Intent and Assignment state, which the root owns. Read it with holyclaude intent show, assignment show, assignment list, assignment verify, routes and reconcile.`,
   state: `The .holyclaude state files are written by the root through the holyclaude CLI. Describe the state you need in your report.`,
   config: (key) => `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
-  unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`
+  unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`,
+  oversized: (what, bytes) => `This ${what} is ${bytes} bytes and the guard reads at most ${MAX_JUDGED_BYTES}, so it cannot be checked. Shorten it, or send the work in smaller calls, for example one shorter command at a time.`,
+  noTool: `This tool call names no tool that can be read, so it cannot be checked. Retry the call, and report it to the root if it recurs.`,
+  noPath: (tool) => `This ${tool} call names no file path that can be read, so it cannot be checked. Send the path as a plain string.`
 };
 var GIT_READS = new Set([
   "status",
@@ -8710,8 +8718,9 @@ var findAfter = (words, markers) => {
   const end = tail.findIndex((word) => word.text === ";" || word.text === "+");
   return end === -1 ? tail : tail.slice(0, end);
 };
+var isCommandFlag = (text) => /^-[A-Za-z]+$/.test(text) && text.includes("c");
 var classifyShell = (rest, depth) => {
-  const flagged = rest.findIndex((word) => /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text));
+  const flagged = rest.findIndex((word) => isCommandFlag(word.text));
   if (flagged !== -1) {
     const script = rest.slice(flagged + 1).find((word) => !word.text.startsWith("-"));
     if (script === undefined)
@@ -8854,25 +8863,39 @@ var denyReason = (command) => classifyScript(command, 0);
 var UNREADABLE = REASONS.unsure("it is nested too deeply to read");
 var SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
 var FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var oversize = (what, text) => {
+  const bytes = Buffer.byteLength(text);
+  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined;
+};
 var denyToolReason = (toolName, input) => {
   if (toolName === undefined)
-    return;
-  if (SHELL_TOOLS.has(toolName))
-    return input?.command === undefined ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.` : denyReason(input.command);
+    return REASONS.noTool;
+  if (SHELL_TOOLS.has(toolName)) {
+    const command = input?.command;
+    return command === undefined ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.` : oversize("command", command) ?? denyReason(command);
+  }
   if (FILE_TOOLS.has(toolName)) {
-    const target = input?.file_path ?? input?.notebook_path;
-    return target !== undefined && touchesState(target) ? REASONS.state : undefined;
+    const targets = [input?.file_path, input?.notebook_path].filter((path) => path !== undefined);
+    if (targets.length === 0)
+      return REASONS.noPath(toolName);
+    for (const target of targets) {
+      const verdict = oversize("file path", target) ?? (touchesState(target) ? REASONS.state : undefined);
+      if (verdict !== undefined)
+        return verdict;
+    }
+    return;
   }
   return;
 };
 
 // src/hook/pre-tool-use.ts
 var OBSERVATION_BUDGET = "750 millis";
+var MAX_REASON_CHARS = 1000;
 var deny = (reason) => JSON.stringify({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: reason
+    permissionDecisionReason: reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS)}...` : reason
   }
 });
 var observe = (input, agentId) => gen2(function* () {
@@ -8894,12 +8917,15 @@ var observe = (input, agentId) => gen2(function* () {
   yield* appendObservation(record);
 });
 var preToolUse = (stdin) => gen2(function* () {
-  const input = yield* decodeHookInput(stdin);
-  const agentId = input.agent_id;
-  if (agentId === undefined || agentId === "")
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const agent = input?.agent;
+  if (input === undefined || agent === undefined)
     return "";
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
-  yield* observe(input, agentId).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
+  if (agent.id !== undefined)
+    yield* observe(input, agent.id).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
   return reason === undefined ? "" : deny(reason);
 });
 
