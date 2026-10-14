@@ -24,18 +24,23 @@ import {
   findAssignment,
   findIntent,
   followUp,
+  latestIntent,
   projectRoot,
   reconcile,
+  readCloneId,
+  refuseOtherClone,
   reserve,
   resolveReconcile,
   rollbackReservation,
   routeFor,
   selectWorker,
-  stateFilePath,
+  sortedById,
+  stateDirPath,
   updateIntent,
   updateState,
   type Assignment,
   type State,
+  type UpdateContext,
 } from "@holyclaude/core"
 import { Effect, Schema } from "effect"
 
@@ -106,7 +111,7 @@ const dispatchInfo = (assignment: Assignment) => {
 const activeIntent = (state: State, id: string | undefined) =>
   Effect.gen(function* () {
     if (id !== undefined) return yield* findIntent(state, id)
-    const latest = state.intents.at(-1)
+    const latest = latestIntent(state)
     return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }))
   })
 
@@ -114,10 +119,26 @@ const read = <A, E>(use: (state: State) => Effect.Effect<A, E>) =>
   loadStateFile.pipe(Effect.flatMap(use))
 
 const change = <A, E>(
+  transition: (
+    state: State,
+    context: UpdateContext,
+  ) => Effect.Effect<{ readonly state: State; readonly value: A }, E>,
+) => Effect.suspend(() => updateState(stateDirPath(), transition))
+
+/**
+ * A change to an Assignment this clone must own: a Running row that another clone reserved is
+ * refused, since its worker is that clone's to settle.
+ */
+const changeOwn = <A, E>(
+  id: string,
   transition: (state: State) => Effect.Effect<{ readonly state: State; readonly value: A }, E>,
 ) =>
-  // Loading first lets a corrupt file be reported as such, not as bad input to the transition.
-  loadStateFile.pipe(Effect.andThen(updateState(stateFilePath(), transition)))
+  change((state, { cloneId }) =>
+    cloneId.pipe(
+      Effect.flatMap((own) => refuseOtherClone(state, id, own)),
+      Effect.andThen(transition(state)),
+    ),
+  )
 
 const need = (stdin: Effect.Effect<string, StdinMissing>, command: string) =>
   stdin.pipe(
@@ -266,7 +287,7 @@ const assignmentList = cmd({
     stateFilter(stringFlag(args, "state")).pipe(
       Effect.flatMap((wanted) =>
         read((state) => {
-          const rows = state.assignments
+          const rows = sortedById(state.assignments)
             .filter((assignment) => wanted === undefined || assignment.state === wanted)
             .map(summaryRow)
           return Effect.succeed({ value: { assignments: rows } })
@@ -303,12 +324,14 @@ const assignmentReserve = cmd({
       const id = args.positionals[0]
       const given = stringFlag(args, "capabilities")
       const roots = listFlag(args, "root")
-      const context = {
-        projectRoot: projectRoot(),
-        writableRoots: roots.length > 0 ? roots : [projectRoot()],
-      }
-      const reserved = yield* change((state) =>
+      const reserved = yield* change((state, { cloneId }) =>
         Effect.gen(function* () {
+          // Read under the lock: two first-time reserves must not each find no clone id.
+          const context = {
+            projectRoot: projectRoot(),
+            writableRoots: roots.length > 0 ? roots : [projectRoot()],
+            cloneId: yield* cloneId,
+          }
           const assignment = yield* findAssignment(state, id ?? "")
           const capabilities =
             given === undefined
@@ -348,7 +371,7 @@ const assignmentBind = cmd({
         agent_id: agent,
         fingerprint,
       })
-      const bound = yield* change((state) => bindAgent(state, input))
+      const bound = yield* changeOwn(input.assignment_id, (state) => bindAgent(state, input))
       // The bind is committed and authoritative. The override is only a non-authoritative note
       // for verify, so a failed write is reported in the output and never fails the command.
       const missed =
@@ -364,9 +387,7 @@ const assignmentBind = cmd({
             }).pipe(
               Effect.as(undefined),
               Effect.catch((error) =>
-                Effect.succeed(
-                  `override not recorded in ${observationsPath()}: ${String(error.cause)}`,
-                ),
+                Effect.succeed(`override not recorded in ${observationsPath()}: ${error.message}`),
               ),
             )
       return {
@@ -384,7 +405,9 @@ const assignmentRollback = cmd({
   positionals: 1,
   run: (args) =>
     withRef(args.positionals[0]).pipe(
-      Effect.flatMap((ref) => change((state) => rollbackReservation(state, ref))),
+      Effect.flatMap((ref) =>
+        changeOwn(ref.assignment_id, (state) => rollbackReservation(state, ref)),
+      ),
       Effect.map((assignment) => ({ value: summaryRow(assignment) })),
     ),
 })
@@ -412,7 +435,7 @@ const assignmentFinish = cmd({
         outcome,
         result: body.result,
       })
-      const done = yield* change((state) => finish(state, input))
+      const done = yield* changeOwn(input.assignment_id, (state) => finish(state, input))
       return { value: summaryRow(done) }
     }),
 })
@@ -432,7 +455,7 @@ const assignmentCancel = cmd({
         notification: "stopped",
         ...(reason === undefined ? {} : { reason }),
       })
-      const done = yield* change((state) => cancel(state, input))
+      const done = yield* changeOwn(input.assignment_id, (state) => cancel(state, input))
       return { value: summaryRow(done) }
     }),
 })
@@ -545,12 +568,32 @@ const routes = cmd({
 const reconcileList = cmd({
   path: ["reconcile"],
   usage: "reconcile",
-  summary: "list Running rows to confirm by agent id",
+  summary: "list Running rows to confirm by agent id, and those running elsewhere",
   root: false,
   flags: {},
   positionals: 0,
   run: () =>
-    read((state) => Effect.succeed({ value: { running: reconcile(state).map(summaryRow) } })),
+    read((state) =>
+      Effect.suspend(() => readCloneId(stateDirPath())).pipe(
+        Effect.map((cloneId) => {
+          const { local, elsewhere } = reconcile(state, cloneId)
+          return {
+            value: {
+              running: local.map(summaryRow),
+              // Another clone reserved these; its root confirms them. Resolve one only by naming it.
+              ...(elsewhere.length === 0
+                ? {}
+                : {
+                    running_elsewhere: elsewhere.map((row) => ({
+                      ...summaryRow(row),
+                      clone: row.clone_id,
+                    })),
+                  }),
+            },
+          }
+        }),
+      ),
+    ),
 })
 
 const reconcileResolve = cmd({

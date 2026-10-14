@@ -5,8 +5,26 @@ import { TooLarge } from "./errors.ts"
 /** Largest MCP or CLI input accepted, in bytes. */
 export const MAX_INPUT_BYTES = 64 * 1024
 
-/** Largest state file read or written, in bytes. */
-export const MAX_STATE_BYTES = 1024 * 1024
+/** Largest committed record file read or written, in bytes. */
+export const MAX_RECORD_BYTES = 256 * 1024
+
+/**
+ * Largest local file (worker list, agent ids) read or written, in bytes. These files are never
+ * merged and they only grow: the agent id of a finished Assignment still feeds `verify`, and a
+ * worker's history feeds the independence rule, so entries cannot be pruned safely. The cap is
+ * large enough for tens of thousands of Assignments and still stops a runaway file.
+ */
+export const MAX_LOCAL_BYTES = 4 * 1024 * 1024
+
+/**
+ * Size past which the observations log is rotated, in bytes. The log is appended to on every
+ * specialist tool call and read whole on the next, so it is kept to two generations of about this
+ * size, well within the local files' cap that each read enforces.
+ */
+export const OBSERVATIONS_ROTATE_BYTES = 1024 * 1024
+
+/** Largest legacy single-file state read for migration, in bytes. */
+export const MAX_LEGACY_STATE_BYTES = 1024 * 1024
 
 const strict = { onExcessProperty: "error" } as const
 

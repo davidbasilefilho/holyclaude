@@ -21,10 +21,16 @@ export type Selection =
     }
   | { readonly _tag: "Spawn" }
 
-/** True when the worker has no Assignment or its last one is terminal. */
+/**
+ * True when the worker has no Assignment or its last one is terminal. A last Assignment that is not
+ * in the loaded state, such as one from another branch, cannot be shown finished, so the worker
+ * counts as busy.
+ */
 export const isIdle = (state: State, worker: Worker): boolean => {
-  const last = state.assignments.find((assignment) => assignment.id === worker.history.at(-1))
-  return last === undefined || isTerminal(last)
+  const lastId = worker.history.at(-1)
+  if (lastId === undefined) return true
+  const last = state.assignments.find((assignment) => assignment.id === lastId)
+  return last !== undefined && isTerminal(last)
 }
 
 const intersects = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>

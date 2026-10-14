@@ -6,8 +6,9 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import { breakStaleLock } from "./lock.ts"
 import { emptyState, type Change } from "./model/state.ts"
-import { breakStaleLock, loadState, updateState } from "./store.ts"
+import { loadState, updateState } from "./store.ts"
 
 // Far above any real pid range, so process.kill(pid, 0) reports ESRCH.
 const DEAD_PID = 2_147_483_646
@@ -15,7 +16,7 @@ const LONG_AGO = new Date(Date.now() - 10 * 60_000)
 
 // Taken before the mock below replaces the module's exports.
 const real = { ...nodeFs }
-const { mkdtemp, readdir, rm, utimes } = real
+const { mkdtemp, rm, utimes } = real
 const realKill = process.kill.bind(process)
 
 // A test arms `failures` to make the next calls of open or rename fail with `code`; anything else
@@ -39,7 +40,6 @@ void mock.module("node:fs/promises", () => ({
 }))
 
 let directory: string
-let path: string
 let lockFile: string
 let guardFile: string
 
@@ -47,8 +47,7 @@ beforeEach(async () => {
   for (const fault of Object.values(injected))
     Object.assign(fault, { failures: 0, calls: 0, code: "EPERM" })
   directory = await mkdtemp(join(tmpdir(), "holyclaude-store-"))
-  path = join(directory, "state.json")
-  lockFile = `${path}.lock`
+  lockFile = join(directory, "local", "lock")
   guardFile = `${lockFile}.breaking`
 })
 
@@ -72,13 +71,20 @@ const plant = async (file: string, content: string, mtime?: Date) => {
   if (mtime !== undefined) await utimes(file, mtime, mtime)
 }
 
-const withIntent = (state: typeof emptyState): Change<string> => ({
+const withIntent = (state: typeof emptyState, objective = "o"): Change<string> => ({
   state: {
     ...state,
-    intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1 }],
+    intents: [{ id: "intent-1", objective, requirements: "r", revision: 1 }],
   },
   value: "ok",
 })
+
+/** Every file under the directory, relative and sorted, dot files included. */
+const files = async () =>
+  (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true })))
+    .map((name) => name.replaceAll("\\", "/"))
+    .sort()
+const INTENT_FILE = "intents/intent-1/intent.json"
 
 const breaks = () => Effect.runPromise(breakStaleLock(lockFile))
 
@@ -117,6 +123,23 @@ describe("lock staleness", () => {
   test("a record that fails validation is undecodable", async () => {
     await plant(lockFile, record(owner({ pid: 0, token: "  " })))
     expect(await breaks()).toBe(false)
+  })
+
+  test("a lock file over the owner cap is not read, so it is judged by age only", async () => {
+    // Valid JSON naming a dead owner, padded past the cap. Read whole, the dead pid would break it.
+    const padded = record(owner({ pid: DEAD_PID })) + " ".repeat(8 * 1024)
+    await plant(lockFile, padded)
+    expect(await breaks()).toBe(false)
+    await utimes(lockFile, LONG_AGO, LONG_AGO)
+    expect(await breaks()).toBe(true)
+  })
+
+  test("a guard over the owner cap is not read, so a live-looking breaker is judged by age", async () => {
+    await plant(lockFile, record(owner({ pid: DEAD_PID })))
+    await plant(guardFile, record(owner()) + " ".repeat(8 * 1024), LONG_AGO)
+    expect(await breaks()).toBe(false)
+    expect(await Bun.file(guardFile).exists()).toBe(false)
+    expect(await breaks()).toBe(true)
   })
 
   test("a guard left by a dead breaker expires, and the next attempt breaks the lock", async () => {
@@ -173,9 +196,9 @@ describe("lock staleness", () => {
     await plant(lockFile, record(owner({ pid: DEAD_PID })))
     await plant(guardFile, record(owner({ pid: DEAD_PID })))
     expect(
-      await Effect.runPromise(updateState(path, (state) => Effect.succeed(withIntent(state)))),
+      await Effect.runPromise(updateState(directory, (state) => Effect.succeed(withIntent(state)))),
     ).toBe("ok")
-    expect((await Effect.runPromise(loadState(path))).intents).toHaveLength(1)
+    expect((await Effect.runPromise(loadState(directory))).intents).toHaveLength(1)
     expect(await Bun.file(lockFile).exists()).toBe(false)
     expect(await Bun.file(guardFile).exists()).toBe(false)
   })
@@ -183,27 +206,27 @@ describe("lock staleness", () => {
 
 describe("commit", () => {
   test("aborts with the state untouched when the lock is no longer its own", async () => {
-    await Effect.runPromise(updateState(path, (state) => Effect.succeed(withIntent(state))))
-    const before = await Bun.file(path).text()
+    await Effect.runPromise(updateState(directory, (state) => Effect.succeed(withIntent(state))))
+    const before = await Bun.file(join(directory, INTENT_FILE)).text()
     const stolen = record(owner({ token: "successor" }))
     const exit = await Effect.runPromise(
-      updateState(path, (state) =>
+      updateState(directory, (state) =>
         // The lock is broken and retaken while this writer is paused inside its transition.
         Effect.promise(() => Bun.write(lockFile, stolen)).pipe(
-          Effect.as({ state: { ...state, intents: [] }, value: "lost" } satisfies Change<string>),
+          Effect.as(withIntent(state, "changed while paused")),
         ),
       ).pipe(Effect.flip),
     )
     expect(exit._tag).toBe("LockLost")
-    expect(await Bun.file(path).text()).toBe(before)
-    expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([])
+    expect(await Bun.file(join(directory, INTENT_FILE)).text()).toBe(before)
+    expect((await files()).filter((name) => name.endsWith(".tmp"))).toEqual([])
     // The successor's lock is not released by the loser.
     expect(await Bun.file(lockFile).text()).toBe(stolen)
   })
 
   test("a normal write leaves no temp file and no lock", async () => {
-    await Effect.runPromise(updateState(path, (state) => Effect.succeed(withIntent(state))))
-    expect((await readdir(directory)).sort()).toEqual(["state.json"])
+    await Effect.runPromise(updateState(directory, (state) => Effect.succeed(withIntent(state))))
+    expect(await files()).toEqual([".gitignore", INTENT_FILE])
   })
 })
 
@@ -211,7 +234,7 @@ describe("writing", () => {
   test("refuses a state that loading would reject, and leaves the store usable", async () => {
     const intent = { id: "intent-1", objective: "o", requirements: "r", revision: 1 }
     const failure = await Effect.runPromise(
-      updateState(path, (state) =>
+      updateState(directory, (state) =>
         Effect.succeed({
           state: { ...state, intents: [intent, intent] },
           value: "dup",
@@ -219,46 +242,48 @@ describe("writing", () => {
       ).pipe(Effect.flip),
     )
     expect(failure._tag).toBe("InvalidRecord")
-    expect(await readdir(directory)).toEqual([])
-    expect(await Effect.runPromise(loadState(path))).toEqual(emptyState)
+    expect(await files()).toEqual([".gitignore"])
+    expect(await Effect.runPromise(loadState(directory))).toEqual(emptyState)
   })
 })
 
 describe("transient Windows errors", () => {
-  const commit = () =>
-    Effect.runPromise(updateState(path, (state) => Effect.succeed(withIntent(state))))
+  const commit = (objective = "o") =>
+    Effect.runPromise(
+      updateState(directory, (state) => Effect.succeed(withIntent(state, objective))),
+    )
 
   test("opening the lock is retried after EPERM", async () => {
     injected.open.failures = 2
     expect(await commit()).toBe("ok")
     expect(injected.open.calls).toBe(3)
-    expect((await Effect.runPromise(loadState(path))).intents).toHaveLength(1)
+    expect((await Effect.runPromise(loadState(directory))).intents).toHaveLength(1)
   })
 
   test("the commit rename is retried after EPERM and EBUSY", async () => {
     for (const code of ["EPERM", "EBUSY"]) {
       Object.assign(injected.rename, { failures: 2, calls: 0, code })
-      expect(await commit()).toBe("ok")
+      expect(await commit(code)).toBe("ok")
       expect(injected.rename.calls).toBe(3)
     }
-    expect((await readdir(directory)).sort()).toEqual(["state.json"])
+    expect(await files()).toEqual([".gitignore", INTENT_FILE])
   })
 
   test("a rename that keeps failing gives up with StateIo and cleans up", async () => {
     injected.rename.failures = 1000
     const failure = await Effect.runPromise(
-      updateState(path, (state) => Effect.succeed(withIntent(state))).pipe(Effect.flip),
+      updateState(directory, (state) => Effect.succeed(withIntent(state))).pipe(Effect.flip),
     )
     expect(failure._tag).toBe("StateIo")
     expect(injected.rename.calls).toBeGreaterThan(1)
     expect(injected.rename.calls).toBeLessThan(10)
-    expect(await readdir(directory)).toEqual([])
+    expect(await files()).toEqual([".gitignore"])
   })
 
   test("any other code is not retried", async () => {
     Object.assign(injected.rename, { failures: 1, code: "EACCES" })
     const failure = await Effect.runPromise(
-      updateState(path, (state) => Effect.succeed(withIntent(state))).pipe(Effect.flip),
+      updateState(directory, (state) => Effect.succeed(withIntent(state))).pipe(Effect.flip),
     )
     expect(failure._tag).toBe("StateIo")
     expect(injected.rename.calls).toBe(1)

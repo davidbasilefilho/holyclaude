@@ -105,18 +105,36 @@ describe("the shipped core rules", () => {
   })
 })
 
+describe("the Intent in the summary", () => {
+  test("is the latest by id order, so a generated id beats legacy intent-1000", () => {
+    const intent = (id: string) => ({
+      id,
+      objective: `objective of ${id}`,
+      requirements: "",
+      revision: 1,
+    })
+    const state: State = {
+      ...stateWith(0),
+      intents: [intent("intent-0mg8k2x1a-7f3q"), intent("intent-1000"), intent("intent-0999")],
+    }
+    const context = composeForState(undefined, state)
+    expect(context).toContain("objective of intent-0mg8k2x1a-7f3q")
+    expect(context).not.toContain("objective of intent-1000")
+  })
+})
+
 describe("the plugin root in injected text", () => {
   const AGENT = new URL("../../../../plugin/agents/holyclaude.md", import.meta.url)
   const saved = {
     root: process.env["CLAUDE_PLUGIN_ROOT"],
-    state: process.env["HOLYCLAUDE_STATE_FILE"],
+    state: process.env["HOLYCLAUDE_STATE_DIR"],
   }
   let base = ""
 
   afterEach(() => {
     for (const [key, value] of [
       ["CLAUDE_PLUGIN_ROOT", saved.root],
-      ["HOLYCLAUDE_STATE_FILE", saved.state],
+      ["HOLYCLAUDE_STATE_DIR", saved.state],
     ] as const)
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
@@ -151,7 +169,7 @@ describe("the plugin root in injected text", () => {
     mkdirSync(join(root, "agents"), { recursive: true })
     copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
     process.env["CLAUDE_PLUGIN_ROOT"] = root
-    process.env["HOLYCLAUDE_STATE_FILE"] = join(base, "state.json")
+    process.env["HOLYCLAUDE_STATE_DIR"] = join(base, ".holyclaude")
     const output = JSON.parse(await Effect.runPromise(sessionStart))
     const context: string = output.hookSpecificOutput.additionalContext
     expect(context).not.toContain("${CLAUDE_PLUGIN_ROOT}")

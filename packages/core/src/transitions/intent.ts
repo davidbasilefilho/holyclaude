@@ -1,8 +1,9 @@
 import { Effect, Schema } from "effect"
 
+import { newId } from "../model/ids.ts"
 import type { Intent } from "../model/intent.ts"
 import { Id, Text } from "../model/primitives.ts"
-import { findIntent, nextId, type Change, type State } from "../model/state.ts"
+import { findIntent, type Change, type State } from "../model/state.ts"
 
 /** Input of createIntent. */
 export const CreateIntentInput = Schema.Struct({
@@ -26,10 +27,11 @@ export type UpdateIntentInput = typeof UpdateIntentInput.Type
 export const createIntent = (
   state: State,
   input: CreateIntentInput,
-): Effect.Effect<Change<Intent>> => {
-  const intent: Intent = { id: nextId("intent", state.intents), ...input, revision: 1 }
-  return Effect.succeed({ state: { ...state, intents: [...state.intents, intent] }, value: intent })
-}
+): Effect.Effect<Change<Intent>> =>
+  Effect.gen(function* () {
+    const intent: Intent = { id: yield* newId("intent"), ...input, revision: 1 }
+    return { state: { ...state, intents: [...state.intents, intent] }, value: intent }
+  })
 
 /** Edits an Intent. The revision bumps only when the caller flags the change as material. */
 export const updateIntent = (state: State, input: UpdateIntentInput) =>
