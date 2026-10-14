@@ -5,7 +5,7 @@ description: Use when you are about to create, launch, finish, accept, follow up
 
 # Assignments through the CLI
 
-The `holyclaude` CLI is the interface to Intent and Assignment state, and it keeps the state file consistent for you. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
+The `holyclaude` CLI is not on `PATH`: run it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`, which every `holyclaude <command>` below stands for. It is the interface to Intent and Assignment state, and it keeps the state file consistent for you. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
 
 Read-only commands are open to every agent: `holyclaude intent show`, `holyclaude assignment show <id>`, `holyclaude assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]`, `holyclaude assignment verify <id>`, `holyclaude routes` and `holyclaude reconcile`. The commands that change state are yours as the root, and workers leave them to you.
 
@@ -20,7 +20,7 @@ Read-only commands are open to every agent: `holyclaude intent show`, `holyclaud
 ## 2. Create
 
 ```
-holyclaude assignment create <<'JSON'
+"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" assignment create <<'JSON'
 {
   "intent_id": "intent-0001",
   "intent_revision": 1,
@@ -70,7 +70,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 - `holyclaude assignment bind <id> --agent <agentId>` records the agent id from the spawn result (or the reused worker's id) and attaches the worker to the Running Assignment. When you escalated with a per-call override, add `--model haiku|sonnet|opus|fable` and `--effort low..max` with the values you passed, so `verify` expects them. `--fingerprint` defaults to the live roster, so omit it.
 - If the spawn or resume failed, `holyclaude assignment rollback <id>` returns the unbound reservation to Ready. Fix the cause or report the blocker. A bound Assignment moves on by finish.
-- `holyclaude assignment verify <id>` compares expected and observed model, effort and agent type. The output lists `checks` with `field`, `expected`, `observed` and `status` for model, effort and agent_type, and `expected_source` says whether the route or your override set the expectation. The verdict is `match`, `mismatch` (exit code 3) or `incomplete`. The PreToolUse hook records effort and agent type from the worker's tool calls, and the observed model comes from the worker's transcript, so a fresh worker reads `unobserved` and `incomplete` until it has acted. A mismatch is a failed dispatch to redo with the right model and effort.
+- `holyclaude assignment verify <id>` compares expected and observed model, effort and agent type. The output lists `checks` with `field`, `expected`, `observed` and `status` for model, effort and agent_type, and `expected_source` says whether the route or your override set the expectation. The verdict is `match`, `mismatch` (exit code 3) or `incomplete`. The SubagentStart hook records the agent type, PreToolUse the effort at a guarded tool call, and SubagentStop the effort and transcript path; the observed model comes from the worker's transcript, so a running worker reads `unobserved` and `incomplete` until it has stopped or made a guarded call. A mismatch is a failed dispatch to redo with the right model and effort.
 
 Run steps 3 to 6 for every ready independent Assignment in one message, then end the turn.
 

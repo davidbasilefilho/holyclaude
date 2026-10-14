@@ -291,7 +291,7 @@ const isEntry = (path: string) =>
 
 /**
  * The program a word names, or undefined when the shell computes the name. A path that is computed
- * only in its directory (`${CLAUDE_PLUGIN_ROOT}/bin/holyclaude`) still names its program.
+ * only in its directory (`${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude`) still names its program.
  */
 const programOf = (word: Word): string | undefined =>
   word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text)))
@@ -795,6 +795,12 @@ export const UNREADABLE = REASONS.unsure("it is nested too deeply to read")
 
 const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
 const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
+
+/**
+ * The tools the guard judges. The plugin's hooks.json matcher must list all of them, since a tool
+ * the matcher leaves out never reaches the guard.
+ */
+export const JUDGED_TOOLS: ReadonlySet<string> = new Set([...SHELL_TOOLS, ...FILE_TOOLS])
 
 /** The reason to deny when the text a rule must scan is over the limit, or undefined when it fits. */
 const oversize = (what: string, text: string): Verdict => {
