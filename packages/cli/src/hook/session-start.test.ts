@@ -130,6 +130,14 @@ describe("the plugin root in injected text", () => {
     expect(extractRules(file)).toBe('run `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" routes`')
   })
 
+  test("extractRules inserts a root with replacement patterns literally", () => {
+    const file =
+      '<!-- holyclaude:core-rules:start -->\nrun `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`\n<!-- holyclaude:core-rules:end -->'
+    expect(extractRules(file, "/home/u/a$&b$'c")).toBe(
+      'run `"/home/u/a$&b$\'c/scripts/holyclaude"`',
+    )
+  })
+
   test("the pointer names the CLI as given", () => {
     const context = composeForState(RULES, stateWith(150), '"/opt/hc/scripts/holyclaude"')
     expect(context).toContain(

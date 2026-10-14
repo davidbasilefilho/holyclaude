@@ -127,7 +127,7 @@ export const extractRules = (agentFile: string, root?: string): string | undefin
   const end = agentFile.indexOf(RULES_END)
   if (start === -1 || end === -1 || end < start) return undefined
   const rules = agentFile.slice(start + RULES_START.length, end).trim()
-  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, root)
+  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root)
 }
 
 /**

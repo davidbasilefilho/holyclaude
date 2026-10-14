@@ -22,8 +22,8 @@ claude --plugin-dir <path-to-clone>/plugin
 ```
 
 The plugin's `settings.json` sets `agent` to `holyclaude`, so the session starts with the root
-agent. Check `/agents` for the `holyclaude:` presets, and run `holyclaude routes` in a shell to see
-each preset's model and effort.
+agent. Check `/agents` for the `holyclaude:` presets, and run `<path-to-clone>/plugin/scripts/holyclaude routes` in a
+shell to see each preset's model and effort.
 
 To install it through the marketplace route, add the marketplace and then install the plugin. In a
 session:
