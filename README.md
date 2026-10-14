@@ -60,7 +60,7 @@ fallback must not rely on the plugin's own SessionStart hook:
 - the holyclaude root agent file in `~/.claude/agents/` or `.claude/agents/`;
 - the user-level `settings.json` setting `agent` to it;
 - the presets and skills in `.claude/agents` and `.claude/skills`;
-- the CLI on `PATH` through `bun link` in `packages/cli`, replacing `bin/`;
+- the CLI on `PATH` through `bun link` in `packages/cli`, replacing `scripts/`;
 - the hooks in user or project settings.
 
 If T3 Code ignores `agent` in user settings too, the main thread stays on the default agent. Then a
@@ -149,7 +149,7 @@ scripts (`fmt`, `fmt:readonly`, `lint`, `lint:readonly`, `typecheck`, `test`) an
 ```sh
 bun install
 mise run fmt:readonly && mise run lint:readonly && mise run typecheck && mise run test
-mise run build   # rebuilds plugin/bin/holyclaude.js after core or cli changes
+mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli changes
 ```
 
 | Task                                      | What it does                                                         |
@@ -158,7 +158,7 @@ mise run build   # rebuilds plugin/bin/holyclaude.js after core or cli changes
 | `lint`, `lint:readonly`                   | Lint with fixes, or lint without them                                |
 | `typecheck`                               | Type-check the repository                                            |
 | `test`                                    | Run the test suite                                                   |
-| `build`                                   | Bundle the CLI into `plugin/bin/holyclaude.js`                       |
+| `build`                                   | Bundle the CLI into `plugin/scripts/holyclaude.js`                   |
 | `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the version in all six places and print the old and new version |
 
 Versions follow `0.X.Y-Z`: `X` is the minor, `Y` the patch and `Z` an optional hotfix. A bump
@@ -168,7 +168,7 @@ resets the later positions, so from `0.3.2-1` a minor bump gives `0.4.0`, a patc
 `.claude-plugin/marketplace.json`, and the six stay identical. Claude Code only sees a plugin update when
 the version string changes. The bump tasks refuse to run when the six disagree. After a successful bump they
 run `build`, because the CLI reads its version from `packages/cli/package.json` at build time; commit the
-rebuilt `plugin/bin/holyclaude.js` together with the version change.
+rebuilt `plugin/scripts/holyclaude.js` together with the version change.
 
 ## Third-party material
 

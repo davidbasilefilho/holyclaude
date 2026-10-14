@@ -7,7 +7,7 @@
       "specifier": "eslint-plugin-jsdoc"
     }
   ],
-  "ignorePatterns": ["plugin/bin/holyclaude.js"],
+  "ignorePatterns": ["plugin/scripts/holyclaude.js"],
   "options": {
     "typeAware": true,
     "typeCheck": true

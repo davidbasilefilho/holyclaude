@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/holyclaude\" hook session-start",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude\" hook session-start",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/holyclaude\" hook pre-tool-use",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude\" hook pre-tool-use",
             "timeout": 30
           }
         ]
