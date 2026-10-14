@@ -1,7 +1,17 @@
-/** One shell word after quote removal. `dynamic` marks text the shell computes at run time. */
+/**
+ * One shell word after quote removal. `dynamic` marks text the shell computes at run time. `open`
+ * marks the last word of a command that a `(` cut short: what follows belongs to a subshell or, in
+ * PowerShell, to an expression, so the command's remaining operands are not among its words.
+ */
 export interface Word {
   readonly text: string
   readonly dynamic: boolean
+  readonly open?: true
+  /**
+   * The word as PowerShell and cmd read it, where an unquoted backslash stays in the text, set only
+   * when that differs from `text`. A caller that judges a program or a path judges both readings.
+   */
+  readonly literal?: string
 }
 
 /** One simple command: its words and the targets of its output redirections. */
@@ -21,6 +31,17 @@ interface Heredoc {
   readonly expand: boolean
 }
 
+/**
+ * Deepest nesting of text scanned again on its own (a heredoc body's substitution, a backtick).
+ * Each level reads the rest of the script once more, so the depth bounds the scan's cost at depth
+ * times the script's length; real scripts nest two or three deep.
+ */
+const MAX_NESTING = 3
+
+// The characters after which a backslash is part of a Windows path, not an escape: bash drops it
+// (`C:\Git\cmd` is `C:Gitcmd`), PowerShell and cmd keep it.
+const KEPT_BACKSLASH = /[A-Za-z0-9_.\-~@+,%=:/\\]/
+
 const WORD_END = /[\s;&|()<>]/
 const ANSI_ESCAPES: Readonly<Record<string, string>> = {
   n: "\n",
@@ -29,6 +50,7 @@ const ANSI_ESCAPES: Readonly<Record<string, string>> = {
   a: "\u0007",
   b: "\b",
   e: "\u001b",
+  E: "\u001b",
   f: "\f",
   v: "\v",
   "\\": "\\",
@@ -36,15 +58,31 @@ const ANSI_ESCAPES: Readonly<Record<string, string>> = {
   '"': '"',
 }
 
+// The largest code point `\U` can name; a longer value is not a character, so it stays as written.
+const MAX_CODE_POINT = 0x10ffff
+
+/** The control character `\cX` names: X's code with all but its low five bits cleared, DEL for `?`. */
+const control = (char: string): string =>
+  char === "?" ? "\u007f" : String.fromCharCode(char.toUpperCase().charCodeAt(0) & 0x1f)
+
+/**
+ * Decodes the escapes of `$'...'` as bash does: `\xHH`, `\uHHHH`, `\UHHHHHHHH`, octal, `\cX` and
+ * named. `\cX` takes the character after it, two backslashes counting as one, so `\cJ` is a newline
+ * that `eval` or `bash -c` reads as the end of a command.
+ */
 const decodeAnsi = (body: string): string =>
-  body.replace(/\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|[0-7]{1,3}|.)/g, (_, code: string) =>
-    code.length > 1 && code[0] === "x"
-      ? String.fromCharCode(Number.parseInt(code.slice(1), 16))
-      : code.length > 1 && code[0] === "u"
-        ? String.fromCharCode(Number.parseInt(code.slice(1), 16))
-        : /^[0-7]+$/.test(code)
-          ? String.fromCharCode(Number.parseInt(code, 8))
-          : (ANSI_ESCAPES[code] ?? `\\${code}`),
+  body.replace(
+    /\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c(?:\\\\|[\s\S])|.)/g,
+    (whole, code: string) => {
+      if (code.length > 1 && code[0] === "c") return control(code[1] ?? "")
+      if (code.length > 1 && /[xuU]/.test(code[0] ?? "")) {
+        const point = Number.parseInt(code.slice(1), 16)
+        return point <= MAX_CODE_POINT ? String.fromCodePoint(point) : whole
+      }
+      return /^[0-7]+$/.test(code)
+        ? String.fromCharCode(Number.parseInt(code, 8))
+        : (ANSI_ESCAPES[code] ?? `\\${code}`)
+    },
   )
 
 /** Finds the `)` closing a `$(` that starts at `from`, ignoring quotes; -1 when unbalanced. */
@@ -86,9 +124,11 @@ const bodySubstitutions = (body: string): ReadonlyArray<string> => {
 /**
  * Splits a shell script into its simple commands. Pipelines, lists, subshells, command and process
  * substitutions, backticks, heredocs and quoting are understood; every simple command found at any
- * nesting depth is returned, so a caller can judge each one. Anything unterminated fails the scan.
+ * nesting depth is returned, so a caller can judge each one. Anything unterminated, or nested past
+ * {@link MAX_NESTING}, fails the scan. `nesting` counts the scans this one is inside of.
  */
-export const scanScript = (source: string): Scan => {
+export const scanScript = (source: string, nesting = 0): Scan => {
+  if (nesting > MAX_NESTING) return { ok: false, reason: "substitutions nested too deeply" }
   const commands: Simple[] = []
   const pending: Heredoc[] = []
   let failure: string | undefined
@@ -116,7 +156,7 @@ export const scanScript = (source: string): Scan => {
   }
 
   const absorb = (script: string) => {
-    const nested = scanScript(script)
+    const nested = scanScript(script, nesting + 1)
     if (nested.ok) commands.push(...nested.commands)
     else fail(nested.reason)
   }
@@ -198,6 +238,8 @@ export const scanScript = (source: string): Scan => {
     let words: Word[] = []
     let outputs: string[] = []
     let current: string | null = null
+    // The word as PowerShell and cmd read it, where an unquoted backslash is part of the text.
+    let literal = ""
     let dynamic = false
     let redirect: "out" | "in" | null = null
     let parenDepth = 0
@@ -208,11 +250,14 @@ export const scanScript = (source: string): Scan => {
     const endWord = () => {
       if (current === null) return
       const text = current
+      const windows = literal
       current = null
+      literal = ""
       const isDynamic = dynamic
       dynamic = false
-      if (redirect === "out") outputs.push(text)
-      else if (redirect === null) words.push({ text, dynamic: isDynamic })
+      if (redirect === "out") outputs.push(...(windows === text ? [text] : [text, windows]))
+      else if (redirect === null)
+        words.push({ text, dynamic: isDynamic, ...(windows === text ? {} : { literal: windows }) })
       redirect = null
     }
     const endCommand = () => {
@@ -222,8 +267,9 @@ export const scanScript = (source: string): Scan => {
       outputs = []
       redirect = null
     }
-    const append = (text: string, computed = false) => {
+    const append = (text: string, computed = false, windows = text) => {
       current = (current ?? "") + text
+      literal += windows
       if (computed) dynamic = true
     }
 
@@ -301,6 +347,7 @@ export const scanScript = (source: string): Scan => {
       const char = source[pos] ?? ""
       if (current !== null && /^\d+$/.test(current)) {
         current = null
+        literal = ""
         dynamic = false
       } else endWord()
       if (source[pos + 1] === "(") {
@@ -329,7 +376,8 @@ export const scanScript = (source: string): Scan => {
       const char = source[pos] ?? ""
       if (char === "\\") {
         const next = source[pos + 1]
-        if (next !== undefined && next !== "\n") append(next)
+        if (next !== undefined && next !== "\n")
+          append(next, false, KEPT_BACKSLASH.test(next) ? `\\${next}` : next)
         pos += 2
       } else if (char === "'") {
         const end = source.indexOf("'", pos + 1)
@@ -359,6 +407,9 @@ export const scanScript = (source: string): Scan => {
         pos += 1
       } else if (char === "<" || char === ">") redirection()
       else if (char === "(") {
+        endWord()
+        const last = words[words.length - 1]
+        if (last !== undefined) words[words.length - 1] = { ...last, open: true }
         endCommand()
         const open = source[pos + 1] === "(" ? 2 : 1
         if (open === 2 && arithmeticBase === -1) arithmeticBase = parenDepth
