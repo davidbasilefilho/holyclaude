@@ -166,7 +166,9 @@ resets the later positions, so from `0.3.2-1` a minor bump gives `0.4.0`, a patc
 `0.3.3` and a hotfix bump gives `0.3.2-2`. The version appears in the root, `packages/cli`,
 `packages/core` and `plugin` `package.json` files, in `plugin/.claude-plugin/plugin.json` and in
 `.claude-plugin/marketplace.json`, and the six stay identical. Claude Code only sees a plugin update when
-the version string changes. The bump tasks refuse to run when the six disagree.
+the version string changes. The bump tasks refuse to run when the six disagree. After a successful bump they
+run `build`, because the CLI reads its version from `packages/cli/package.json` at build time; commit the
+rebuilt `plugin/bin/holyclaude.js` together with the version change.
 
 ## Third-party material
 

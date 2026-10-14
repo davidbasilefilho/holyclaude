@@ -32,12 +32,15 @@ run = "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.
 
 [tasks."bump:minor"]
 description = "Bump the minor version in all six version files and reset patch and hotfix"
-run = "bun scripts/bump-version.ts minor"
+usage = 'arg "[root]" help "Repository root holding the six version files"'
+run = ['bun scripts/bump-version.ts minor {{usage.root | default(value="")}}', { task = "build" }]
 
 [tasks."bump:patch"]
 description = "Bump the patch version in all six version files and reset hotfix"
-run = "bun scripts/bump-version.ts patch"
+usage = 'arg "[root]" help "Repository root holding the six version files"'
+run = ['bun scripts/bump-version.ts patch {{usage.root | default(value="")}}', { task = "build" }]
 
 [tasks."bump:hotfix"]
 description = "Bump the hotfix version in all six version files"
-run = "bun scripts/bump-version.ts hotfix"
+usage = 'arg "[root]" help "Repository root holding the six version files"'
+run = ['bun scripts/bump-version.ts hotfix {{usage.root | default(value="")}}', { task = "build" }]
