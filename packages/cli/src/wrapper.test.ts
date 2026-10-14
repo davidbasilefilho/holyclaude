@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join } from "node:path"
 
@@ -26,6 +26,7 @@ const install = (name: string, withBundle: boolean) => {
   const bin = join(root, name, "bin")
   mkdirSync(bin, { recursive: true })
   copyFileSync(WRAPPER, join(bin, "holyclaude"))
+  copyFileSync(join(dirname(WRAPPER), "empty-bunfig.toml"), join(bin, "empty-bunfig.toml"))
   if (withBundle)
     writeFileSync(
       join(bin, "holyclaude.js"),
@@ -77,6 +78,30 @@ describe.skipIf(Bun.which("sh") === null)("plugin/bin/holyclaude", () => {
     expect(JSON.parse(out)).toEqual({ probe: null, argv: ["x"] })
   })
 
+  test("the common path forks nothing: the only command substitution is readlink for a symlink", async () => {
+    const lines = (await Bun.file(WRAPPER).text()).split("\n")
+    const code = lines.filter((line) => !line.trimStart().startsWith("#"))
+    expect(code.filter((line) => line.includes("$(") || line.includes("`"))).toEqual([
+      '  link=$(readlink "$self")',
+    ])
+  })
+
+  test.skipIf(process.platform === "win32")("a symlinked wrapper finds its bundle", async () => {
+    const installed = install("install", true)
+    const link = join(root, "link")
+    symlinkSync(join(installed, "bin", "holyclaude"), link)
+    const { code, out } = await run(root, "link", ["x"])
+    expect(code).toBe(0)
+    expect(JSON.parse(out)).toEqual({ probe: null, argv: ["x"] })
+  })
+
+  test("a relative invocation through a bare name finds its bundle in the working directory", async () => {
+    const installed = install("install", true)
+    const { code, out } = await run(join(installed, "bin"), "holyclaude", ["y"])
+    expect(code).toBe(0)
+    expect(JSON.parse(out)).toEqual({ probe: null, argv: ["y"] })
+  })
+
   test("without the bundle a command prints one TOON error line and exits 127", async () => {
     const installed = install("install", false)
     const { code, out, err } = await run(installed, "bin/holyclaude", ["routes"])
@@ -85,6 +110,25 @@ describe.skipIf(Bun.which("sh") === null)("plugin/bin/holyclaude", () => {
     expect(err.trimEnd().split("\n")).toHaveLength(1)
     expect(err).toStartWith('error: "BunMissing: ')
     expect(err).toContain("https://bun.sh")
+  })
+
+  test("without Bun a command exits 127 and a hook exits 0 and says nothing", async () => {
+    const installed = install("install", true)
+    const empty = join(root, "empty")
+    mkdirSync(empty)
+    const sh = Bun.which("sh") ?? "sh"
+    const script = posix(join(installed, "bin", "holyclaude"))
+    const runWithoutBun = async (args: string[]) => {
+      const result = await $`${sh} ${script} ${args}`
+        .env({ ...process.env, PATH: empty, BUN_INSTALL: posix(empty), HOME: posix(empty) })
+        .nothrow()
+        .quiet()
+      return { code: result.exitCode, out: result.stdout.toString(), err: result.stderr.toString() }
+    }
+    const command = await runWithoutBun(["routes"])
+    expect(command.code).toBe(127)
+    expect(command.err).toStartWith('error: "BunMissing: ')
+    expect(await runWithoutBun(["hook", "pre-tool-use"])).toEqual({ code: 0, out: "", err: "" })
   })
 
   test("without the bundle a hook exits 0 and says nothing", async () => {

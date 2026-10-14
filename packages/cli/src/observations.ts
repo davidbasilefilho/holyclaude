@@ -66,12 +66,25 @@ export const appendObservation = (record: ObservationRecord, path: string = obse
     Effect.andThen(Effect.tryPromise(() => appendFile(path, `${JSON.stringify(record)}\n`))),
   )
 
-/** The newest observation of an agent, if any. */
-export const latestObserved = (records: ReadonlyArray<ObservationRecord>, agentId: string) =>
-  records.findLast(
-    (record): record is typeof Observed.Type =>
-      record.kind === "observed" && record.agent_id === agentId,
-  )
+/** What the hooks have seen of one agent, each field from the newest record that carries it. */
+export type Seen = Partial<Pick<typeof Observed.Type, "agent_type" | "effort" | "transcript">>
+
+/**
+ * Combines an agent's observations field by field. Three hooks write them, each seeing different
+ * fields at different times: SubagentStart the agent type, PreToolUse the effort and a transcript
+ * path inferred from the parent's, and SubagentStop the effort and the real transcript path. So no
+ * single record is complete, and a later record wins only for the fields it carries.
+ */
+export const seenOf = (records: ReadonlyArray<ObservationRecord>, agentId: string): Seen => {
+  const seen: { -readonly [K in keyof Seen]: Seen[K] } = {}
+  for (const record of records) {
+    if (record.kind !== "observed" || record.agent_id !== agentId) continue
+    if (record.agent_type !== undefined) seen.agent_type = record.agent_type
+    if (record.effort !== undefined) seen.effort = record.effort
+    if (record.transcript !== undefined) seen.transcript = record.transcript
+  }
+  return seen
+}
 
 /** The newest per-call override recorded for an Assignment and agent, if any. */
 export const latestOverride = (

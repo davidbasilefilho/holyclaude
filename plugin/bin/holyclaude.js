@@ -7683,6 +7683,46 @@ ${text}
 });
 var rosterFingerprint = pluginRoot.pipe(flatMap2(rosterFingerprintAt));
 
+// src/hook/input.ts
+var Envelope = fromJsonString2(Record(String4, Unknown2));
+var Effort2 = Union2([
+  Struct({ level: optionalKey2(String4) }),
+  String4
+]);
+var lenient = (schema, value) => getOrUndefined(decodeUnknownOption2(schema)(value));
+var toolInput = (value) => {
+  const fields = lenient(Record(String4, Unknown2), value);
+  return fields === undefined ? undefined : {
+    command: lenient(String4, fields["command"]),
+    file_path: lenient(String4, fields["file_path"]),
+    notebook_path: lenient(String4, fields["notebook_path"])
+  };
+};
+var isAgentId = (value) => value !== undefined && value !== null && value !== "";
+var decode2 = decodeUnknownEffect2(Envelope);
+var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
+  agent: isAgentId(envelope["agent_id"]) ? { id: lenient(String4, envelope["agent_id"]) } : undefined,
+  tool_name: lenient(String4, envelope["tool_name"]),
+  tool_input: toolInput(envelope["tool_input"]),
+  agent_type: lenient(String4, envelope["agent_type"]),
+  transcript_path: lenient(String4, envelope["transcript_path"]),
+  agent_transcript_path: lenient(String4, envelope["agent_transcript_path"]),
+  effort: lenient(Effort2, envelope["effort"])
+})));
+var effortOf = (input) => {
+  const { effort } = input;
+  return typeof effort === "string" ? effort : effort?.level;
+};
+var subagentTranscript = (input) => {
+  const { transcript_path: path } = input;
+  const agent = input.agent?.id;
+  if (path === undefined || agent === undefined)
+    return;
+  if (path.includes("/subagents/"))
+    return path;
+  return `${path.replace(/\.jsonl$/, "")}/subagents/agent-${agent}.jsonl`;
+};
+
 // src/observations.ts
 import { appendFile, mkdir as mkdir2 } from "fs/promises";
 import { dirname as dirname2 } from "path";
@@ -7721,47 +7761,41 @@ var readObservations = (path = observationsPath()) => gen2(function* () {
 });
 var appendObservation = (record, path = observationsPath()) => tryPromise2(() => mkdir2(dirname2(path), { recursive: true })).pipe(andThen2(tryPromise2(() => appendFile(path, `${JSON.stringify(record)}
 `))));
-var latestObserved = (records, agentId) => records.findLast((record) => record.kind === "observed" && record.agent_id === agentId);
+var seenOf = (records, agentId) => {
+  const seen = {};
+  for (const record of records) {
+    if (record.kind !== "observed" || record.agent_id !== agentId)
+      continue;
+    if (record.agent_type !== undefined)
+      seen.agent_type = record.agent_type;
+    if (record.effort !== undefined)
+      seen.effort = record.effort;
+    if (record.transcript !== undefined)
+      seen.transcript = record.transcript;
+  }
+  return seen;
+};
 var latestOverride = (records, assignmentId, agentId) => records.findLast((record) => record.kind === "override" && record.assignment_id === assignmentId && record.agent_id === agentId);
 
-// src/hook/input.ts
-var Envelope = fromJsonString2(Record(String4, Unknown2));
-var Effort2 = Union2([
-  Struct({ level: optionalKey2(String4) }),
-  String4
-]);
-var lenient = (schema, value) => getOrUndefined(decodeUnknownOption2(schema)(value));
-var toolInput = (value) => {
-  const fields = lenient(Record(String4, Unknown2), value);
-  return fields === undefined ? undefined : {
-    command: lenient(String4, fields["command"]),
-    file_path: lenient(String4, fields["file_path"]),
-    notebook_path: lenient(String4, fields["notebook_path"])
+// src/hook/observe.ts
+var OBSERVATION_BUDGET = "750 millis";
+var observe = (agentId, sighting) => gen2(function* () {
+  const seen = {
+    ...sighting.agent_type ? { agent_type: sighting.agent_type } : {},
+    ...sighting.effort ? { effort: sighting.effort } : {},
+    ...sighting.transcript ? { transcript: sighting.transcript } : {}
   };
-};
-var isAgentId = (value) => value !== undefined && value !== null && value !== "";
-var decode2 = decodeUnknownEffect2(Envelope);
-var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
-  agent: isAgentId(envelope["agent_id"]) ? { id: lenient(String4, envelope["agent_id"]) } : undefined,
-  tool_name: lenient(String4, envelope["tool_name"]),
-  tool_input: toolInput(envelope["tool_input"]),
-  agent_type: lenient(String4, envelope["agent_type"]),
-  transcript_path: lenient(String4, envelope["transcript_path"]),
-  effort: lenient(Effort2, envelope["effort"])
-})));
-var effortOf = (input) => {
-  const { effort } = input;
-  return typeof effort === "string" ? effort : effort?.level;
-};
-var subagentTranscript = (input) => {
-  const { transcript_path: path } = input;
-  const agent = input.agent?.id;
-  if (path === undefined || agent === undefined)
+  const known = seenOf(yield* readObservations(), agentId);
+  const keys = Object.keys(seen);
+  if (keys.every((key) => seen[key] === known[key]))
     return;
-  if (path.includes("/subagents/"))
-    return path;
-  return `${path.replace(/\.jsonl$/, "")}/subagents/agent-${agent}.jsonl`;
-};
+  yield* appendObservation({
+    kind: "observed",
+    agent_id: agentId,
+    ...seen,
+    at: yield* nowIso
+  });
+}).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
 
 // src/hook/shell.ts
 var MAX_NESTING = 3;
@@ -8863,6 +8897,7 @@ var denyReason = (command) => classifyScript(command, 0);
 var UNREADABLE = REASONS.unsure("it is nested too deeply to read");
 var SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
 var FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var JUDGED_TOOLS = new Set([...SHELL_TOOLS, ...FILE_TOOLS]);
 var oversize = (what, text) => {
   const bytes = Buffer.byteLength(text);
   return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined;
@@ -8889,7 +8924,6 @@ var denyToolReason = (toolName, input) => {
 };
 
 // src/hook/pre-tool-use.ts
-var OBSERVATION_BUDGET = "750 millis";
 var MAX_REASON_CHARS = 1000;
 var deny = (reason) => JSON.stringify({
   hookSpecificOutput: {
@@ -8897,24 +8931,6 @@ var deny = (reason) => JSON.stringify({
     permissionDecision: "deny",
     permissionDecisionReason: reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS)}...` : reason
   }
-});
-var observe = (input, agentId) => gen2(function* () {
-  const effort = effortOf(input);
-  const transcript = subagentTranscript(input);
-  if (effort === undefined && input.agent_type === undefined && transcript === undefined)
-    return;
-  const known = latestObserved(yield* readObservations(), agentId);
-  if (known !== undefined && known.effort === effort && known.agent_type === input.agent_type && known.transcript === transcript)
-    return;
-  const record = {
-    kind: "observed",
-    agent_id: agentId,
-    ...input.agent_type ? { agent_type: input.agent_type } : {},
-    ...effort ? { effort } : {},
-    ...transcript ? { transcript } : {},
-    at: yield* nowIso
-  };
-  yield* appendObservation(record);
 });
 var preToolUse = (stdin) => gen2(function* () {
   const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
@@ -8925,7 +8941,11 @@ var preToolUse = (stdin) => gen2(function* () {
     return "";
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
   if (agent.id !== undefined)
-    yield* observe(input, agent.id).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
+    yield* observe(agent.id, {
+      agent_type: input.agent_type,
+      effort: effortOf(input),
+      transcript: subagentTranscript(input)
+    });
   return reason === undefined ? "" : deny(reason);
 });
 
@@ -9566,6 +9586,22 @@ var sessionStart = gen2(function* () {
   });
 });
 
+// src/hook/subagent.ts
+var record2 = (stdin, sighting) => gen2(function* () {
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const agentId = input?.agent?.id;
+  if (input !== undefined && agentId !== undefined)
+    yield* observe(agentId, sighting(input));
+  return "";
+});
+var subagentStart = (stdin) => record2(stdin, (input) => ({ agent_type: input.agent_type }));
+var subagentStop = (stdin) => record2(stdin, (input) => ({
+  effort: effortOf(input),
+  transcript: input.agent_transcript_path
+}));
+
 // src/state.ts
 var loadStateFile = suspend2(() => {
   const path = stateFilePath();
@@ -9606,8 +9642,8 @@ var verifyAssignment = (id) => gen2(function* () {
     effort: override?.effort ?? route.effort,
     agent_type: `${PLUGIN_NAME}:${assignment.role}`
   };
-  const seen = latestObserved(records, agentId);
-  const models = seen?.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
+  const seen = seenOf(records, agentId);
+  const models = seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
   const observedModel = models.length === 0 ? undefined : models.join("|");
   const rows = [
     {
@@ -9619,14 +9655,14 @@ var verifyAssignment = (id) => gen2(function* () {
     {
       field: "effort",
       expected: expected.effort,
-      observed: seen?.effort ?? "unobserved",
-      status: compare(expected.effort, seen?.effort)
+      observed: seen.effort ?? "unobserved",
+      status: compare(expected.effort, seen.effort)
     },
     {
       field: "agent_type",
       expected: expected.agent_type,
-      observed: seen?.agent_type ?? "unobserved",
-      status: compare(expected.agent_type, seen?.agent_type, (want, got) => got === want || got.endsWith(`:${assignment.role}`))
+      observed: seen.agent_type ?? "unobserved",
+      status: compare(expected.agent_type, seen.agent_type, (want, got) => got === want || got.endsWith(`:${assignment.role}`))
     }
   ];
   const verdict = rows.some((r) => r.status === "mismatch") ? "mismatch" : rows.some((r) => r.status === "unobserved") ? "incomplete" : "ok";
@@ -10023,6 +10059,28 @@ var hookPreToolUse = cmd({
   positionals: 0,
   run: (_args, stdin) => stdin.pipe(flatMap2(preToolUse), map4((text) => ({ text })))
 });
+var hookSubagentStart = cmd({
+  path: ["hook", "subagent-start"],
+  usage: "hook subagent-start",
+  summary: "SubagentStart hook: observe the agent type",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) => stdin.pipe(flatMap2(subagentStart), map4((text) => ({ text })))
+});
+var hookSubagentStop = cmd({
+  path: ["hook", "subagent-stop"],
+  usage: "hook subagent-stop",
+  summary: "SubagentStop hook: observe the effort and transcript path, never block",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) => stdin.pipe(flatMap2(subagentStop), map4((text) => ({ text })))
+});
 var COMMANDS = [
   intentShow,
   intentCreate,
@@ -10043,7 +10101,9 @@ var COMMANDS = [
   reconcileResolve,
   reconcileList,
   hookSessionStart,
-  hookPreToolUse
+  hookPreToolUse,
+  hookSubagentStart,
+  hookSubagentStop
 ].toSorted((a, b) => b.path.length - a.path.length);
 
 // src/main.ts

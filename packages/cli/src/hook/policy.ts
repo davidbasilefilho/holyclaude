@@ -796,6 +796,12 @@ export const UNREADABLE = REASONS.unsure("it is nested too deeply to read")
 const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
 const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
 
+/**
+ * The tools the guard judges. The plugin's hooks.json matcher must list all of them, since a tool
+ * the matcher leaves out never reaches the guard.
+ */
+export const JUDGED_TOOLS: ReadonlySet<string> = new Set([...SHELL_TOOLS, ...FILE_TOOLS])
+
 /** The reason to deny when the text a rule must scan is over the limit, or undefined when it fits. */
 const oversize = (what: string, text: string): Verdict => {
   const bytes = Buffer.byteLength(text)
