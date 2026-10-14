@@ -446,6 +446,8 @@ describe("a judgement has a bound on its work", () => {
       "a hashtable value of many }",
       fill("a} ", "").replace(/^/, "Start-Process notepad -WorkingDirectory @{").slice(0, MIB),
     ],
+    ["unknown powershell parameters", "powershell " + fill("-x ", "git status").slice(11)],
+    ["glued cmd switches", "cmd " + fill("/q", "/c git status").slice(4)],
   ]
   for (const [name, command] of SHAPES) {
     test(`${name}, at 1 MiB, is decided in under three seconds`, () => {
@@ -680,5 +682,100 @@ describe("the work budget belongs to one judgement", () => {
     expect(overBudget(first, 1)).toBe(true)
     expect(second.left).toBe(WORK_LIMIT)
     expect(overBudget(second, 1)).toBe(false)
+  })
+})
+
+describe("a script block or a command run in the current scope", () => {
+  test("is judged where it stands, braces glued or not", () => {
+    expectDenied(
+      ". git commit -m x",
+      ".{ git push }",
+      ".{git push}",
+      "{git push}",
+      "&{git push}",
+      'powershell -c "& {git push}"',
+      'powershell ". git push"',
+    )
+    expectAllowed("&{git status}", ". { git status }", ". ./script.sh", "{git status}")
+  })
+})
+
+describe("cmd's switches", () => {
+  test("may be glued together and to the command", () => {
+    expectDenied(
+      "cmd /q/c git push",
+      "cmd /cgit push",
+      'cmd /c"git push"',
+      "cmd //c git push",
+      "cmd /v:on/c git push",
+      "cmd /cC:\\Git\\cmd\\git.exe push",
+      "cmd /c call git push",
+      "call git push",
+    )
+    expectAllowed("cmd /cgit status", "cmd /q/c git status", "cmd /path/to/cgit push", "cmd /k")
+  })
+})
+
+describe("powershell's parameters before the command", () => {
+  test("are read past with their values", () => {
+    expectDenied(
+      "powershell -ep Bypass git push",
+      "powershell -ExecutionPolicy Bypass -NoProfile git push",
+      "pwsh -wd C:/repo -nop git push",
+      "powershell -Unknown Value git push",
+      "powershell -Unknown git push",
+    )
+    expectAllowed(
+      "powershell -ep Bypass git status",
+      "powershell -ep Bypass -File x.ps1",
+      "powershell -NoProfile",
+    )
+  })
+})
+
+describe("wt's subcommands after a ; that cmd hands to wt", () => {
+  test("start a command of their own", () => {
+    expectDenied(
+      'cmd /c "wt nt cmd /c git status ; sp cmd /c git push"',
+      'cmd /c "wt nt git status ; new-tab git push"',
+      "split-pane -H git push",
+    )
+    expectAllowed('cmd /c "wt nt cmd /c git status ; sp cmd /c git status"')
+  })
+})
+
+describe("the git program a subcommand runs", () => {
+  test("is judged as that subcommand", () => {
+    expectDenied("git-commit -m x", "/usr/lib/git-core/git-receive-pack repo", "git-push origin")
+    expectAllowed("git-log -1", "git-status")
+  })
+})
+
+describe("variables that make git run a program, set for a launched program", () => {
+  test("are refused in Start-Process -Environment", () => {
+    expectDenied(
+      "Start-Process -Environment @{GIT_PAGER='x'} git log",
+      "Start-Process git -Environment @{GIT_SSH_COMMAND='x'} fetch",
+      "Start-Process git -Environment @{ 'GIT_PAGER' = 'x' } log",
+      "Start-Process git -Environment:@{GIT_PAGER='x'} log",
+    )
+    expectAllowed(
+      "Start-Process git -Environment @{LANG='C'} log",
+      "Start-Process git -Environment $vars log",
+    )
+  })
+
+  test("are refused through setenv, setx and PowerShell's env: drive", () => {
+    expectDenied(
+      "setenv GIT_PAGER x",
+      "setx GIT_PAGER x",
+      "setx /M GIT_SSH_COMMAND x",
+      "Set-Item env:GIT_PAGER x; git log",
+      "Set-Item -Path Env:GIT_PAGER -Value x",
+      "New-Item -Path Env:\\GIT_PAGER -Value x",
+      "si env:GIT_EXTERNAL_DIFF x",
+      "GIT_ALLOW_PROTOCOL=ext git fetch 'ext::sh -c x'",
+    )
+    expectAllowed("setx LANG C", "Set-Item env:LANG C; git log", "Get-Item env:GIT_PAGER")
   })
 })

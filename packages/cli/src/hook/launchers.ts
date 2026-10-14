@@ -37,6 +37,8 @@ export interface Judge {
   readonly unsure: (why: string) => string
   /** The reason to deny a text over the size the policy scans, or undefined when it fits. */
   readonly oversize: (text: string) => Verdict
+  /** The reason to deny setting the environment variable `name`, or undefined when it may be set. */
+  readonly variable: (name: string) => Verdict
   /** Judges the words of one command. */
   readonly words: (words: ReadonlyArray<Word>, depth: number, budget: Budget) => Verdict
   /** Judges the text of a script, every command in it. */
@@ -220,6 +222,34 @@ const afterHashtable = (
 }
 
 /**
+ * The reason to deny the -Environment value of Start-Process that starts at `valueAt`: it sets a
+ * variable the policy refuses for the program, as `@{GIT_PAGER='x'}` does. A hashtable spreads over
+ * the words up to its `}`, and the `}` that ends it cannot be told from one in a quote, so every
+ * name in the words from its start up to the last `}` is judged, and a value that is not a
+ * hashtable is judged alone.
+ */
+const environmentOf = (
+  judge: Judge,
+  words: ReadonlyArray<Word>,
+  valueAt: number,
+  inline: Word | undefined,
+): Verdict => {
+  const value = inline ?? words[valueAt]
+  if (value === undefined) return undefined
+  let end = valueAt
+  if (value.text.startsWith("@{"))
+    for (let index = valueAt; index < words.length; index += 1)
+      if (words[index]?.text.includes("}") === true) end = index
+  const texts = [value.text, ...words.slice(valueAt + 1, end + 1).map((word) => word.text)]
+  for (const text of texts)
+    for (const [name] of text.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
+      const verdict = judge.variable(name)
+      if (verdict !== undefined) return verdict
+    }
+  return undefined
+}
+
+/**
  * `Start-Process git -ArgumentList 'commit'` runs the program it names with the arguments it lists,
  * so the program and its arguments are judged as the command they make. The program is the
  * -FilePath value or the first operand; the arguments are the -ArgumentList value and the operands
@@ -266,6 +296,10 @@ const classifyStartProcess = (
       if (inline === undefined) index += 1
     } else if (isStartFlag(name, START_VALUED)) {
       const valueAt = inline === undefined ? index + 1 : index
+      if (isStartFlag(name, ["environment"])) {
+        const verdict = environmentOf(judge, words, valueAt, inline)
+        if (verdict !== undefined) return verdict
+      }
       if ((inline ?? words[index + 1])?.text.startsWith("@{") === true)
         return afterHashtable(judge, words, index, valueAt, depth, budget)
       if (inline === undefined) index += 1
@@ -496,6 +530,8 @@ const launchersNamed = (names: ReadonlyArray<string>, launcher: Launcher) =>
 export const LAUNCHERS: Readonly<Record<string, Launcher>> = Object.fromEntries([
   ...launchersNamed(["start-process", "saps", "start"], startProcess),
   ...["wsl", "conhost", "wt"].map((name) => [name, hosted(name)] as const),
+  // Windows Terminal's subcommands, where cmd hands wt its `;` and a command starts with one.
+  ...launchersNamed([...TERMINAL_SUBCOMMANDS], hosted("wt")),
   ...launchersNamed(
     ["invoke-command", "icm", "start-job", "sajb", "start-threadjob"],
     classifyScriptBlock,

@@ -132,8 +132,8 @@ which review Assignments call; it is neither vendored nor wrapped.
 ## Limits
 
 - The worker VCS-write hook is a guardrail for well-meaning workers, not a sandbox. Interpreters,
-  scripts and PowerShell script blocks other than those given to Invoke-Command (icm), Start-Job
-  (sajb) and Start-ThreadJob are out of its reach. Writes into `.holyclaude` and `.git` are refused
+  scripts and PowerShell script blocks other than those run in place (`& { }`, `. { }`) or given to
+  Invoke-Command (icm), Start-Job (sajb) and Start-ThreadJob are out of its reach. Writes into `.holyclaude` and `.git` are refused
   by the path a command names, either separator and any case, and by every path a wildcard or brace
   list in it can expand to; a path computed at run time (a variable, a substitution) or reached by
   a relative path after `cd` is out of its reach.

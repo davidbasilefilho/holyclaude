@@ -125,9 +125,26 @@ const GIT_EXEC_FLAGS =
  * Variables that only locate or shape a read (GIT_DIR, LANG) are not listed.
  */
 const GIT_EXEC_ENV =
-  /^(git_(external_diff|pager|ssh|ssh_command|askpass|proxy_command|exec_path|config(_(count|parameters|global|system|(key|value)_\d+))?)|pager|ssh_askpass)$/i
+  /^(git_(external_diff|pager|ssh|ssh_command|askpass|proxy_command|exec_path|allow_protocol|config(_(count|parameters|global|system|(key|value)_\d+))?)|pager|ssh_askpass)$/i
 /** Commands that set the environment of the shell or of later commands from their arguments. */
 const ENV_SETTERS = new Set(["export", "declare", "typeset", "readonly", "local", "set"])
+/** Commands that take a variable's name and its value as two words: csh's setenv, Windows' setx. */
+const ENV_NAMERS = new Set(["setenv", "setx"])
+/** PowerShell commands that write an item, which `env:NAME` makes an environment variable. */
+const ITEM_WRITERS = new Set([
+  "set-item",
+  "si",
+  "new-item",
+  "ni",
+  "copy-item",
+  "cpi",
+  "rename-item",
+  "rni",
+  "set-content",
+  "sc",
+  "add-content",
+  "ac",
+])
 
 const BRANCH_FLAGS = new Set([
   "-l",
@@ -235,6 +252,9 @@ const WRAPPERS: Readonly<Record<string, Wrapper>> = {
   taskset: { values: [], leading: 1 },
   flock: { values: ["-w", "-E"], leading: 1, script: ["-c", "--command"] },
   busybox: { values: [], leading: 0 },
+  // cmd's `call`, and PowerShell's `.`, which runs a command in the current scope.
+  call: { values: [], leading: 0 },
+  ".": { values: [], leading: 0 },
 }
 
 // Under xargs the input appends arguments the command line does not show. Judging the command
@@ -803,13 +823,62 @@ const classifyShell = (rest: ReadonlyArray<Word>, depth: number, budget: Budget)
 const isFlagFor = (text: string, full: string) =>
   /^[-/][A-Za-z]+$/.test(text) && full.startsWith(text.slice(1).toLowerCase())
 
+// The parameters of powershell and pwsh that come before the command: switches, and those that take
+// a value. Either may be written as any start of its name.
+const POWERSHELL_SWITCHES = [
+  "noprofile",
+  "nologo",
+  "noninteractive",
+  "noexit",
+  "sta",
+  "mta",
+  "login",
+  "interactive",
+]
+const POWERSHELL_VALUED = [
+  "executionpolicy",
+  "ep",
+  "windowstyle",
+  "outputformat",
+  "inputformat",
+  "version",
+  "psconsolefile",
+  "configurationname",
+  "workingdirectory",
+  "wd",
+  "custompipename",
+  "settingsfile",
+]
+// Parameters whose value is not the command line: an encoded command and a script file.
+const POWERSHELL_OTHER = ["encodedcommand", "file"]
+
 /**
  * `powershell -Command TEXT` and `pwsh -c TEXT` run the rest of the line. Without a command flag
- * the first operand starts the command, as in `powershell git push`.
+ * the first operand starts the command, as in `powershell git push`, past the parameters before it
+ * and their values (`-ExecutionPolicy Bypass`). A parameter that is not known may take a value or
+ * not, so both readings are judged.
  */
 const classifyPowerShell = (rest: ReadonlyArray<Word>, depth: number, budget: Budget): Verdict => {
+  if (depth > MAX_DEPTH) return REASONS.unsure("commands nested too deeply")
+  if (overBudget(budget, rest.length)) return TOO_LARGE
   const flagged = rest.findIndex((word) => isFlagFor(word.text, "command"))
-  const start = flagged === -1 ? rest.findIndex((word) => !word.text.startsWith("-")) : flagged + 1
+  let start = flagged === -1 ? -1 : flagged + 1
+  for (let index = 0; flagged === -1 && index < rest.length; index += 1) {
+    const text = rest[index]?.text ?? ""
+    const named = (names: ReadonlyArray<string>) => names.some((full) => isFlagFor(text, full))
+    if (!text.startsWith("-")) {
+      start = index
+      break
+    }
+    if (named(POWERSHELL_VALUED)) index += 1
+    else if (!named(POWERSHELL_SWITCHES) && !named(POWERSHELL_OTHER)) {
+      const without = (count: number) => [...rest.slice(0, index), ...rest.slice(index + count)]
+      return (
+        classifyPowerShell(without(1), depth + 1, budget) ??
+        classifyPowerShell(without(2), depth + 1, budget)
+      )
+    }
+  }
   const flags = start === -1 ? rest : rest.slice(0, start)
   if (flags.some((word) => isFlagFor(word.text, "encodedcommand")))
     return REASONS.unsure("an encoded PowerShell command")
@@ -818,10 +887,26 @@ const classifyPowerShell = (rest: ReadonlyArray<Word>, depth: number, budget: Bu
   return classifyLine(rest.slice(start), depth, budget)
 }
 
+// cmd's switches up to the one that runs a command (/c, /k or /r), which takes the rest of the line.
+// Switches may be glued together (`/q/c`), and to the command (`/cgit push`); `//c` is how MSYS
+// bash passes `/c` to a Windows program.
+const CMD_RUN = /^(?:\/+(?:[adqsuxy]|[eftv]:\w*))*\/+[ckr]|^-[ckr]$/i
+
 /** `cmd /c TEXT` runs the rest of the line. */
 const classifyCmd = (rest: ReadonlyArray<Word>, depth: number, budget: Budget): Verdict => {
-  const flagged = rest.findIndex((word) => /^(\/\/?|-)[ckr]$/i.test(word.text))
-  return flagged === -1 ? undefined : classifyLine(rest.slice(flagged + 1), depth, budget)
+  for (const [index, word] of rest.entries()) {
+    const run = CMD_RUN.exec(word.text)?.[0]
+    if (run === undefined) continue
+    // A switch holds no backslash, so it is as long in both readings of the word.
+    const glued = word.text.slice(run.length)
+    const literal = word.literal?.slice(run.length)
+    const line =
+      glued === ""
+        ? []
+        : [{ text: glued, dynamic: word.dynamic, ...(literal === undefined ? {} : { literal }) }]
+    return classifyLine([...line, ...rest.slice(index + 1)], depth, budget)
+  }
+  return undefined
 }
 
 /** The index of the first word from `from` that is neither a flag nor a flag's value. */
@@ -858,6 +943,24 @@ const classifyRuntime = (
   return runner ? classifyWords(rest.slice(at), depth + 1, budget) : undefined
 }
 
+/**
+ * The reason to deny a command that sets a variable of {@link GIT_EXEC_ENV}: `export NAME=value`,
+ * `setenv NAME value`, `setx NAME value`, or a PowerShell item at `env:NAME`.
+ */
+const environmentReason = (name: string, rest: ReadonlyArray<Word>): Verdict => {
+  for (const word of rest) {
+    const text = word.text
+    const at = ITEM_WRITERS.has(name) ? text.toLowerCase().lastIndexOf("env:") : -1
+    const variable = at === -1 ? text : text.slice(at + "env:".length).replace(/^[\\/]/, "")
+    if (ENV_SETTERS.has(name)) {
+      const verdict = classifyAssignment(text)
+      if (verdict !== undefined) return verdict
+    } else if ((ENV_NAMERS.has(name) || at !== -1) && GIT_EXEC_ENV.test(variable))
+      return REASONS.env(variable)
+  }
+  return undefined
+}
+
 const classifyWords = (input: ReadonlyArray<Word>, depth: number, budget: Budget): Verdict => {
   // Wrappers, find -exec and package runners nest like scripts do, and no real command needs more.
   if (depth > MAX_DEPTH) return REASONS.unsure("commands nested too deeply")
@@ -885,15 +988,18 @@ const classifyWords = (input: ReadonlyArray<Word>, depth: number, budget: Budget
     const verdict = classifyWords([windows, ...rest], depth, budget)
     if (verdict !== undefined) return verdict
   }
+  // A script block run where it stands: `.{ git push }`, `&{git push}`, `{git push}`.
+  if (!head.dynamic && /^[.&]?\{/.test(head.text)) {
+    const block = { text: head.text.replace(/^[.&]/, ""), dynamic: false }
+    return LAUNCHERS["invoke-command"]?.(judge, [head, block, ...rest], depth, budget)
+  }
   const name = programOf(head)
   if (name === undefined) return REASONS.unsure("the program name is computed")
-  if (ENV_SETTERS.has(name)) {
-    for (const word of rest) {
-      const verdict = classifyAssignment(word.text)
-      if (verdict !== undefined) return verdict
-    }
-  }
+  const variable = environmentReason(name, rest)
+  if (variable !== undefined) return variable
   if (name === "git") return classifyGit(rest)
+  // `git-commit` is the program git runs for `git commit`.
+  if (name.startsWith("git-")) return classifyGitSub(name.slice(4), rest)
   if (name === "gh") return classifyGh(rest)
   if (HOLYCLAUDE.test(name)) return classifyHolyclaude(rest)
   const launcher = Object.hasOwn(LAUNCHERS, name) ? LAUNCHERS[name] : undefined
@@ -955,6 +1061,7 @@ const judge: Judge = {
   maxDepth: MAX_DEPTH,
   unsure: REASONS.unsure,
   oversize: (text) => oversize("command", text),
+  variable: (name) => (GIT_EXEC_ENV.test(name) ? REASONS.env(name) : undefined),
   words: classifyWords,
   script: classifyScript,
   simple: classifySimple,
