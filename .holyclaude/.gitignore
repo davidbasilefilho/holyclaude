@@ -1,0 +1,6 @@
+/local/
+*.tmp
+/state.json.migrated
+/state.json
+/state.json.lock*
+/state.observations.jsonl

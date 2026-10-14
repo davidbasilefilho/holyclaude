@@ -22,13 +22,20 @@ const HINTS: Readonly<Record<string, string>> = {
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence:
     "Cover exactly the declared labels in criteria_evidence and required_evidence.",
-  TooLarge: "Shorten the input to fit the limit.",
+  TooLarge:
+    "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
   StateLocked:
     "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
-  StateIo: "Check HOLYCLAUDE_STATE_FILE or CLAUDE_PROJECT_DIR and the file permissions.",
-  StateCorrupt:
-    "Fix the field the message names in the state file, or restore the file from a backup; a missing file reads as empty state.",
+  StateIo: "Check HOLYCLAUDE_STATE_DIR or CLAUDE_PROJECT_DIR and the file permissions.",
+  SymlinkRefused:
+    "Replace the symbolic link the message names with a real file or directory, or review why the repository has one; the state directory must hold none.",
+  MigratedFileInTheWay:
+    "Move the state.json.migrated the message names out of the folder (or delete it if you no longer need it), then rerun; the old state.json is still in place.",
+  OwnedElsewhere:
+    "Another clone reserved this Assignment. Settle it from there, or with `holyclaude reconcile resolve <id>` once you have evidence about its worker.",
+  CorruptRecord:
+    "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError:
     "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
   NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
