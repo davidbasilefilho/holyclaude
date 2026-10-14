@@ -52,8 +52,10 @@ const smallestId = (workers: ReadonlyArray<Worker>): Worker | undefined =>
 
 /**
  * Why a registered worker may not take the Assignment, or undefined when it may: it must be the
- * same specialist with an unchanged fingerprint and idle, and for review work its whole history
- * must be independent from the work under review. Selection and binding share this rule.
+ * same specialist, one that does not run on Haiku, with an unchanged fingerprint and idle, and for
+ * review work its whole history must be independent from the work under review. A Haiku specialist
+ * always gets a new worker, since a follow-up rereads a context it has grown. Selection and binding
+ * share this rule.
  */
 export const reuseProblem = (
   state: State,
@@ -63,6 +65,8 @@ export const reuseProblem = (
 ): string | undefined => {
   if (worker.preset !== next.role)
     return `${worker.agent_id} is a ${worker.preset}, not a ${next.role}`
+  if (routeFor(next.role).model === "haiku")
+    return `${next.role} runs on Haiku, so every Assignment gets a new worker`
   if (worker.fingerprint !== fingerprint)
     return `${worker.agent_id} was launched with a different roster or tools`
   if (!isIdle(state, worker))

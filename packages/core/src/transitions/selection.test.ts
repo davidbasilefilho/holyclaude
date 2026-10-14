@@ -82,4 +82,19 @@ describe("selectWorker", () => {
     )
     expect(selection).toEqual({ _tag: "Spawn" })
   })
+
+  test("reuses an idle Sonnet specialist and never an idle Haiku one", async () => {
+    const select = (role: Assignment["role"]) =>
+      Effect.runPromise(
+        selectWorker(
+          stateWith(
+            [row("assignment-0001", "Succeeded"), { ...row("assignment-0002", "Ready"), role }],
+            [{ ...worker(["assignment-0001"]), preset: role }],
+          ),
+          { assignment_id: "assignment-0002", fingerprint: "roster:a" },
+        ),
+      )
+    expect(await select("Worker.implementation")).toMatchObject({ _tag: "Reuse" })
+    expect(await select("Worker.mechanical")).toEqual({ _tag: "Spawn" })
+  })
 })

@@ -7397,20 +7397,20 @@ var spec = (mutability, capabilities, independence, model, effort) => ({ mutabil
 var SPECS = {
   "Explorer.map": spec("ReadOnly", [], "DisjointWrites", "haiku", "medium"),
   "Explorer.lookup": spec("ReadOnly", [], "DisjointWrites", "haiku", "medium"),
-  "Explorer.trace": spec("ReadOnly", [], "DependenciesTerminal", "sonnet", "high"),
+  "Explorer.trace": spec("ReadOnly", [], "DependenciesTerminal", "sonnet", "medium"),
   "Librarian.lookup": spec("ReadOnly", ["Search"], "DisjointWrites", "haiku", "medium"),
-  "Librarian.research": spec("ReadOnly", ["Search"], "DependenciesTerminal", "sonnet", "high"),
+  "Librarian.research": spec("ReadOnly", ["Search"], "DependenciesTerminal", "sonnet", "medium"),
   "Worker.mechanical": spec("ScopedWrite", ["Write"], "DisjointWrites", "haiku", "high"),
   "Worker.implementation": spec("ScopedWrite", ["Write"], "DisjointWrites", "sonnet", "high"),
   "Worker.integration": spec("ScopedWrite", ["Write"], "DependenciesTerminal", "sonnet", "high"),
   "Worker.operations": spec("ScopedWrite", ["Shell"], "DisjointWrites", "haiku", "high"),
   "Worker.validation": spec("ReadOnly", ["Shell"], "DependenciesTerminal", "haiku", "high"),
-  "Worker.debugging": spec("ScopedWrite", ["Write"], "DependenciesTerminal", "sonnet", "xhigh"),
+  "Worker.debugging": spec("ScopedWrite", ["Write"], "DependenciesTerminal", "sonnet", "high"),
   "Worker.visual": spec("ScopedWrite", ["Write", "VisualInspection"], "DisjointWrites", "sonnet", "high"),
   "Reviewer.code": spec("ReadOnly", [], "IndependentReview", "sonnet", "high"),
-  "Reviewer.testing": spec("ReadOnly", ["Shell"], "IndependentReview", "sonnet", "high"),
-  "Reviewer.audit": spec("ReadOnly", [], "IndependentReview", "sonnet", "medium"),
-  "Reviewer.security": spec("ReadOnly", [], "IndependentReview", "sonnet", "xhigh"),
+  "Reviewer.testing": spec("ReadOnly", ["Shell"], "IndependentReview", "sonnet", "medium"),
+  "Reviewer.audit": spec("ReadOnly", [], "IndependentReview", "haiku", "high"),
+  "Reviewer.security": spec("ReadOnly", [], "IndependentReview", "sonnet", "high"),
   "Reviewer.artifact": spec("ReadOnly", [], "IndependentReview", "haiku", "high"),
   "Reviewer.visual": spec("ReadOnly", ["VisualInspection"], "IndependentReview", "sonnet", "high")
 };
@@ -7921,6 +7921,8 @@ var smallestId = (workers) => workers.toSorted((a, b) => a.agent_id < b.agent_id
 var reuseProblem = (state, worker, next, fingerprint) => {
   if (worker.preset !== next.role)
     return `${worker.agent_id} is a ${worker.preset}, not a ${next.role}`;
+  if (routeFor(next.role).model === "haiku")
+    return `${next.role} runs on Haiku, so every Assignment gets a new worker`;
   if (worker.fingerprint !== fingerprint)
     return `${worker.agent_id} was launched with a different roster or tools`;
   if (!isIdle(state, worker))
