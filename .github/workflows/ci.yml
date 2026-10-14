@@ -44,9 +44,10 @@ jobs:
         run: |
           mise run build
           # Porcelain output is non-empty when the bundle is modified, untracked or ignored.
-          status="$(git status --porcelain --ignored -- plugin/bin/holyclaude.js)"
+          # The glob follows the bundle wherever the build task writes it under plugin/.
+          status="$(git status --porcelain --ignored -- 'plugin/*/holyclaude.js')"
           if [ -n "$status" ]; then
             echo "$status"
-            echo "::error file=plugin/bin/holyclaude.js::The committed bundle is stale. Run 'mise run build' and commit plugin/bin/holyclaude.js."
+            echo "::error::The committed bundle is stale. Run 'mise run build' and commit the bundle it writes under plugin/."
             exit 1
           fi
