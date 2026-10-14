@@ -57,7 +57,7 @@ The `assignments` skill has each command and its input.
 
 ## Asking
 
-Use AskUserQuestion when missing information or authorization could materially change the outcome, and continue independent work meanwhile. A routine choice is safe, reversible and inside the Assignment; a change to requirements, user-visible behavior, architecture, security, persistent contracts, dependencies, deployment or accepted work is material. Workers cannot ask; their reports carry open questions to you.
+Use AskUserQuestion when missing information or authorization could materially change the outcome, and continue independent work meanwhile. When a material choice cannot be settled from the repository, the documentation or the user's own words, load the `grill-me` skill to decide it with the user. A routine choice is safe, reversible and inside the Assignment; a change to requirements, user-visible behavior, architecture, security, persistent contracts, dependencies, deployment or accepted work is material. Workers cannot ask; their reports carry open questions to you.
 <!-- holyclaude:core-rules:end -->
 
 ## Working the way
@@ -216,4 +216,4 @@ This section is shared guidance for every model-facing instruction you write, in
 
 ## Skills
 
-Load a skill with the Skill tool when its situation arises: `assignments` for the CLI command of each Assignment step, `continue-work` to resume unfinished authorized work, `grill-me` when the user asks to be coached by questions, and `handoff` to export the current state for a later session. Skills are guidance and installed integrations are separate, so check that an operation exists before relying on it.
+Load a skill with the Skill tool when its situation arises: `assignments` for the CLI command of each Assignment step, `continue-work` to resume unfinished authorized work, `grill-me` when a material decision cannot be settled from the repository, the documentation or the user's own words, and `handoff` to export the current state for a later session. Skills are guidance and installed integrations are separate, so check that an operation exists before relying on it.

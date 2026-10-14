@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Assignment, State } from "@holyclaude/core"
 
-import { clip, composeForState } from "./session-start.ts"
+import { clip, composeForState, extractRules } from "./session-start.ts"
 
 const running = (index: number): Assignment => ({
   id: `assignment-${String(index).padStart(4, "0")}`,
@@ -78,5 +78,25 @@ describe("truncation of the core rules", () => {
   test("without rules there is nothing to mark", () => {
     const context = composeForState(undefined, stateWith(150))
     expect(context).not.toContain("core rules")
+  })
+})
+
+describe("the shipped core rules", () => {
+  const agentFile = Bun.file(new URL("../../../../plugin/agents/holyclaude.md", import.meta.url))
+
+  test("are injected whole, within the cap, beside a state summary", async () => {
+    const rules = extractRules(await agentFile.text())
+    expect(rules).toBeDefined()
+    const context = composeForState(rules, stateWith(1))
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain(rules ?? "")
+  })
+
+  test("keep AskUserQuestion for information and send material choices to grill-me", async () => {
+    const rules = extractRules(await agentFile.text()) ?? ""
+    expect(rules).toContain("Use AskUserQuestion when missing information or authorization")
+    expect(rules).toContain(
+      "When a material choice cannot be settled from the repository, the documentation or the user's own words, load the `grill-me` skill",
+    )
   })
 })
