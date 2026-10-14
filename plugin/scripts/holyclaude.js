@@ -9571,7 +9571,7 @@ var extractRules = (agentFile, root) => {
   if (start === -1 || end === -1 || end < start)
     return;
   const rules = agentFile.slice(start + RULES_START.length, end).trim();
-  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, root);
+  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root);
 };
 var sessionStart = gen2(function* () {
   const root = yield* pluginRoot;
