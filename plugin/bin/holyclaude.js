@@ -8319,7 +8319,7 @@ var Override = Struct({
 });
 var ObservationRecord = Union2([Observed, Override]);
 var observationsPath = (statePath = stateFilePath()) => statePath.endsWith(".json") ? `${statePath.slice(0, -".json".length)}.observations.jsonl` : `${statePath}.observations.jsonl`;
-var decodeLine = decodeUnknownEffect2(fromJsonString2(ObservationRecord));
+var decodeLine = decodeJsonStrict(ObservationRecord);
 var readObservations = (path = observationsPath()) => gen2(function* () {
   const text = yield* tryPromise2(() => Bun.file(path).text()).pipe(orElseSucceed2(() => ""));
   const records = [];

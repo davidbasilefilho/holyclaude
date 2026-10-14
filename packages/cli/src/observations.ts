@@ -1,7 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
 import { Effect, Schema } from "effect"
-import { stateFilePath } from "@holyclaude/core"
+import { decodeJsonStrict, stateFilePath } from "@holyclaude/core"
 
 const Text = Schema.String.check(Schema.isPattern(/\S/))
 
@@ -36,7 +36,8 @@ export const observationsPath = (statePath: string = stateFilePath()): string =>
     ? `${statePath.slice(0, -".json".length)}.observations.jsonl`
     : `${statePath}.observations.jsonl`
 
-const decodeLine = Schema.decodeUnknownEffect(Schema.fromJsonString(ObservationRecord))
+// Strict like every persisted file: a record with extra fields is not ours, so it is skipped.
+const decodeLine = decodeJsonStrict(ObservationRecord)
 
 /** Reads every valid line; a missing file or an unreadable line is skipped. */
 export const readObservations = (path: string = observationsPath()) =>
