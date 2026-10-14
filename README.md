@@ -142,13 +142,31 @@ which review Assignments call; it is neither vendored nor wrapped.
 
 ## Development
 
+Tasks live in `mise.toml`, which pins Bun. Run them with `mise run <task>`; the root `bun run`
+scripts (`fmt`, `fmt:readonly`, `lint`, `lint:readonly`, `typecheck`, `test`) and the CLI package's
+`build` script call the matching task.
+
 ```sh
 bun install
-bun run fmt:readonly && bun run lint:readonly && bun run typecheck && bun test
-cd packages/cli && bun run build   # rebuilds plugin/bin/holyclaude.js after core or cli changes
+mise run fmt:readonly && mise run lint:readonly && mise run typecheck && mise run test
+mise run build   # rebuilds plugin/bin/holyclaude.js after core or cli changes
 ```
 
-All workspace packages and the plugin manifest carry the same version.
+| Task                                      | What it does                                                         |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| `fmt`, `fmt:readonly`                     | Format in place, or check formatting                                 |
+| `lint`, `lint:readonly`                   | Lint with fixes, or lint without them                                |
+| `typecheck`                               | Type-check the repository                                            |
+| `test`                                    | Run the test suite                                                   |
+| `build`                                   | Bundle the CLI into `plugin/bin/holyclaude.js`                       |
+| `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the version in all six places and print the old and new version |
+
+Versions follow `0.X.Y-Z`: `X` is the minor, `Y` the patch and `Z` an optional hotfix. A bump
+resets the later positions, so from `0.3.2-1` a minor bump gives `0.4.0`, a patch bump gives
+`0.3.3` and a hotfix bump gives `0.3.2-2`. The version appears in the root, `packages/cli`,
+`packages/core` and `plugin` `package.json` files, in `plugin/.claude-plugin/plugin.json` and in
+`.claude-plugin/marketplace.json`, and the six stay identical. Claude Code only sees a plugin update when
+the version string changes. The bump tasks refuse to run when the six disagree.
 
 ## Third-party material
 

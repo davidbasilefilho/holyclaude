@@ -5,7 +5,9 @@
     "": {
       "name": "holyclaude",
       "devDependencies": {
+        "@holyclaude/core": "workspace:*",
         "@types/bun": "^1.0.0",
+        "effect": "^4.0.0",
         "eslint-plugin-jsdoc": "^65.0.0",
         "oxfmt": "^0.73.0",
         "oxlint": "^1.0.0",
