@@ -4,10 +4,12 @@ import { dirname } from "node:path"
 import {
   decodeJsonStrict,
   keepLocalFilesOutOfVersionControl,
-  localFile,
   MAX_LOCAL_BYTES,
+  observationsFile,
+  previousObservationsFile,
   readText,
   refuseSymlinks,
+  rotateObservations,
   StateIo,
   stateDirPath,
 } from "@holyclaude/core"
@@ -40,21 +42,19 @@ export const ObservationRecord = Schema.Union([Observed, Override])
 /** One decoded line of the observations file. */
 export type ObservationRecord = typeof ObservationRecord.Type
 
-/** The observations file in the state directory's local files: append-only JSON lines, never locked. */
+/**
+ * The observations file in the state directory's local files: JSON lines, appended without the
+ * lock. Once it outgrows its rotation size it becomes the previous generation, under the lock.
+ */
 export const observationsPath = (directory: string = stateDirPath()): string =>
-  localFile(directory, "observations.jsonl")
+  observationsFile(directory)
 
 // Strict like every persisted file: a record with extra fields is not ours, so it is skipped.
 const decodeLine = decodeJsonStrict(ObservationRecord)
 
-/**
- * Reads every valid line; a missing file or an unreadable line is skipped. The file is never read
- * through a symbolic link, and one over the local files' cap is TooLarge, since this runs on every
- * specialist tool call and its `transcript` field is later opened as a path.
- */
-export const readObservations = (directory: string = stateDirPath()) =>
+/** Every valid line of one generation of the log; a missing file has none. */
+const readGeneration = (directory: string, path: string) =>
   Effect.gen(function* () {
-    const path = observationsPath(directory)
     yield* refuseSymlinks(directory, path)
     const text = (yield* readText(path, MAX_LOCAL_BYTES)) ?? ""
     const records: ObservationRecord[] = []
@@ -67,13 +67,29 @@ export const readObservations = (directory: string = stateDirPath()) =>
   })
 
 /**
+ * Reads every valid line, oldest first: the previous generation of the log, then the current one. A
+ * missing file or an unreadable line is skipped. A file is never read through a symbolic link, and
+ * one over the local files' cap is TooLarge, since this runs on every specialist tool call and its
+ * `transcript` field is later opened as a path. Rotation keeps both generations well under the
+ * cap.
+ */
+export const readObservations = (directory: string = stateDirPath()) =>
+  Effect.gen(function* () {
+    // The current log is read first. A rotation between the two reads then shows the rotated
+    // records twice, which a newest-first lookup does not mind, instead of not at all.
+    const current = yield* readGeneration(directory, observationsPath(directory))
+    const previous = yield* readGeneration(directory, previousObservationsFile(directory))
+    return [...previous, ...current]
+  })
+
+/**
  * Appends one record to the observations file of the state directory. A single small append is
  * atomic, so no lock is needed. Bun has no append write: `Bun.write` and `Bun.file().writer()`
  * truncate the file, and a read-then-rewrite would lose records to concurrent hooks. So the append
  * uses `node:fs` `appendFile`, and `mkdir` stands in for the missing Bun directory creation; the
  * read side already uses `Bun.file`. The folder's `.gitignore` is put in place first, so the log is
  * never left where version control would pick it up, and nothing is written through a symbolic
- * link.
+ * link. A log that has outgrown its rotation size is rotated first, so the file stays bounded.
  */
 export const appendObservation = (
   record: ObservationRecord,
@@ -88,6 +104,7 @@ export const appendObservation = (
       }),
     ),
     Effect.andThen(keepLocalFilesOutOfVersionControl(directory)),
+    Effect.andThen(rotateObservations(directory)),
     Effect.andThen(
       Effect.tryPromise({
         try: () => appendFile(path, `${JSON.stringify(record)}\n`),

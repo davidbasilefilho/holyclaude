@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { MAX_LOCAL_BYTES } from "@holyclaude/core"
+import { MAX_LOCAL_BYTES, OBSERVATIONS_ROTATE_BYTES } from "@holyclaude/core"
 import { Effect } from "effect"
 
 import { appendObservation, observationsPath, readObservations } from "./observations.ts"
@@ -85,6 +85,77 @@ describe("appendObservation", () => {
     symlinkSync(outside, join(dir, "local"), "junction")
     const error = await failure(appendObservation(record, dir))
     expect(error).toMatchObject({ _tag: "SymlinkRefused" })
+    expect(readdirSync(outside)).toEqual([])
+  })
+})
+
+describe("the bounded log", () => {
+  const observed = (agent: string) => ({
+    kind: "observed" as const,
+    agent_id: agent,
+    at: "2026-01-01T00:00:00Z",
+  })
+  const previousPath = () => join(dir, "local", "observations.1.jsonl")
+
+  /** A log of valid lines at least the given size, numbered from the given start. */
+  const plant = (path: string, bytes: number, from = 0) => {
+    const lines: string[] = []
+    let size = 0
+    for (let at = from; size < bytes; at++) {
+      const line = `${JSON.stringify(observed(`old-${at}`))}\n`
+      lines.push(line)
+      size += line.length
+    }
+    mkdirSync(join(dir, "local"), { recursive: true })
+    writeFileSync(path, lines.join(""))
+    return lines.length
+  }
+
+  test("rotates a log past its rotation size, so the next append starts a new one", async () => {
+    const planted = plant(observationsPath(dir), OBSERVATIONS_ROTATE_BYTES + 1)
+    await Effect.runPromise(appendObservation(observed("newest"), dir))
+    expect(await Bun.file(observationsPath(dir)).text()).toBe(
+      `${JSON.stringify(observed("newest"))}\n`,
+    )
+    const records = await Effect.runPromise(readObservations(dir))
+    expect(records).toHaveLength(planted + 1)
+    expect(records[0]).toEqual(observed("old-0"))
+    expect(records.at(-1)).toEqual(observed("newest"))
+    expect(await Bun.file(join(dir, "local", "lock")).exists()).toBe(false)
+  })
+
+  test("leaves a log within its rotation size where it is", async () => {
+    plant(observationsPath(dir), 1024)
+    await Effect.runPromise(appendObservation(observed("newest"), dir))
+    expect(await Bun.file(previousPath()).exists()).toBe(false)
+  })
+
+  test("never lets appends grow the log past what a read accepts", async () => {
+    // Just under the read cap: without rotation a few more appends make every read TooLarge.
+    plant(observationsPath(dir), MAX_LOCAL_BYTES - 100)
+    for (const agent of ["a", "b", "c"])
+      await Effect.runPromise(appendObservation(observed(agent), dir))
+    const records = await Effect.runPromise(readObservations(dir))
+    expect(records.slice(-3)).toEqual([observed("a"), observed("b"), observed("c")])
+  })
+
+  test("drops the oldest generation, never the newest records, on the next rotation", async () => {
+    plant(previousPath(), 1024)
+    const planted = plant(observationsPath(dir), OBSERVATIONS_ROTATE_BYTES + 1, 1_000_000)
+    await Effect.runPromise(appendObservation(observed("newest"), dir))
+    const records = await Effect.runPromise(readObservations(dir))
+    expect(records).toHaveLength(planted + 1)
+    expect(records[0]).toEqual(observed("old-1000000"))
+    expect(records.at(-1)).toEqual(observed("newest"))
+  })
+
+  test("refuses a linked previous generation for reads and appends", async () => {
+    mkdirSync(join(dir, "local"))
+    symlinkSync(outside, previousPath(), "junction")
+    expect(await failure(readObservations(dir))).toMatchObject({ _tag: "SymlinkRefused" })
+    expect(await failure(appendObservation(observed("a"), dir))).toMatchObject({
+      _tag: "SymlinkRefused",
+    })
     expect(readdirSync(outside)).toEqual([])
   })
 })

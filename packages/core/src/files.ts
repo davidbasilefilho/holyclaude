@@ -11,6 +11,39 @@ import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
 import { ownsFile, type Lock } from "./lock.ts"
 import { refuseSymlinks } from "./safety.ts"
 
+/** The text after the first line break, so it starts on a whole line; none when there is no break. */
+const fromNextLine = (text: string) => {
+  const at = text.indexOf("\n")
+  return at === -1 ? "" : text.slice(at + 1)
+}
+
+/**
+ * The newest whole lines of a text that fit in the limit, in bytes. A text within the limit comes
+ * back as it is; otherwise the oldest lines go, and the line the cut falls in goes with them.
+ */
+export const keepNewestLines = (text: string, limit: number) => {
+  const bytes = new TextEncoder().encode(text)
+  // One byte before the cut is kept too, so a line that starts exactly at the cut survives.
+  return bytes.byteLength <= limit
+    ? text
+    : fromNextLine(new TextDecoder().decode(bytes.subarray(bytes.byteLength - limit - 1)))
+}
+
+/**
+ * Reads the newest whole lines of a file that fit in the limit, in bytes, without reading the rest:
+ * a log over the limit loses its oldest lines rather than failing. A missing file reads as
+ * undefined. It does not look for symbolic links, so call {@link refuseSymlinks} first.
+ */
+export const readNewestLines = (path: string, limit: number) =>
+  Effect.gen(function* () {
+    const file = Bun.file(path)
+    if (!(yield* io(path, () => file.exists()))) return undefined
+    const size = file.size
+    if (size <= limit) return yield* readText(path, limit)
+    const bytes = yield* io(path, () => file.slice(size - limit - 1, size).bytes())
+    return fromNextLine(new TextDecoder().decode(bytes))
+  })
+
 /**
  * Reads and strictly decodes a JSON file. A missing file reads as undefined. A file that is not
  * valid JSON for the schema is reported as CorruptRecord with the path, so the user is pointed at

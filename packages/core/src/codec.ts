@@ -16,6 +16,13 @@ export const MAX_RECORD_BYTES = 256 * 1024
  */
 export const MAX_LOCAL_BYTES = 4 * 1024 * 1024
 
+/**
+ * Size past which the observations log is rotated, in bytes. The log is appended to on every
+ * specialist tool call and read whole on the next, so it is kept to two generations of about this
+ * size, well within the local files' cap that each read enforces.
+ */
+export const OBSERVATIONS_ROTATE_BYTES = 1024 * 1024
+
 /** Largest legacy single-file state read for migration, in bytes. */
 export const MAX_LEGACY_STATE_BYTES = 1024 * 1024
 

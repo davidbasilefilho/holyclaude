@@ -4,9 +4,16 @@ import { Effect } from "effect"
 
 import { MAX_LEGACY_STATE_BYTES, MAX_LOCAL_BYTES } from "./codec.ts"
 import { CorruptRecord, MigratedFileInTheWay } from "./errors.ts"
-import { commitFile, moveFile, readJson, removeFile } from "./files.ts"
+import {
+  commitFile,
+  keepNewestLines,
+  moveFile,
+  readJson,
+  readNewestLines,
+  removeFile,
+} from "./files.ts"
 import { readText } from "./io.ts"
-import { legacyFile, legacyLockFiles, localFile, migratedFile } from "./layout.ts"
+import { legacyFile, legacyLockFiles, migratedFile, previousObservationsFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
 import { State, validateState } from "./model/state.ts"
 import { loadRecordState, persist, recordTexts } from "./records.ts"
@@ -50,22 +57,23 @@ export const mergeLegacy = (legacy: State, existing: State): State => {
 }
 
 /**
- * An earlier version kept the observations log beside the state file; it now lives in `local/`.
- * When a log is already there, the old lines go in front of it, as they are older.
+ * An earlier version kept the observations log beside the state file; it now lives in `local/`. The
+ * old lines are older than anything this version appended, so they go in front of the previous
+ * generation of the log, which readers read first, and the log that hooks append to without the
+ * lock is never rewritten. Only the newest lines that fit in the local files' cap are kept, so an
+ * old log of any size migrates. Both ends are checked for symbolic links before either is read.
  */
 const moveObservations = (directory: string, lock: Lock) => {
   const from = join(directory, "state.observations.jsonl")
-  const to = localFile(directory, "observations.jsonl")
+  const to = previousObservationsFile(directory)
   return Effect.gen(function* () {
-    // Both ends are checked before either is read, and both reads are capped like any local file.
     yield* refuseSymlinks(directory, from)
     yield* refuseSymlinks(directory, to)
-    const older = yield* readText(from, MAX_LOCAL_BYTES)
+    const older = yield* readNewestLines(from, MAX_LOCAL_BYTES)
     if (older === undefined) return
-    const newer = yield* readText(to, MAX_LOCAL_BYTES)
-    if (newer === undefined) return yield* moveFile(from, to, lock)
+    const newer = (yield* readNewestLines(to, MAX_LOCAL_BYTES)) ?? ""
     const separator = older === "" || older.endsWith("\n") ? "" : "\n"
-    yield* commitFile(to, `${older}${separator}${newer}`, lock)
+    yield* commitFile(to, keepNewestLines(`${older}${separator}${newer}`, MAX_LOCAL_BYTES), lock)
     yield* removeFile(from, lock)
   })
 }

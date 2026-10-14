@@ -31,6 +31,17 @@ export const assignmentFile = (directory: string, intentId: string, id: string):
 export const localFile = (directory: string, name: string): string =>
   join(directory, LOCAL_DIRECTORY, name)
 
+/** The observations log the hooks append to, one JSON record per line. */
+export const observationsFile = (directory: string): string =>
+  localFile(directory, "observations.jsonl")
+
+/**
+ * The previous generation of the observations log. The log moves here once it outgrows
+ * `OBSERVATIONS_ROTATE_BYTES`, replacing the generation before it, and readers read it first.
+ */
+export const previousObservationsFile = (directory: string): string =>
+  localFile(directory, "observations.1.jsonl")
+
 /** The lock file. Its `.breaking` neighbour guards the breaking of a stale lock. */
 export const lockFile = (directory: string): string => localFile(directory, "lock")
 
@@ -48,10 +59,10 @@ export const legacyLockFiles = (directory: string): ReadonlyArray<string> => [
 
 /**
  * The folder's own `.gitignore`. It lists exactly what must not be committed: the machine-local
- * files under `local/` (lock and its guard, worker list, agent ids, clone id, observations log),
- * the temporary files a write renames into place, and what an earlier version left beside the
- * records, namely its state file, the copy of it after migration, its lock files and its
- * observations log. Everything else in the folder is committed.
+ * files under `local/` (lock and its guard, worker list, agent ids, clone id, the two generations
+ * of the observations log), the temporary files a write renames into place, and what an earlier
+ * version left beside the records, namely its state file, the copy of it after migration, its lock
+ * files and its observations log. Everything else in the folder is committed.
  */
 const IGNORE_RULES =
   [

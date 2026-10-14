@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { decodeJsonStrict, MAX_RECORD_BYTES } from "./codec.ts"
+import { decodeJsonStrict, MAX_LOCAL_BYTES, MAX_RECORD_BYTES } from "./codec.ts"
 import { emptyState, State } from "./model/state.ts"
 import { loadState, updateState } from "./store.ts"
 
@@ -205,10 +205,11 @@ describe("migration on first use", () => {
     expect(await text(".gitignore")).toContain("/local/")
   })
 
-  test("moves the observations log into local files", async () => {
+  test("moves the observations log into local files, as the previous generation", async () => {
     await touch()
     expect(await exists("state.observations.jsonl")).toBe(false)
-    expect(await text("local", "observations.jsonl")).toBe(`${OBSERVATION}\n`)
+    expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n`)
+    expect(await exists("local", "observations.jsonl")).toBe(false)
   })
 
   test("is done once: the next update does not touch the records", async () => {
@@ -389,7 +390,7 @@ describe("a symbolic link where the migration reads", () => {
     expect(
       await failure(updateState(directory, (state) => Effect.succeed({ state, value: 0 }))),
     ).toMatchObject({ _tag: "SymlinkRefused" })
-    expect(await exists("local", "observations.jsonl")).toBe(false)
+    expect(await exists("local", "observations.1.jsonl")).toBe(false)
     expect(await exists("state.json")).toBe(true)
   })
 
@@ -401,7 +402,7 @@ describe("a symbolic link where the migration reads", () => {
 
   test("is refused for a log already in local/ that the old lines would be put before", async () => {
     await mkdir(join(directory, "local"), { recursive: true })
-    await symlink(outside, join(directory, "local", "observations.jsonl"), "junction")
+    await symlink(outside, join(directory, "local", "observations.1.jsonl"), "junction")
     expect(
       await failure(updateState(directory, (state) => Effect.succeed({ state, value: 0 }))),
     ).toMatchObject({ _tag: "SymlinkRefused" })
@@ -409,13 +410,39 @@ describe("a symbolic link where the migration reads", () => {
 })
 
 describe("the observations log", () => {
-  test("old lines go in front of a log that is already in local/", async () => {
-    const newer = JSON.stringify({ kind: "observed", agent_id: "a9", at: "2026-02-01T00:00:00Z" })
+  const line = (agent: string) =>
+    JSON.stringify({ kind: "observed", agent_id: agent, at: "2026-02-01T00:00:00Z" })
+
+  test("old lines go in front of a previous generation already in local/", async () => {
     await mkdir(join(directory, "local"), { recursive: true })
-    await writeFile(join(directory, "local", "observations.jsonl"), `${newer}\n`)
+    await writeFile(join(directory, "local", "observations.1.jsonl"), `${line("a9")}\n`)
     await touch()
-    expect(await text("local", "observations.jsonl")).toBe(`${OBSERVATION}\n${newer}\n`)
+    expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n${line("a9")}\n`)
     expect(await exists("state.observations.jsonl")).toBe(false)
+  })
+
+  test("the log hooks append to without the lock is left as it is", async () => {
+    await mkdir(join(directory, "local"), { recursive: true })
+    await writeFile(join(directory, "local", "observations.jsonl"), `${line("a9")}\n`)
+    await touch()
+    expect(await text("local", "observations.jsonl")).toBe(`${line("a9")}\n`)
+    expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n`)
+  })
+
+  test("an old log over the local cap migrates, keeping its newest whole lines", async () => {
+    // Lines of about 100 bytes each, numbered so the oldest and newest can be told apart.
+    const count = Math.ceil((MAX_LOCAL_BYTES * 1.5) / 100)
+    const lines = Array.from({ length: count }, (_, at) => line(`agent-${at}`.padEnd(60, "x")))
+    await writeFile(join(directory, "state.observations.jsonl"), `${lines.join("\n")}\n`)
+    await touch()
+    const kept = await text("local", "observations.1.jsonl")
+    expect(new TextEncoder().encode(kept).byteLength).toBeLessThanOrEqual(MAX_LOCAL_BYTES)
+    const keptLines = kept.split("\n").filter((entry) => entry !== "")
+    expect(keptLines.at(-1)).toBe(lines.at(-1))
+    expect(keptLines).toEqual(lines.slice(lines.length - keptLines.length))
+    expect(keptLines.length).toBeGreaterThan(count / 2)
+    expect(await exists("state.observations.jsonl")).toBe(false)
+    expect(await exists("state.json")).toBe(false)
   })
 })
 

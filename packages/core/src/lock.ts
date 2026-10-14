@@ -1,12 +1,15 @@
-import { open, rm, stat } from "node:fs/promises"
+import { mkdir, open, rm, stat } from "node:fs/promises"
 import { hostname } from "node:os"
+import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
 
 import { decodeJsonStrict } from "./codec.ts"
 import { StateIo, StateLocked } from "./errors.ts"
-import { attempt, attemptTransient, hasCode, readText } from "./io.ts"
+import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
+import { lockFile } from "./layout.ts"
 import { Text } from "./model/primitives.ts"
+import { refuseSymlinks } from "./safety.ts"
 
 const LOCK_STALE_MS = 30_000
 
@@ -157,5 +160,26 @@ export const acquireLock = (directory: string, lockFile: string) => {
       times: 15,
       while: (error) => error._tag === "StateLocked",
     }),
+  )
+}
+
+/**
+ * Runs `use` while holding the state lock of the directory, and releases the lock afterwards
+ * whatever the outcome. The lock file and its guard are checked for symbolic links before anything
+ * is created, and the `local/` folder that holds them is made when it is missing.
+ */
+export const withStateLock = <A, E, R>(
+  directory: string,
+  use: (lock: Lock) => Effect.Effect<A, E, R>,
+) => {
+  const file = lockFile(directory)
+  return Effect.acquireUseRelease(
+    refuseSymlinks(directory, `${file}.breaking`).pipe(
+      Effect.andThen(refuseSymlinks(directory, file)),
+      Effect.andThen(io(directory, () => mkdir(dirname(file), { recursive: true }))),
+      Effect.andThen(acquireLock(directory, file)),
+    ),
+    use,
+    (lock) => releaseIfOwned(lock.file, lock.token),
   )
 }
