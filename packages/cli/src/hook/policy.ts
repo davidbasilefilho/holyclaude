@@ -291,7 +291,7 @@ const isEntry = (path: string) =>
 
 /**
  * The program a word names, or undefined when the shell computes the name. A path that is computed
- * only in its directory (`${CLAUDE_PLUGIN_ROOT}/bin/holyclaude`) still names its program.
+ * only in its directory (`${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude`) still names its program.
  */
 const programOf = (word: Word): string | undefined =>
   word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text)))
