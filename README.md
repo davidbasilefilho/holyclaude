@@ -146,12 +146,12 @@ This setup has not been observed taking effect in a live session. Watch for the 
 }
 ```
 
-| Event           | Matcher                                                                  | `<name>`         | What it does                                                                                      |
-| --------------- | ------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------- |
-| `SessionStart`  | `startup\|resume\|clear\|compact`                                        | `session-start`  | Injects the core rules and state as additional context.                                           |
-| `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit\|Agent` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. `Agent` is only observed. |
-| `SubagentStart` | none                                                                     | `subagent-start` | Records the agent type. It cannot block.                                                          |
-| `SubagentStop`  | none                                                                     | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.                              |
+| Event           | Matcher                                                           | `<name>`         | What it does                                                            |
+| --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
+| `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
+| `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
+| `SubagentStart` | none                                                              | `subagent-start` | Records the agent type. It cannot block.                                |
+| `SubagentStop`  | none                                                              | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.    |
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
 `Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
