@@ -1,2 +1,26 @@
 [tools]
-bun = "1.4"
+bun = "1.4.3"
+
+[tasks.fmt]
+description = "Format the repository in place"
+run = "bunx oxfmt --write"
+
+[tasks."fmt:readonly"]
+description = "Check formatting without writing"
+run = "bunx oxfmt --check"
+
+[tasks.lint]
+description = "Lint the repository and apply fixes"
+run = "bunx oxlint --fix"
+
+[tasks."lint:readonly"]
+description = "Lint the repository without fixing"
+run = "bunx oxlint"
+
+[tasks.typecheck]
+description = "Type-check the repository"
+run = "bun check"
+
+[tasks.test]
+description = "Run the test suite"
+run = "bun test"
