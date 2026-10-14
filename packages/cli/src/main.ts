@@ -20,8 +20,12 @@ const HINTS: Readonly<Record<string, string>> = {
   InsufficientEvidence:
     "Cover exactly the declared labels in criteria_evidence and required_evidence.",
   TooLarge: "Shorten the input to fit the limit.",
-  StateLocked: "Another process holds the state lock; retry in a moment.",
+  StateLocked:
+    "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
+  LockLost: "The state was left untouched; rerun the command.",
   StateIo: "Check HOLYCLAUDE_STATE_FILE or CLAUDE_PROJECT_DIR and the file permissions.",
+  StateCorrupt:
+    "Fix the field the message names in the state file, or restore the file from a backup; a missing file reads as empty state.",
   SchemaError:
     "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
   NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",

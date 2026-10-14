@@ -93,6 +93,23 @@ export const scanScript = (source: string): Scan => {
   const pending: Heredoc[] = []
   let failure: string | undefined
   let pos = 0
+  // Where the word at `pos` ends and where its last `,`, `..` and `]` are. It is computed once per
+  // word, on its first `{` or `[`, so a long word of braces is still read in linear time.
+  let look = { end: -1, separator: -1, close: -1 }
+
+  const lookahead = () => {
+    if (pos < look.end) return look
+    let end = pos
+    let separator = -1
+    let close = -1
+    while (end < source.length && !WORD_END.test(source[end] ?? " ")) {
+      if (source[end] === "," || (source[end] === "." && source[end + 1] === ".")) separator = end
+      if (source[end] === "]") close = end
+      end += 1
+    }
+    look = { end, separator, close }
+    return look
+  }
 
   const fail = (reason: string) => {
     failure ??= reason
@@ -172,14 +189,20 @@ export const scanScript = (source: string): Scan => {
     fail("unterminated parameter expansion")
   }
 
-  /** Scans commands until the end of input or, when `nested`, the `)` that closes a `$(`. */
-  const list = (nested: boolean): void => {
+  /**
+   * Scans commands until the end of input or, when `nested`, the `)` that closes a `$(`. Inside
+   * arithmetic (`$((`, or a `((` command) `<<` is a shift: read as a heredoc it would swallow the
+   * lines that follow.
+   */
+  const list = (nested: boolean, arithmetic = false): void => {
     let words: Word[] = []
     let outputs: string[] = []
     let current: string | null = null
     let dynamic = false
     let redirect: "out" | "in" | null = null
     let parenDepth = 0
+    // Paren depth outside the `((` command being read, or -1 when none is open.
+    let arithmeticBase = -1
     let closed = false
 
     const endWord = () => {
@@ -207,9 +230,10 @@ export const scanScript = (source: string): Scan => {
     const dollar = (quoted: boolean) => {
       const next = source[pos + 1]
       if (next === "(") {
+        const shift = source[pos + 2] === "("
         pos += 2
         append("$(...)", true)
-        list(true)
+        list(true, shift)
       } else if (next === "{") {
         pos += 2
         append("${...}", true)
@@ -291,7 +315,7 @@ export const scanScript = (source: string): Scan => {
         redirect = "in"
         return
       }
-      if (char === "<" && source.startsWith("<<", pos)) {
+      if (char === "<" && source.startsWith("<<", pos) && !arithmetic && arithmeticBase === -1) {
         pos += 2
         pending.push(readHeredocDelimiter())
         return
@@ -336,17 +360,20 @@ export const scanScript = (source: string): Scan => {
       } else if (char === "<" || char === ">") redirection()
       else if (char === "(") {
         endCommand()
-        parenDepth += 1
-        pos += 1
+        const open = source[pos + 1] === "(" ? 2 : 1
+        if (open === 2 && arithmeticBase === -1) arithmeticBase = parenDepth
+        parenDepth += open
+        pos += open
       } else if (char === ")") {
         endCommand()
         pos += 1
-        if (parenDepth > 0) parenDepth -= 1
-        else if (nested) closed = true
+        if (parenDepth > 0) {
+          parenDepth -= 1
+          if (parenDepth <= arithmeticBase) arithmeticBase = -1
+        } else if (nested) closed = true
       } else {
-        const rest = source.slice(pos).split(WORD_END)[0] ?? ""
-        const braceList = char === "{" && /^\{[^\s;&|()<>]*(,|\.\.)/.test(rest)
-        const bracket = char === "[" && rest.length > 1 && rest.includes("]")
+        const braceList = char === "{" && lookahead().separator > pos
+        const bracket = char === "[" && lookahead().close > pos
         append(char, char === "*" || char === "?" || braceList || bracket)
         pos += 1
       }

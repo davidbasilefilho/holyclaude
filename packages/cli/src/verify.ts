@@ -1,8 +1,9 @@
 import { Effect, Schema } from "effect"
-import { findAssignment, loadState, routeFor, stateFilePath } from "@holyclaude/core"
+import { findAssignment, routeFor } from "@holyclaude/core"
 import { NotBound } from "./errors.ts"
 import { PLUGIN_NAME } from "./fingerprint.ts"
 import { latestObserved, latestOverride, readObservations } from "./observations.ts"
+import { loadStateFile } from "./state.ts"
 
 const TranscriptLine = Schema.Struct({
   message: Schema.optionalKey(Schema.Struct({ model: Schema.optionalKey(Schema.String) })),
@@ -41,7 +42,7 @@ const compare = (
  */
 export const verifyAssignment = (id: string) =>
   Effect.gen(function* () {
-    const state = yield* loadState(stateFilePath())
+    const state = yield* loadStateFile
     const assignment = yield* findAssignment(state, id)
     const agentId = assignment.agent_id
     if (agentId === null) return yield* new NotBound({ id })

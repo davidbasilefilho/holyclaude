@@ -1,3 +1,4 @@
+import type { ToolInput } from "./input.ts"
 import { scanScript, type Simple, type Word } from "./shell.ts"
 
 /** A reason to deny, or undefined when the command may run. */
@@ -13,6 +14,8 @@ const REASONS = {
   holyclaude: (sub: string) =>
     `holyclaude ${sub} changes Intent and Assignment state, which the root owns. Read it with holyclaude intent show, assignment show, assignment list, assignment verify, routes and reconcile.`,
   state: `The .holyclaude state files are written by the root through the holyclaude CLI. Describe the state you need in your report.`,
+  config: (key: string) =>
+    `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
   unsure: (why: string) =>
     `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`,
 }
@@ -65,10 +68,16 @@ const GIT_VALUE_GLOBALS = new Set([
   "--namespace",
   "--super-prefix",
 ])
-const GIT_INLINE_GLOBALS = /^--(git-dir|work-tree|namespace|super-prefix|attr-source|config-env)=/
+const GIT_INLINE_GLOBALS = /^--(git-dir|work-tree|namespace|super-prefix|attr-source)=/
 const GIT_INFO_GLOBALS = new Set(["--version", "--help", "-h", "--html-path", "--man-path"])
-const GIT_EXEC_CONFIG =
-  /^(alias\.|core\.(fsmonitor|pager|sshcommand|editor|hookspath|askpass|gitproxy)|credential\.|filter\.|diff\..*\.(command|textconv)|pager\.|include|url\.|sequence\.editor|gpg\.|uploadpack\.|receive\.|protocol\.ext)/i
+/**
+ * The `git -c` keys a read may set: they only change how output looks or compares. Git has many
+ * keys that run a program (alias.<name>, diff.external, core.pager, credential.<name>, any key
+ * ending in .cmd or .driver, and more), so every other key is refused instead of listing the
+ * dangerous ones.
+ */
+const GIT_DISPLAY_CONFIG =
+  /^(color\.|column\.|advice\.|core\.(quotepath|abbrev|whitespace|autocrlf|safecrlf|filemode|ignorecase|precomposeunicode|longpaths|symlinks)$|diff\.(algorithm|context|renames|colormoved|colormovedws|noprefix|mnemonicprefix|ignoresubmodules|interhunkcontext|wserrorhighlight)$|log\.(abbrevcommit|date|decorate|follow|showroot)$|status\.(short|branch|showuntrackedfiles|renames|aheadbehind)$)/
 const GIT_EXEC_FLAGS =
   /^--(upload-pack|receive-pack|exec|ext-diff|open-files-in-pager|config-env)(=|$)/
 
@@ -142,10 +151,20 @@ const CONFIG_NEUTRAL = new Set([
   "--bool-or-int",
 ])
 
-const WRAPPERS: Readonly<
-  Record<string, { readonly values: ReadonlyArray<string>; readonly leading: number }>
-> = {
-  env: { values: ["-u", "-C", "--unset", "--chdir"], leading: 0 },
+/** A program that runs the command following its own flags. */
+interface Wrapper {
+  /** Flags that take a value. */
+  readonly values: ReadonlyArray<string>
+  /** Operands before the command (flock's lock file). */
+  readonly leading: number
+  /** Flags whose value is command text to judge in turn: `env -S`, `flock -c`. */
+  readonly script?: ReadonlyArray<string>
+  /** The words that follow are one command line, as `watch` runs them through a shell. */
+  readonly line?: true
+}
+
+const WRAPPERS: Readonly<Record<string, Wrapper>> = {
+  env: { values: ["-u", "-C", "--unset", "--chdir"], leading: 0, script: ["-S", "--split-string"] },
   command: { values: [], leading: 0 },
   exec: { values: ["-a"], leading: 0 },
   builtin: { values: [], leading: 0 },
@@ -162,18 +181,27 @@ const WRAPPERS: Readonly<
     values: ["-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-l", "-i"],
     leading: 0,
   },
-  watch: { values: ["-n", "-d", "--interval"], leading: 0 },
+  watch: { values: ["-n", "-d", "--interval"], leading: 0, line: true },
   unbuffer: { values: [], leading: 0 },
   chronic: { values: [], leading: 0 },
   taskset: { values: [], leading: 1 },
-  flock: { values: ["-w", "-E", "-c"], leading: 1 },
+  flock: { values: ["-w", "-E"], leading: 1, script: ["-c", "--command"] },
   busybox: { values: [], leading: 0 },
 }
 
+// Under xargs the input appends arguments the command line does not show. Judging the command
+// with two more words (one a refspec) makes `git tag`, `git branch` and `git fetch origin` count
+// as the writes they become.
+const XARGS_INPUT: ReadonlyArray<Word> = [
+  { text: "x", dynamic: false },
+  { text: "x:x", dynamic: false },
+]
+
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh"])
 const RUNTIMES = new Set(["bun", "bunx", "node", "npx", "deno", "tsx", "ts-node", "pnpm", "yarn"])
-const BREAKS = new Set(["for", "select", "case", "function", "fi", "done", "esac", "}", "[["])
+const BREAKS = new Set(["for", "select", "case", "fi", "done", "esac", "}", "[["])
 const OPENERS = new Set(["if", "then", "elif", "else", "while", "until", "do", "!", "{", "coproc"])
+// The names are lower-case because PowerShell, and Windows paths, ignore case.
 const FILE_WRITERS = new Set([
   "rm",
   "mv",
@@ -187,12 +215,77 @@ const FILE_WRITERS = new Set([
   "unlink",
   "shred",
   "touch",
+  "remove-item",
+  "ri",
+  "del",
+  "erase",
+  "rd",
+  "rmdir",
+  "move-item",
+  "mi",
+  "move",
+  "copy-item",
+  "copy",
+  "cpi",
+  "set-content",
+  "sc",
+  "add-content",
+  "ac",
+  "clear-content",
+  "clc",
+  "out-file",
+  "new-item",
+  "ni",
+  "rename-item",
+  "rni",
+  "tee-object",
 ])
+const HOLYCLAUDE = /^holyclaude(\.js)?$/
+// Flags that take a value, between a runtime and the file or package it runs.
+const RUNTIME_VALUE_FLAGS = new Set([
+  "--cwd",
+  "-c",
+  "--config",
+  "--env-file",
+  "--preload",
+  "-r",
+  "--require",
+  "--import",
+  "--filter",
+  "--port",
+  "--tsconfig-override",
+  "-d",
+  "--define",
+  "--conditions",
+  "--loader",
+])
+const PACKAGE_RUNNERS = new Set(["bunx", "npx"])
+const RUNNER_SUBCOMMANDS = new Set(["x", "dlx", "exec"])
 
-const basename = (path: string) => path.slice(path.lastIndexOf("/") + 1)
+const partStart = (path: string) => Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1
+/** The program a path names: its last part, lower-cased, without a Windows executable suffix. */
+const program = (path: string) =>
+  path
+    .slice(partStart(path))
+    .toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, "")
 const isAssignment = (text: string) => /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(text)
 const texts = (words: ReadonlyArray<Word>) => words.map((word) => word.text)
-const touchesState = (text: string) => text.includes(".holyclaude")
+const touchesState = (text: string) => text.toLowerCase().includes(".holyclaude")
+const isHolyclaude = (path: string) => HOLYCLAUDE.test(program(path))
+/** The bundle, the wrapper or the CLI source: whatever starts the holyclaude CLI. */
+const isEntry = (path: string) =>
+  isHolyclaude(path) ||
+  /packages\/cli\/(src\/)?main\.(ts|js)$/.test(path.replaceAll("\\", "/").toLowerCase())
+
+/**
+ * The program a word names, or undefined when the shell computes the name. A path that is computed
+ * only in its directory (`${CLAUDE_PLUGIN_ROOT}/bin/holyclaude`) still names its program.
+ */
+const programOf = (word: Word): string | undefined =>
+  word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text)))
+    ? undefined
+    : program(word.text)
 
 const classifyGitBranch = (args: ReadonlyArray<string>): boolean => {
   let listing = false
@@ -201,6 +294,11 @@ const classifyGitBranch = (args: ReadonlyArray<string>): boolean => {
     const arg = args[index] ?? ""
     if (arg === "-l" || arg === "--list") listing = true
     if (BRANCH_FLAGS.has(arg)) continue
+    if (/^-[larvi]{2,}$/.test(arg)) {
+      // Clustered listing flags such as -av and -rv.
+      if (arg.includes("l")) listing = true
+      continue
+    }
     if (BRANCH_VALUE_FLAGS.has(arg)) index += 1
     else if (/^--(merged|no-merged|contains|no-contains|sort|format|points-at|abbrev)=/.test(arg))
       continue
@@ -218,6 +316,11 @@ const classifyGitTag = (args: ReadonlyArray<string>): boolean => {
     if (arg === "-l" || arg === "--list" || arg === "-v" || arg === "--verify") listing = true
     if (TAG_FLAGS.has(arg) || /^-n\d*$/.test(arg)) {
       if (/^-n\d*$/.test(arg)) listing = true
+      continue
+    }
+    if (/^-(?:[liv]|n\d*){2,}$/.test(arg)) {
+      // Clustered listing flags such as -ln and -ln5. Only -l, -v and -n list; -i alone does not.
+      if (/[lvn]/.test(arg)) listing = true
       continue
     }
     if (
@@ -287,10 +390,12 @@ const classifyGitSub = (sub: string, rest: ReadonlyArray<Word>): Verdict => {
     case "config":
       return classifyGitConfig(args) ? undefined : deny
     case "remote": {
-      const [first, ...others] = args.filter((arg) => arg !== "-v" && arg !== "--verbose")
+      const [first, ...others] = args.filter((arg) => !/^-v+$/.test(arg) && arg !== "--verbose")
       if (first === undefined) return undefined
       if (first === "show" || first === "get-url")
-        return others.every((a) => !a.startsWith("-") || a === "-n") ? undefined : deny
+        return others.every((a) => !a.startsWith("-") || ["-n", "--push", "--all"].includes(a))
+          ? undefined
+          : deny
       return deny
     }
     case "stash":
@@ -308,12 +413,15 @@ const classifyGit = (args: ReadonlyArray<Word>): Verdict => {
     const word = args[index]
     if (word === undefined || !word.text.startsWith("-")) break
     const flag = word.text
-    if (flag === "-c") {
-      const setting = args[index + 1]
-      if (setting === undefined) return REASONS.unsure("git -c without a value")
-      if (GIT_EXEC_CONFIG.test(setting.text))
-        return REASONS.unsure(`git -c ${setting.text.split("=")[0]} can run programs`)
-      index += 2
+    if (flag === "-c" || flag === "--config-env" || flag.startsWith("--config-env=")) {
+      const attached = flag.startsWith("--config-env=")
+        ? flag.slice("--config-env=".length)
+        : undefined
+      const setting = attached ?? args[index + 1]?.text
+      if (setting === undefined) return REASONS.unsure(`git ${flag} without a value`)
+      const key = setting.split("=")[0] ?? ""
+      if (!GIT_DISPLAY_CONFIG.test(key.toLowerCase())) return REASONS.config(key)
+      index += attached === undefined ? 2 : 1
     } else if (GIT_VALUE_GLOBALS.has(flag)) {
       if (args[index + 1] === undefined) return REASONS.unsure(`git ${flag} without a value`)
       index += 2
@@ -333,22 +441,81 @@ const GH_READS: Readonly<Record<string, ReadonlyArray<string>>> = {
   issue: ["view", "list", "status"],
   repo: ["view"],
 }
-const GH_API_WRITES = /^(-X|--method|-f|-F|--field|--raw-field|--input)(=|$)/
-const GH_API_CLUSTER = /^-[A-Za-z]*[XfF]/
+const GH_API_FIELDS = new Set(["-f", "-F", "--field", "--raw-field"])
+const GH_API_VALUE_FLAGS = new Set([
+  "-H",
+  "--header",
+  "-q",
+  "--jq",
+  "-t",
+  "--template",
+  "--hostname",
+  "--cache",
+  "-p",
+  "--preview",
+])
 
-const classifyGh = (args: ReadonlyArray<Word>): Verdict => {
+/** Splits `--name=value` and `-Xvalue` into the flag and the value attached to it. */
+const attached = (arg: string): readonly [string, string | undefined] => {
+  if (arg.startsWith("--")) {
+    const at = arg.indexOf("=")
+    return at === -1 ? [arg, undefined] : [arg.slice(0, at), arg.slice(at + 1)]
+  }
+  return /^-[XfF]./.test(arg) ? [arg.slice(0, 2), arg.slice(2)] : [arg, undefined]
+}
+
+/**
+ * Judges `gh api`. With fields or a body gh sends a POST, so those are writes, except when the
+ * method is GET (the fields become the query string) and for a GraphQL query without `mutation`.
+ */
+const classifyGhApi = (args: ReadonlyArray<string>): Verdict => {
+  const deny = REASONS.gh("api with a write method, fields, a body or a GraphQL mutation")
+  let method = ""
+  let endpoint: string | undefined
+  let body = false
+  const fields: string[] = []
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? ""
+    const [flag, inline] = attached(arg)
+    const isMethod = flag === "-X" || flag === "--method"
+    const valued =
+      isMethod || GH_API_FIELDS.has(flag) || flag === "--input" || GH_API_VALUE_FLAGS.has(flag)
+    const value = valued ? (inline ?? args[++index] ?? "") : undefined
+    if (isMethod) method = (value ?? "").toUpperCase()
+    else if (GH_API_FIELDS.has(flag)) fields.push(value ?? "")
+    else if (flag === "--input") body = true
+    else if (!valued && /^-[A-Za-z]*[XfF]/.test(arg) && !arg.startsWith("--")) return deny
+    else if (!valued && !arg.startsWith("-") && endpoint === undefined) endpoint = arg
+  }
+  if (body) return deny
+  if (endpoint === "graphql") {
+    // A query read from a file cannot be checked, so it is refused with the mutations.
+    const queries = fields.filter((field) => field.startsWith("query="))
+    const reads =
+      queries.length > 0 &&
+      queries.every((query) => !/mutation/i.test(query) && !query.startsWith("query=@"))
+    return reads && ["", "GET", "POST"].includes(method) ? undefined : deny
+  }
+  if (method === "" ? fields.length > 0 : method !== "GET" && method !== "HEAD") return deny
+  return undefined
+}
+
+const classifyGh = (input: ReadonlyArray<Word>): Verdict => {
+  // `gh -R owner/repo pr view` names the repository before the command group.
+  let from = 0
+  for (;;) {
+    const text = input[from]?.text ?? ""
+    if (text === "-R" || text === "--repo") from += 2
+    else if (text.startsWith("--repo=") || /^-R./.test(text)) from += 1
+    else break
+  }
+  const args = input.slice(from)
   const [group, action] = args
   if (group === undefined) return undefined
   if (group.dynamic || action?.dynamic === true)
     return REASONS.unsure("the gh subcommand is computed")
   if (["--version", "--help", "-h"].includes(group.text)) return undefined
-  if (group.text === "api") {
-    const flags = texts(args.slice(1)).filter((arg) => arg.startsWith("-"))
-    const writes = flags.some(
-      (arg) => GH_API_WRITES.test(arg) || (!arg.startsWith("--") && GH_API_CLUSTER.test(arg)),
-    )
-    return writes ? REASONS.gh("api with a write flag") : undefined
-  }
+  if (group.text === "api") return classifyGhApi(texts(args.slice(1)))
   const allowed = GH_READS[group.text]
   if (allowed !== undefined && action !== undefined && allowed.includes(action.text))
     return undefined
@@ -374,7 +541,7 @@ const classifyHolyclaude = (args: ReadonlyArray<Word>): Verdict => {
   if (args.slice(0, 2).some((word) => word.dynamic))
     return REASONS.unsure("the holyclaude subcommand is computed")
   if (args.some((word) => word.text === "--help" || word.text === "-h")) return undefined
-  if (first === "--version" || first === "-V") return undefined
+  if (first === "--version" || first === "-V" || first === "help") return undefined
   if (first === "reconcile" && (second === undefined || second.startsWith("-"))) return undefined
   if (first === "routes") return undefined
   return HOLYCLAUDE_READS.has(`${first} ${second ?? ""}`)
@@ -384,7 +551,38 @@ const classifyHolyclaude = (args: ReadonlyArray<Word>): Verdict => {
       )
 }
 
-const unwrap = (name: string, rest: ReadonlyArray<Word>): ReadonlyArray<Word> | string => {
+/**
+ * Judges words the program runs as one command line, as `cmd /c`, `powershell -Command` and `watch`
+ * do.
+ */
+const classifyLine = (words: ReadonlyArray<Word>, depth: number): Verdict => {
+  const [first] = words
+  if (first === undefined) return undefined
+  if (first.dynamic) return REASONS.unsure("the command text is computed")
+  return classifyScript(texts(words).join(" "), depth + 1)
+}
+
+/** The command text a wrapper flag carries: `-c TEXT`, `-cTEXT`, `--flag TEXT` or `--flag=TEXT`. */
+const carriedScript = (wrapper: Wrapper, rest: ReadonlyArray<Word>, index: number) => {
+  const word = rest[index]
+  if (word === undefined) return undefined
+  for (const flag of wrapper.script ?? []) {
+    if (word.text === flag) {
+      const value = rest[index + 1]
+      return { text: value?.text, dynamic: value?.dynamic ?? false, width: 2 }
+    }
+    const prefix = flag.startsWith("--") ? `${flag}=` : flag
+    if (word.text.startsWith(prefix))
+      return { text: word.text.slice(prefix.length), dynamic: word.dynamic, width: 1 }
+  }
+  return undefined
+}
+
+const unwrap = (
+  name: string,
+  rest: ReadonlyArray<Word>,
+  depth: number,
+): ReadonlyArray<Word> | string => {
   const wrapper = WRAPPERS[name]
   if (wrapper === undefined) return rest
   let index = 0
@@ -398,12 +596,13 @@ const unwrap = (name: string, rest: ReadonlyArray<Word>): ReadonlyArray<Word> | 
       break
     }
     if (name === "command" && (text === "-v" || text === "-V")) return []
-    if (name === "env" && (text === "-S" || text === "--split-string")) {
-      const script = rest[index + 1]
-      if (script === undefined || script.dynamic) return REASONS.unsure("env -S script is computed")
-      const verdict = classifyScript(script.text, 1)
+    const carried = carriedScript(wrapper, rest, index)
+    if (carried !== undefined) {
+      if (carried.text === undefined || carried.dynamic)
+        return REASONS.unsure(`the ${name} command text is computed`)
+      const verdict = classifyScript(carried.text, depth + 1)
       if (verdict !== undefined) return verdict
-      index += 2
+      index += carried.width
       continue
     }
     if (text.startsWith("-") && text.length > 1) {
@@ -421,7 +620,8 @@ const unwrap = (name: string, rest: ReadonlyArray<Word>): ReadonlyArray<Word> | 
     }
     break
   }
-  return rest.slice(index)
+  const tail = rest.slice(index)
+  return wrapper.line === true ? (classifyLine(tail, depth) ?? []) : tail
 }
 
 const findAfter = (words: ReadonlyArray<Word>, markers: ReadonlyArray<string>) => {
@@ -444,54 +644,104 @@ const classifyShell = (rest: ReadonlyArray<Word>, depth: number): Verdict => {
   const file = rest.find((word) => !word.text.startsWith("-") || word.text === "-")
   if (file === undefined || file.text === "-" || rest.some((word) => word.text === "-s"))
     return REASONS.unsure("a shell reading commands from input")
-  if (/^holyclaude(\.js)?$/.test(basename(file.text)))
-    return classifyHolyclaude(rest.slice(rest.indexOf(file) + 1))
+  if (isHolyclaude(file.text)) return classifyHolyclaude(rest.slice(rest.indexOf(file) + 1))
   return undefined
 }
 
-const classifyRuntime = (rest: ReadonlyArray<Word>): Verdict => {
-  const entry = rest.findIndex(
-    (word) =>
-      /^holyclaude(\.js)?$/.test(basename(word.text)) ||
-      /packages\/cli\/(src\/)?main\.(ts|js)$/.test(word.text),
-  )
-  return entry === -1 ? undefined : classifyHolyclaude(rest.slice(entry + 1))
+/** Whether `text` is a PowerShell flag spelled `full` or any start of it (-c, -com, -Command). */
+const isFlagFor = (text: string, full: string) =>
+  /^[-/][A-Za-z]+$/.test(text) && full.startsWith(text.slice(1).toLowerCase())
+
+/**
+ * `powershell -Command TEXT` and `pwsh -c TEXT` run the rest of the line. Without a command flag
+ * the first operand starts the command, as in `powershell git push`.
+ */
+const classifyPowerShell = (rest: ReadonlyArray<Word>, depth: number): Verdict => {
+  const flagged = rest.findIndex((word) => isFlagFor(word.text, "command"))
+  const start = flagged === -1 ? rest.findIndex((word) => !word.text.startsWith("-")) : flagged + 1
+  const flags = start === -1 ? rest : rest.slice(0, start)
+  if (flags.some((word) => isFlagFor(word.text, "encodedcommand")))
+    return REASONS.unsure("an encoded PowerShell command")
+  // A script file is out of reach, like any script.
+  if (start === -1 || flags.some((word) => isFlagFor(word.text, "file"))) return undefined
+  return classifyLine(rest.slice(start), depth)
+}
+
+/** `cmd /c TEXT` runs the rest of the line. */
+const classifyCmd = (rest: ReadonlyArray<Word>, depth: number): Verdict => {
+  const flagged = rest.findIndex((word) => /^(\/\/?|-)[ckr]$/i.test(word.text))
+  return flagged === -1 ? undefined : classifyLine(rest.slice(flagged + 1), depth)
+}
+
+/** The index of the first word from `from` that is neither a flag nor a flag's value. */
+const operandFrom = (rest: ReadonlyArray<Word>, from: number) => {
+  let index = from
+  for (;;) {
+    const text = rest[index]?.text ?? ""
+    if (!text.startsWith("-") || text === "-") return index
+    index += RUNTIME_VALUE_FLAGS.has(text) ? 2 : 1
+  }
+}
+
+/**
+ * A runtime runs the CLI only when the CLI is the file or package it is told to run: the first
+ * operand, after an optional `run` or `x`. The CLI's path as an argument of a tool (`bunx oxlint
+ * packages/cli/src/main.ts`, `bun build packages/cli/src/main.ts`) is not a run. A package runner
+ * (`bunx`, `bun x`) runs whatever program it names, so that program is judged too.
+ */
+const classifyRuntime = (name: string, rest: ReadonlyArray<Word>, depth: number): Verdict => {
+  let at = operandFrom(rest, 0)
+  // `node --check FILE` only parses the file. The flag counts before the file, not after it.
+  if (name === "node" && rest.slice(0, at).some((word) => word.text === "--check")) return undefined
+  const subcommand = rest[at]?.text ?? ""
+  const runner = PACKAGE_RUNNERS.has(name) || RUNNER_SUBCOMMANDS.has(subcommand)
+  if (subcommand === "run" || RUNNER_SUBCOMMANDS.has(subcommand)) at = operandFrom(rest, at + 1)
+  const operand = rest[at]
+  if (operand === undefined) return undefined
+  if (isEntry(operand.text)) return classifyHolyclaude(rest.slice(at + 1))
+  return runner ? classifyWords(rest.slice(at), depth + 1) : undefined
 }
 
 const classifyWords = (input: ReadonlyArray<Word>, depth: number): Verdict => {
-  let words = input
+  // Wrappers, find -exec and package runners nest like scripts do, and no real command needs more.
+  if (depth > MAX_DEPTH) return REASONS.unsure("commands nested too deeply")
+  let start = 0
   for (;;) {
-    const head = words[0]
+    const head = input[start]
     if (head === undefined) return undefined
     if (!head.dynamic && BREAKS.has(head.text)) return undefined
-    if (!head.dynamic && OPENERS.has(head.text)) words = words.slice(1)
-    else if (isAssignment(head.text)) words = words.slice(1)
+    // `function NAME { ... }`: what follows the name is the body.
+    if (!head.dynamic && head.text === "function") start += 2
+    else if ((!head.dynamic && OPENERS.has(head.text)) || isAssignment(head.text)) start += 1
     else break
   }
-  const [head, ...rest] = words
+  const [head, ...rest] = input.slice(start)
   if (head === undefined) return undefined
-  if (head.dynamic) return REASONS.unsure("the program name is computed")
-  const name = basename(head.text)
+  const name = programOf(head)
+  if (name === undefined) return REASONS.unsure("the program name is computed")
   if (name === "git") return classifyGit(rest)
   if (name === "gh") return classifyGh(rest)
-  if (/^holyclaude(\.js)?$/.test(name)) return classifyHolyclaude(rest)
-  if (name in WRAPPERS) {
-    const inner = unwrap(name, rest)
-    return typeof inner === "string" ? inner : classifyWords(inner, depth)
+  if (HOLYCLAUDE.test(name)) return classifyHolyclaude(rest)
+  if (Object.hasOwn(WRAPPERS, name)) {
+    const inner = unwrap(name, rest, depth)
+    if (typeof inner === "string") return inner
+    return classifyWords(name === "xargs" ? [...inner, ...XARGS_INPUT] : inner, depth + 1)
   }
   if (SHELLS.has(name)) return classifyShell(rest, depth)
-  if (name === "eval") {
-    if (rest.some((word) => word.dynamic)) return REASONS.unsure("eval text is computed")
+  if (name === "powershell" || name === "pwsh") return classifyPowerShell(rest, depth)
+  if (name === "cmd") return classifyCmd(rest, depth)
+  if (name === "eval" || name === "iex" || name === "invoke-expression") {
+    if (rest.some((word) => word.dynamic)) return REASONS.unsure(`${name} text is computed`)
     return classifyScript(texts(rest).join(" "), depth + 1)
   }
-  if (RUNTIMES.has(name)) return classifyRuntime(rest)
+  if (RUNTIMES.has(name)) return classifyRuntime(name, rest, depth)
   if (name === "find") {
     const inner = findAfter(rest, ["-exec", "-execdir", "-ok", "-okdir"])
-    if (inner !== undefined) return classifyWords(inner, depth)
+    if (inner !== undefined) return classifyWords(inner, depth + 1)
   }
   if (name === "fd" || name === "fdfind") {
     const inner = findAfter(rest, ["-x", "-X", "--exec", "--exec-batch"])
-    if (inner !== undefined) return classifyWords(inner, depth)
+    if (inner !== undefined) return classifyWords(inner, depth + 1)
   }
   if (FILE_WRITERS.has(name) && rest.some((word) => touchesState(word.text))) return REASONS.state
   if (
@@ -520,7 +770,34 @@ const classifyScript = (source: string, depth: number): Verdict => {
 }
 
 /**
- * Judges a Bash command a subagent wants to run. Returns the reason to deny it, framed as the good
+ * Judges a shell command a subagent wants to run. Returns the reason to deny it, framed as the good
  * direction to take, or undefined when every simple command in it may run. When unsure it denies.
  */
 export const denyReason = (command: string): string | undefined => classifyScript(command, 0)
+
+/** The reason given when the policy itself fails on a command: what cannot be judged is denied. */
+export const UNREADABLE = REASONS.unsure("it is nested too deeply to read")
+
+const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
+const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
+
+/**
+ * Judges one tool call of a subagent. Tools that carry a shell command (Bash, PowerShell, Monitor)
+ * are judged by {@link denyReason}; file tools are refused on the `.holyclaude` state directory,
+ * which only the root changes, through the CLI. Returns the reason to deny, or undefined to allow.
+ */
+export const denyToolReason = (
+  toolName: string | undefined,
+  input: ToolInput | undefined,
+): string | undefined => {
+  if (toolName === undefined) return undefined
+  if (SHELL_TOOLS.has(toolName))
+    return input?.command === undefined
+      ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.`
+      : denyReason(input.command)
+  if (FILE_TOOLS.has(toolName)) {
+    const target = input?.file_path ?? input?.notebook_path
+    return target !== undefined && touchesState(target) ? REASONS.state : undefined
+  }
+  return undefined
+}

@@ -1335,6 +1335,8 @@ var none2 = () => none;
 var some2 = some;
 var isNone2 = isNone;
 var isSome2 = isSome;
+var getOrElse = /* @__PURE__ */ dual(2, (self, onNone) => isNone2(self) ? onNone() : self.value);
+var getOrUndefined = /* @__PURE__ */ getOrElse(constUndefined);
 var filter = /* @__PURE__ */ dual(2, (self, predicate) => isNone2(self) ? none2() : predicate(self.value) ? some2(self.value) : none2());
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Context.js
@@ -2962,6 +2964,7 @@ var catchTag = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, k, f, or
   return catchIf(self, pred, f, orElse);
 });
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => failSync(() => f(error))));
+var orDie = (self) => catch_(self, die);
 var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
 var ignore = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => {
   if (!options?.log) {
@@ -3098,6 +3101,8 @@ var onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, 
 var onExitUnsafe = (fiber, f) => {
   fiber._stack.push(new OnExitImpl(undefined, f, undefined));
 };
+var onExit = /* @__PURE__ */ dual(2, onExitPrimitive);
+var ensuring = /* @__PURE__ */ dual(2, (self, finalizer) => onExit(self, (_) => finalizer));
 var acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true)));
 var uninterruptible = (self) => withFiber((fiber) => {
   if (!fiber.interruptible)
@@ -3878,12 +3883,14 @@ var catch_2 = catch_;
 var catchTag2 = catchTag;
 var catchCause2 = catchCause;
 var mapError2 = mapError;
+var orDie2 = orDie;
 var tapError2 = tapError;
 var retry2 = retry;
 var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeout2 = timeout;
 var acquireUseRelease2 = acquireUseRelease;
+var ensuring2 = ensuring;
 var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
 var mapEager2 = mapEager;
@@ -6260,6 +6267,9 @@ function decodeUnknownEffect(schema, options) {
   const parser = run(schema.ast);
   return options === undefined ? parser : (input, overrideOptions) => parser(input, mergeParseOptions(options, overrideOptions));
 }
+function decodeUnknownOption(schema, options) {
+  return asOption(decodeUnknownEffect(schema, options));
+}
 function encodeUnknownEffect(schema, options) {
   const parser = run(flip2(schema.ast));
   return options === undefined ? parser : (input, overrideOptions) => parser(input, mergeParseOptions(options, overrideOptions));
@@ -6297,6 +6307,20 @@ function runWithCompiler(compiler, ast) {
       return flatMapEager2(result, getValue);
     }
     return result[args] === missing ? getValue(missing) : result;
+  };
+}
+function asExit(parser) {
+  return (input, options) => runSyncExit2(parser(input, options));
+}
+function asOption(parser) {
+  const parserExit = asExit(parser);
+  return (input, options) => {
+    const exit = parserExit(input, options);
+    if (isSuccess3(exit)) {
+      return some2(exit.value);
+    }
+    getSchemaIssueOrThrow(exit.cause, "Option adapter can only return none for schema issues");
+    return none2();
   };
 }
 function runSync2(effect, message) {
@@ -6458,6 +6482,7 @@ function decodeUnknownEffect2(schema, options) {
     return fromIssueEffect(parser(input, options));
   };
 }
+var decodeUnknownOption2 = decodeUnknownOption;
 function encodeUnknownEffect2(schema, options) {
   const parser = encodeUnknownEffect(schema, options);
   return (input, options) => {
@@ -6881,6 +6906,12 @@ class StdinMissing extends TaggedError2("StdinMissing") {
   }
 }
 
+class StateCorrupt extends TaggedError2("StateCorrupt") {
+  get message() {
+    return `State file ${this.path} does not match the state schema: ${this.detail}`;
+  }
+}
+
 // src/args.ts
 var stringFlag = (parsed, name) => {
   const value = parsed.flags[name];
@@ -6992,6 +7023,12 @@ class StateLocked extends TaggedError2("StateLocked") {
   }
 }
 
+class LockLost extends TaggedError2("LockLost") {
+  get message() {
+    return `Lock ${this.lockFile} was taken over before the write was committed; nothing was written. Retry the operation`;
+  }
+}
+
 class StateIo extends TaggedError2("StateIo") {
   get message() {
     return `State I/O failed for ${this.path}: ${String(this.cause)}`;
@@ -7014,9 +7051,10 @@ var decodeInput = (schema) => {
   return (text) => withinLimit("Input", text, MAX_INPUT_BYTES).pipe(flatMap2((ok) => decode(ok)));
 };
 // ../core/src/paths.ts
-import { isAbsolute, relative, resolve as resolve3 } from "path";
+import { isAbsolute, relative, resolve as resolve3, sep } from "path";
 var FORBIDDEN_CHARACTERS = /[:*?"<>|]/;
 var CONTROL_CHARACTERS = /\p{Cc}/u;
+var RESERVED_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9\u00B9\u00B2\u00B3]|lpt[1-9\u00B9\u00B2\u00B3]|conin\$|conout\$) *(?:\..*)?$/i;
 var segmentProblem = (segment) => {
   if (segment === "")
     return "empty segment";
@@ -7028,6 +7066,8 @@ var segmentProblem = (segment) => {
     return "control character";
   if (FORBIDDEN_CHARACTERS.test(segment))
     return 'one of : * ? " < > |';
+  if (RESERVED_DEVICE_NAME.test(segment))
+    return "Windows reserved device name";
   return;
 };
 var normalizePath = (raw) => {
@@ -7046,11 +7086,12 @@ var isInsideRoots = (path, roots, base) => {
   const target = resolve3(base, path);
   return roots.some((root) => {
     const inside = relative(resolve3(base, root), target);
-    return inside !== ".." && !inside.startsWith("../") && !isAbsolute(inside);
+    return inside.split(sep)[0] !== ".." && !isAbsolute(inside);
   });
 };
 // ../core/src/store.ts
 import { mkdir, open, rename, rm, stat } from "fs/promises";
+import { hostname } from "os";
 import { basename, dirname, join } from "path";
 
 // ../core/src/model/primitives.ts
@@ -7250,6 +7291,12 @@ var stateFilePath = (env = process.env) => env["HOLYCLAUDE_STATE_FILE"] || join(
 var attempt = (run) => tryPromise2({ try: run, catch: (cause) => cause });
 var io = (path, run) => attempt(run).pipe(mapError2((cause) => new StateIo({ path, cause })));
 var hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === code;
+var attemptTransient = (run) => attempt(run).pipe(retry2({
+  schedule: exponential("5 millis", 2),
+  times: 4,
+  while: (cause) => hasCode(cause, "EPERM") || hasCode(cause, "EBUSY")
+}));
+var parseState = (text) => decodeJsonStrict(State)(text).pipe(flatMap2(validateState));
 var loadState = (path) => gen2(function* () {
   const file = Bun.file(path);
   if (!(yield* io(path, () => file.exists())))
@@ -7257,51 +7304,88 @@ var loadState = (path) => gen2(function* () {
   if (file.size > MAX_STATE_BYTES)
     return yield* new TooLarge({ subject: path, bytes: file.size, limit: MAX_STATE_BYTES });
   const text = yield* io(path, () => file.text());
-  return yield* decodeJsonStrict(State)(text).pipe(flatMap2(validateState));
+  return yield* parseState(text);
 });
 var keepOutOfVersionControl = (directory) => {
   const ignore = Bun.file(join(directory, ".gitignore"));
   return basename(directory) === STORE_DIRECTORY ? io(directory, () => ignore.exists()).pipe(flatMap2((exists) => exists ? void_3 : io(directory, () => Bun.write(ignore, `*
 `)))) : void_3;
 };
-var writeState = (path, state) => gen2(function* () {
-  const encoded = yield* encodeEffect(State)(state);
-  const json = yield* withinLimit(path, `${JSON.stringify(encoded, null, 2)}
-`, MAX_STATE_BYTES);
-  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  yield* keepOutOfVersionControl(dirname(path));
-  yield* io(path, () => Bun.write(temporary, json)).pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => attempt(() => rm(temporary, { force: true })).pipe(ignore2)));
+var LockOwner = Struct({
+  pid: Int.check(isGreaterThanOrEqualTo2(1)),
+  host: Text,
+  token: Text,
+  acquired_at: Int
 });
-var createExclusively = (file) => attempt(() => open(file, "wx")).pipe(flatMap2((handle) => attempt(() => handle.close())));
-var removeIfStale = (file) => gen2(function* () {
+var lockPath = (path) => `${path}.lock`;
+var readOwner = (file) => attempt(() => Bun.file(file).text()).pipe(flatMap2(decodeJsonStrict(LockOwner)), orElseSucceed2(() => {
+  return;
+}));
+var ownsFile = (file, token) => readOwner(file).pipe(map4((owner) => owner?.token === token));
+var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed5(!hasCode(cause, "ESRCH"))));
+var isStale = (file, owner) => gen2(function* () {
+  if (owner !== undefined && owner.host === hostname())
+    return !(yield* processAlive(owner.pid));
   const { mtimeMs } = yield* attempt(() => stat(file));
-  const age = (yield* currentTimeMillis2) - mtimeMs;
-  if (age <= LOCK_STALE_MS)
+  return (yield* currentTimeMillis2) - mtimeMs > LOCK_STALE_MS;
+});
+var createExclusively = (file, content) => attemptTransient(() => open(file, "wx")).pipe(flatMap2((handle) => attempt(() => handle.writeFile(content)).pipe(tapError2(() => attempt(() => rm(file, { force: true })).pipe(ignore2)), ensuring2(attempt(() => handle.close()).pipe(ignore2)))));
+var claim = (file) => gen2(function* () {
+  const owner = {
+    pid: process.pid,
+    host: hostname(),
+    token: crypto.randomUUID(),
+    acquired_at: yield* currentTimeMillis2
+  };
+  const content = yield* encodeEffect(fromJsonString2(LockOwner))(owner).pipe(orDie2);
+  yield* createExclusively(file, content);
+  return owner.token;
+});
+var releaseIfOwned = (file, token) => ownsFile(file, token).pipe(flatMap2((owns) => owns ? attempt(() => rm(file, { force: true })) : void_3), ignore2);
+var removeIfStale = (file) => gen2(function* () {
+  const judged = yield* readOwner(file);
+  if (!(yield* isStale(file, judged)))
+    return false;
+  if ((yield* readOwner(file))?.token !== judged?.token)
     return false;
   yield* attempt(() => rm(file));
   return true;
 }).pipe(orElseSucceed2(() => false));
 var breakStaleLock = (lockFile) => {
   const guard = `${lockFile}.breaking`;
-  return acquireUseRelease2(createExclusively(guard), () => removeIfStale(lockFile), () => attempt(() => rm(guard, { force: true })).pipe(ignore2)).pipe(catch_2(() => removeIfStale(guard).pipe(as2(false))));
+  return acquireUseRelease2(claim(guard), () => removeIfStale(lockFile), (token) => releaseIfOwned(guard, token)).pipe(catch_2(() => removeIfStale(guard).pipe(as2(false))));
 };
 var acquireLock = (path) => {
-  const lockFile = `${path}.lock`;
-  const create = createExclusively(lockFile).pipe(mapError2((cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile }) : new StateIo({ path, cause })));
+  const lockFile = lockPath(path);
+  const create = claim(lockFile).pipe(mapError2((cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile }) : new StateIo({ path, cause })));
   return create.pipe(catchTag2("StateLocked", (locked) => breakStaleLock(lockFile).pipe(andThen2(fail5(locked)))), retry2({
     schedule: exponential("10 millis", 1.5),
     times: 15,
     while: (error) => error._tag === "StateLocked"
   }));
 };
-var releaseLock = (path) => io(path, () => rm(`${path}.lock`, { force: true })).pipe(ignore2);
-var updateState = (path, transition) => acquireUseRelease2(io(path, () => mkdir(dirname(path), { recursive: true })).pipe(andThen2(acquireLock(path))), () => gen2(function* () {
+var writeState = (path, state, token) => gen2(function* () {
+  const lockFile = lockPath(path);
+  const encoded = yield* encodeEffect(State)(state);
+  const json = yield* withinLimit(path, `${JSON.stringify(encoded, null, 2)}
+`, MAX_STATE_BYTES);
+  yield* parseState(json);
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  yield* keepOutOfVersionControl(dirname(path));
+  const commit = gen2(function* () {
+    if (!(yield* ownsFile(lockFile, token)))
+      return yield* new LockLost({ lockFile });
+    yield* attemptTransient(() => rename(temporary, path)).pipe(mapError2((cause) => new StateIo({ path, cause })));
+  });
+  yield* io(path, () => Bun.write(temporary, json)).pipe(andThen2(commit), tapError2(() => attempt(() => rm(temporary, { force: true })).pipe(ignore2)));
+});
+var updateState = (path, transition) => acquireUseRelease2(io(path, () => mkdir(dirname(path), { recursive: true })).pipe(andThen2(acquireLock(path))), (token) => gen2(function* () {
   const before = yield* loadState(path);
   const { state, value } = yield* transition(before);
   if (state !== before)
-    yield* writeState(path, state);
+    yield* writeState(path, state, token);
   return value;
-}), () => releaseLock(path));
+}), (token) => releaseIfOwned(lockPath(path), token));
 // ../core/src/model/ci.ts
 var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
@@ -7561,10 +7645,9 @@ var pluginRoot = gen2(function* () {
   }
   return;
 });
-var rosterFingerprint = gen2(function* () {
-  const root = yield* pluginRoot;
+var rosterFingerprintAt = (root) => gen2(function* () {
   if (root === undefined)
-    return "roster:unknown";
+    return `roster:unknown:${crypto.randomUUID()}`;
   const names = yield* tryPromise2(() => Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join2(root, "agents") }))).pipe(orElseSucceed2(() => []));
   const hasher = new Bun.CryptoHasher("sha256");
   for (const name of names.toSorted()) {
@@ -7575,6 +7658,7 @@ ${text}
   }
   return `roster:${hasher.digest("hex").slice(0, 16)}`;
 });
+var rosterFingerprint = pluginRoot.pipe(flatMap2(rosterFingerprintAt));
 
 // src/hook/session-start.ts
 import { join as join3 } from "path";
@@ -8113,7 +8197,8 @@ var RULES_END = "<!-- holyclaude:core-rules:end -->";
 var POINTER = "Full state: holyclaude intent show; holyclaude assignment list";
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
-var clip = (text, max) => text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
+var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
+var clip = (text, max) => max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
 var cutRules = (rules, room) => {
   const cut = rules.slice(0, room);
   const newline = cut.lastIndexOf(`
@@ -8185,7 +8270,10 @@ ${state}`.length - RULES_CUT.length;
     return `${cutRules(rules, room)}${RULES_CUT}
 
 ${state}${tail}`;
-  return `${fitSummary(summary, CAP - tail.length)}${tail}`.trimStart();
+  const marker = rules === undefined ? "" : `${RULES_DROPPED}
+
+`;
+  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
 };
 var extractRules = (agentFile) => {
   const start = agentFile.indexOf(RULES_START);
@@ -8255,17 +8343,29 @@ var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
 
 // src/hook/input.ts
 var MAX_HOOK_BYTES = 1024 * 1024;
-var HookInput = Struct({
-  session_id: optionalKey2(String4),
-  transcript_path: optionalKey2(String4),
-  tool_name: optionalKey2(String4),
-  tool_input: optionalKey2(Record(String4, Unknown2)),
-  agent_id: optionalKey2(String4),
-  agent_type: optionalKey2(String4),
-  effort: optionalKey2(Union2([Struct({ level: optionalKey2(String4) }), String4]))
-});
-var decode2 = decodeUnknownEffect2(fromJsonString2(HookInput));
-var decodeHookInput = (text) => withinLimit("Hook input", text, MAX_HOOK_BYTES).pipe(flatMap2(decode2));
+var Envelope = fromJsonString2(Record(String4, Unknown2));
+var Effort2 = Union2([
+  Struct({ level: optionalKey2(String4) }),
+  String4
+]);
+var lenient = (schema, value) => getOrUndefined(decodeUnknownOption2(schema)(value));
+var toolInput = (value) => {
+  const fields = lenient(Record(String4, Unknown2), value);
+  return fields === undefined ? undefined : {
+    command: lenient(String4, fields["command"]),
+    file_path: lenient(String4, fields["file_path"]),
+    notebook_path: lenient(String4, fields["notebook_path"])
+  };
+};
+var decode2 = decodeUnknownEffect2(Envelope);
+var decodeHookInput = (text) => withinLimit("Hook input", text, MAX_HOOK_BYTES).pipe(flatMap2(decode2), map4((envelope) => ({
+  agent_id: lenient(String4, envelope["agent_id"]),
+  tool_name: lenient(String4, envelope["tool_name"]),
+  tool_input: toolInput(envelope["tool_input"]),
+  agent_type: lenient(String4, envelope["agent_type"]),
+  transcript_path: lenient(String4, envelope["transcript_path"]),
+  effort: lenient(Effort2, envelope["effort"])
+})));
 var effortOf = (input) => {
   const { effort } = input;
   return typeof effort === "string" ? effort : effort?.level;
@@ -8339,6 +8439,23 @@ var scanScript = (source) => {
   const pending = [];
   let failure;
   let pos = 0;
+  let look = { end: -1, separator: -1, close: -1 };
+  const lookahead = () => {
+    if (pos < look.end)
+      return look;
+    let end = pos;
+    let separator = -1;
+    let close = -1;
+    while (end < source.length && !WORD_END.test(source[end] ?? " ")) {
+      if (source[end] === "," || source[end] === "." && source[end + 1] === ".")
+        separator = end;
+      if (source[end] === "]")
+        close = end;
+      end += 1;
+    }
+    look = { end, separator, close };
+    return look;
+  };
   const fail = (reason) => {
     failure ??= reason;
   };
@@ -8425,13 +8542,14 @@ var scanScript = (source) => {
     }
     fail("unterminated parameter expansion");
   };
-  const list = (nested) => {
+  const list = (nested, arithmetic = false) => {
     let words = [];
     let outputs = [];
     let current = null;
     let dynamic = false;
     let redirect = null;
     let parenDepth = 0;
+    let arithmeticBase = -1;
     let closed = false;
     const endWord = () => {
       if (current === null)
@@ -8462,9 +8580,10 @@ var scanScript = (source) => {
     const dollar = (quoted) => {
       const next = source[pos + 1];
       if (next === "(") {
+        const shift = source[pos + 2] === "(";
         pos += 2;
         append("$(...)", true);
-        list(true);
+        list(true, shift);
       } else if (next === "{") {
         pos += 2;
         append("${...}", true);
@@ -8554,7 +8673,7 @@ var scanScript = (source) => {
         redirect = "in";
         return;
       }
-      if (char === "<" && source.startsWith("<<", pos)) {
+      if (char === "<" && source.startsWith("<<", pos) && !arithmetic && arithmeticBase === -1) {
         pos += 2;
         pending.push(readHeredocDelimiter());
         return;
@@ -8608,19 +8727,23 @@ var scanScript = (source) => {
         redirection();
       else if (char === "(") {
         endCommand();
-        parenDepth += 1;
-        pos += 1;
+        const open = source[pos + 1] === "(" ? 2 : 1;
+        if (open === 2 && arithmeticBase === -1)
+          arithmeticBase = parenDepth;
+        parenDepth += open;
+        pos += open;
       } else if (char === ")") {
         endCommand();
         pos += 1;
-        if (parenDepth > 0)
+        if (parenDepth > 0) {
           parenDepth -= 1;
-        else if (nested)
+          if (parenDepth <= arithmeticBase)
+            arithmeticBase = -1;
+        } else if (nested)
           closed = true;
       } else {
-        const rest = source.slice(pos).split(WORD_END)[0] ?? "";
-        const braceList = char === "{" && /^\{[^\s;&|()<>]*(,|\.\.)/.test(rest);
-        const bracket = char === "[" && rest.length > 1 && rest.includes("]");
+        const braceList = char === "{" && lookahead().separator > pos;
+        const bracket = char === "[" && lookahead().close > pos;
         append(char, char === "*" || char === "?" || braceList || bracket);
         pos += 1;
       }
@@ -8642,6 +8765,7 @@ var REASONS = {
   gh: (sub) => `gh ${sub} is a write or an unlisted gh command, and gh writes belong to the root. Put the finding in your report. Open to you: gh pr view|checks|diff|list|status, run view|list, issue view|list, repo view, and gh api for plain reads.`,
   holyclaude: (sub) => `holyclaude ${sub} changes Intent and Assignment state, which the root owns. Read it with holyclaude intent show, assignment show, assignment list, assignment verify, routes and reconcile.`,
   state: `The .holyclaude state files are written by the root through the holyclaude CLI. Describe the state you need in your report.`,
+  config: (key) => `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
   unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`
 };
 var GIT_READS = new Set([
@@ -8691,9 +8815,9 @@ var GIT_VALUE_GLOBALS = new Set([
   "--namespace",
   "--super-prefix"
 ]);
-var GIT_INLINE_GLOBALS = /^--(git-dir|work-tree|namespace|super-prefix|attr-source|config-env)=/;
+var GIT_INLINE_GLOBALS = /^--(git-dir|work-tree|namespace|super-prefix|attr-source)=/;
 var GIT_INFO_GLOBALS = new Set(["--version", "--help", "-h", "--html-path", "--man-path"]);
-var GIT_EXEC_CONFIG = /^(alias\.|core\.(fsmonitor|pager|sshcommand|editor|hookspath|askpass|gitproxy)|credential\.|filter\.|diff\..*\.(command|textconv)|pager\.|include|url\.|sequence\.editor|gpg\.|uploadpack\.|receive\.|protocol\.ext)/i;
+var GIT_DISPLAY_CONFIG = /^(color\.|column\.|advice\.|core\.(quotepath|abbrev|whitespace|autocrlf|safecrlf|filemode|ignorecase|precomposeunicode|longpaths|symlinks)$|diff\.(algorithm|context|renames|colormoved|colormovedws|noprefix|mnemonicprefix|ignoresubmodules|interhunkcontext|wserrorhighlight)$|log\.(abbrevcommit|date|decorate|follow|showroot)$|status\.(short|branch|showuntrackedfiles|renames|aheadbehind)$)/;
 var GIT_EXEC_FLAGS = /^--(upload-pack|receive-pack|exec|ext-diff|open-files-in-pager|config-env)(=|$)/;
 var BRANCH_FLAGS = new Set([
   "-l",
@@ -8765,7 +8889,7 @@ var CONFIG_NEUTRAL = new Set([
   "--bool-or-int"
 ]);
 var WRAPPERS = {
-  env: { values: ["-u", "-C", "--unset", "--chdir"], leading: 0 },
+  env: { values: ["-u", "-C", "--unset", "--chdir"], leading: 0, script: ["-S", "--split-string"] },
   command: { values: [], leading: 0 },
   exec: { values: ["-a"], leading: 0 },
   builtin: { values: [], leading: 0 },
@@ -8782,16 +8906,20 @@ var WRAPPERS = {
     values: ["-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-l", "-i"],
     leading: 0
   },
-  watch: { values: ["-n", "-d", "--interval"], leading: 0 },
+  watch: { values: ["-n", "-d", "--interval"], leading: 0, line: true },
   unbuffer: { values: [], leading: 0 },
   chronic: { values: [], leading: 0 },
   taskset: { values: [], leading: 1 },
-  flock: { values: ["-w", "-E", "-c"], leading: 1 },
+  flock: { values: ["-w", "-E"], leading: 1, script: ["-c", "--command"] },
   busybox: { values: [], leading: 0 }
 };
+var XARGS_INPUT = [
+  { text: "x", dynamic: false },
+  { text: "x:x", dynamic: false }
+];
 var SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh"]);
 var RUNTIMES = new Set(["bun", "bunx", "node", "npx", "deno", "tsx", "ts-node", "pnpm", "yarn"]);
-var BREAKS = new Set(["for", "select", "case", "function", "fi", "done", "esac", "}", "[["]);
+var BREAKS = new Set(["for", "select", "case", "fi", "done", "esac", "}", "[["]);
 var OPENERS = new Set(["if", "then", "elif", "else", "while", "until", "do", "!", "{", "coproc"]);
 var FILE_WRITERS = new Set([
   "rm",
@@ -8805,12 +8933,60 @@ var FILE_WRITERS = new Set([
   "rsync",
   "unlink",
   "shred",
-  "touch"
+  "touch",
+  "remove-item",
+  "ri",
+  "del",
+  "erase",
+  "rd",
+  "rmdir",
+  "move-item",
+  "mi",
+  "move",
+  "copy-item",
+  "copy",
+  "cpi",
+  "set-content",
+  "sc",
+  "add-content",
+  "ac",
+  "clear-content",
+  "clc",
+  "out-file",
+  "new-item",
+  "ni",
+  "rename-item",
+  "rni",
+  "tee-object"
 ]);
-var basename2 = (path) => path.slice(path.lastIndexOf("/") + 1);
+var HOLYCLAUDE = /^holyclaude(\.js)?$/;
+var RUNTIME_VALUE_FLAGS = new Set([
+  "--cwd",
+  "-c",
+  "--config",
+  "--env-file",
+  "--preload",
+  "-r",
+  "--require",
+  "--import",
+  "--filter",
+  "--port",
+  "--tsconfig-override",
+  "-d",
+  "--define",
+  "--conditions",
+  "--loader"
+]);
+var PACKAGE_RUNNERS = new Set(["bunx", "npx"]);
+var RUNNER_SUBCOMMANDS = new Set(["x", "dlx", "exec"]);
+var partStart = (path) => Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
+var program = (path) => path.slice(partStart(path)).toLowerCase().replace(/\.(exe|cmd|bat)$/, "");
 var isAssignment = (text) => /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(text);
 var texts = (words) => words.map((word) => word.text);
-var touchesState = (text) => text.includes(".holyclaude");
+var touchesState = (text) => text.toLowerCase().includes(".holyclaude");
+var isHolyclaude = (path) => HOLYCLAUDE.test(program(path));
+var isEntry = (path) => isHolyclaude(path) || /packages\/cli\/(src\/)?main\.(ts|js)$/.test(path.replaceAll("\\", "/").toLowerCase());
+var programOf = (word) => word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text))) ? undefined : program(word.text);
 var classifyGitBranch = (args) => {
   let listing = false;
   const positionals = [];
@@ -8820,6 +8996,11 @@ var classifyGitBranch = (args) => {
       listing = true;
     if (BRANCH_FLAGS.has(arg))
       continue;
+    if (/^-[larvi]{2,}$/.test(arg)) {
+      if (arg.includes("l"))
+        listing = true;
+      continue;
+    }
     if (BRANCH_VALUE_FLAGS.has(arg))
       index += 1;
     else if (/^--(merged|no-merged|contains|no-contains|sort|format|points-at|abbrev)=/.test(arg))
@@ -8840,6 +9021,11 @@ var classifyGitTag = (args) => {
       listing = true;
     if (TAG_FLAGS.has(arg) || /^-n\d*$/.test(arg)) {
       if (/^-n\d*$/.test(arg))
+        listing = true;
+      continue;
+    }
+    if (/^-(?:[liv]|n\d*){2,}$/.test(arg)) {
+      if (/[lvn]/.test(arg))
         listing = true;
       continue;
     }
@@ -8907,11 +9093,11 @@ var classifyGitSub = (sub, rest) => {
     case "config":
       return classifyGitConfig(args) ? undefined : deny;
     case "remote": {
-      const [first, ...others] = args.filter((arg) => arg !== "-v" && arg !== "--verbose");
+      const [first, ...others] = args.filter((arg) => !/^-v+$/.test(arg) && arg !== "--verbose");
       if (first === undefined)
         return;
       if (first === "show" || first === "get-url")
-        return others.every((a) => !a.startsWith("-") || a === "-n") ? undefined : deny;
+        return others.every((a) => !a.startsWith("-") || ["-n", "--push", "--all"].includes(a)) ? undefined : deny;
       return deny;
     }
     case "stash":
@@ -8929,13 +9115,15 @@ var classifyGit = (args) => {
     if (word === undefined || !word.text.startsWith("-"))
       break;
     const flag = word.text;
-    if (flag === "-c") {
-      const setting = args[index + 1];
+    if (flag === "-c" || flag === "--config-env" || flag.startsWith("--config-env=")) {
+      const attached = flag.startsWith("--config-env=") ? flag.slice("--config-env=".length) : undefined;
+      const setting = attached ?? args[index + 1]?.text;
       if (setting === undefined)
-        return REASONS.unsure("git -c without a value");
-      if (GIT_EXEC_CONFIG.test(setting.text))
-        return REASONS.unsure(`git -c ${setting.text.split("=")[0]} can run programs`);
-      index += 2;
+        return REASONS.unsure(`git ${flag} without a value`);
+      const key = setting.split("=")[0] ?? "";
+      if (!GIT_DISPLAY_CONFIG.test(key.toLowerCase()))
+        return REASONS.config(key);
+      index += attached === undefined ? 2 : 1;
     } else if (GIT_VALUE_GLOBALS.has(flag)) {
       if (args[index + 1] === undefined)
         return REASONS.unsure(`git ${flag} without a value`);
@@ -8960,9 +9148,72 @@ var GH_READS = {
   issue: ["view", "list", "status"],
   repo: ["view"]
 };
-var GH_API_WRITES = /^(-X|--method|-f|-F|--field|--raw-field|--input)(=|$)/;
-var GH_API_CLUSTER = /^-[A-Za-z]*[XfF]/;
-var classifyGh = (args) => {
+var GH_API_FIELDS = new Set(["-f", "-F", "--field", "--raw-field"]);
+var GH_API_VALUE_FLAGS = new Set([
+  "-H",
+  "--header",
+  "-q",
+  "--jq",
+  "-t",
+  "--template",
+  "--hostname",
+  "--cache",
+  "-p",
+  "--preview"
+]);
+var attached = (arg) => {
+  if (arg.startsWith("--")) {
+    const at = arg.indexOf("=");
+    return at === -1 ? [arg, undefined] : [arg.slice(0, at), arg.slice(at + 1)];
+  }
+  return /^-[XfF]./.test(arg) ? [arg.slice(0, 2), arg.slice(2)] : [arg, undefined];
+};
+var classifyGhApi = (args) => {
+  const deny = REASONS.gh("api with a write method, fields, a body or a GraphQL mutation");
+  let method = "";
+  let endpoint;
+  let body = false;
+  const fields = [];
+  for (let index = 0;index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    const [flag, inline] = attached(arg);
+    const isMethod = flag === "-X" || flag === "--method";
+    const valued = isMethod || GH_API_FIELDS.has(flag) || flag === "--input" || GH_API_VALUE_FLAGS.has(flag);
+    const value = valued ? inline ?? args[++index] ?? "" : undefined;
+    if (isMethod)
+      method = (value ?? "").toUpperCase();
+    else if (GH_API_FIELDS.has(flag))
+      fields.push(value ?? "");
+    else if (flag === "--input")
+      body = true;
+    else if (!valued && /^-[A-Za-z]*[XfF]/.test(arg) && !arg.startsWith("--"))
+      return deny;
+    else if (!valued && !arg.startsWith("-") && endpoint === undefined)
+      endpoint = arg;
+  }
+  if (body)
+    return deny;
+  if (endpoint === "graphql") {
+    const queries = fields.filter((field) => field.startsWith("query="));
+    const reads = queries.length > 0 && queries.every((query) => !/mutation/i.test(query) && !query.startsWith("query=@"));
+    return reads && ["", "GET", "POST"].includes(method) ? undefined : deny;
+  }
+  if (method === "" ? fields.length > 0 : method !== "GET" && method !== "HEAD")
+    return deny;
+  return;
+};
+var classifyGh = (input) => {
+  let from = 0;
+  for (;; ) {
+    const text = input[from]?.text ?? "";
+    if (text === "-R" || text === "--repo")
+      from += 2;
+    else if (text.startsWith("--repo=") || /^-R./.test(text))
+      from += 1;
+    else
+      break;
+  }
+  const args = input.slice(from);
   const [group, action] = args;
   if (group === undefined)
     return;
@@ -8970,11 +9221,8 @@ var classifyGh = (args) => {
     return REASONS.unsure("the gh subcommand is computed");
   if (["--version", "--help", "-h"].includes(group.text))
     return;
-  if (group.text === "api") {
-    const flags = texts(args.slice(1)).filter((arg) => arg.startsWith("-"));
-    const writes = flags.some((arg) => GH_API_WRITES.test(arg) || !arg.startsWith("--") && GH_API_CLUSTER.test(arg));
-    return writes ? REASONS.gh("api with a write flag") : undefined;
-  }
+  if (group.text === "api")
+    return classifyGhApi(texts(args.slice(1)));
   const allowed = GH_READS[group.text];
   if (allowed !== undefined && action !== undefined && allowed.includes(action.text))
     return;
@@ -8995,7 +9243,7 @@ var classifyHolyclaude = (args) => {
     return REASONS.unsure("the holyclaude subcommand is computed");
   if (args.some((word) => word.text === "--help" || word.text === "-h"))
     return;
-  if (first === "--version" || first === "-V")
+  if (first === "--version" || first === "-V" || first === "help")
     return;
   if (first === "reconcile" && (second === undefined || second.startsWith("-")))
     return;
@@ -9003,7 +9251,30 @@ var classifyHolyclaude = (args) => {
     return;
   return HOLYCLAUDE_READS.has(`${first} ${second ?? ""}`) ? undefined : REASONS.holyclaude(second === undefined || second.startsWith("-") ? first : `${first} ${second}`);
 };
-var unwrap = (name, rest) => {
+var classifyLine = (words, depth) => {
+  const [first] = words;
+  if (first === undefined)
+    return;
+  if (first.dynamic)
+    return REASONS.unsure("the command text is computed");
+  return classifyScript(texts(words).join(" "), depth + 1);
+};
+var carriedScript = (wrapper, rest, index) => {
+  const word = rest[index];
+  if (word === undefined)
+    return;
+  for (const flag of wrapper.script ?? []) {
+    if (word.text === flag) {
+      const value = rest[index + 1];
+      return { text: value?.text, dynamic: value?.dynamic ?? false, width: 2 };
+    }
+    const prefix = flag.startsWith("--") ? `${flag}=` : flag;
+    if (word.text.startsWith(prefix))
+      return { text: word.text.slice(prefix.length), dynamic: word.dynamic, width: 1 };
+  }
+  return;
+};
+var unwrap = (name, rest, depth) => {
   const wrapper = WRAPPERS[name];
   if (wrapper === undefined)
     return rest;
@@ -9020,14 +9291,14 @@ var unwrap = (name, rest) => {
     }
     if (name === "command" && (text === "-v" || text === "-V"))
       return [];
-    if (name === "env" && (text === "-S" || text === "--split-string")) {
-      const script = rest[index + 1];
-      if (script === undefined || script.dynamic)
-        return REASONS.unsure("env -S script is computed");
-      const verdict = classifyScript(script.text, 1);
+    const carried = carriedScript(wrapper, rest, index);
+    if (carried !== undefined) {
+      if (carried.text === undefined || carried.dynamic)
+        return REASONS.unsure(`the ${name} command text is computed`);
+      const verdict = classifyScript(carried.text, depth + 1);
       if (verdict !== undefined)
         return verdict;
-      index += 2;
+      index += carried.width;
       continue;
     }
     if (text.startsWith("-") && text.length > 1) {
@@ -9045,7 +9316,8 @@ var unwrap = (name, rest) => {
     }
     break;
   }
-  return rest.slice(index);
+  const tail = rest.slice(index);
+  return wrapper.line === true ? classifyLine(tail, depth) ?? [] : tail;
 };
 var findAfter = (words, markers) => {
   const start = words.findIndex((word) => markers.includes(word.text));
@@ -9070,63 +9342,106 @@ var classifyShell = (rest, depth) => {
   const file = rest.find((word) => !word.text.startsWith("-") || word.text === "-");
   if (file === undefined || file.text === "-" || rest.some((word) => word.text === "-s"))
     return REASONS.unsure("a shell reading commands from input");
-  if (/^holyclaude(\.js)?$/.test(basename2(file.text)))
+  if (isHolyclaude(file.text))
     return classifyHolyclaude(rest.slice(rest.indexOf(file) + 1));
   return;
 };
-var classifyRuntime = (rest) => {
-  const entry = rest.findIndex((word) => /^holyclaude(\.js)?$/.test(basename2(word.text)) || /packages\/cli\/(src\/)?main\.(ts|js)$/.test(word.text));
-  return entry === -1 ? undefined : classifyHolyclaude(rest.slice(entry + 1));
+var isFlagFor = (text, full) => /^[-/][A-Za-z]+$/.test(text) && full.startsWith(text.slice(1).toLowerCase());
+var classifyPowerShell = (rest, depth) => {
+  const flagged = rest.findIndex((word) => isFlagFor(word.text, "command"));
+  const start = flagged === -1 ? rest.findIndex((word) => !word.text.startsWith("-")) : flagged + 1;
+  const flags = start === -1 ? rest : rest.slice(0, start);
+  if (flags.some((word) => isFlagFor(word.text, "encodedcommand")))
+    return REASONS.unsure("an encoded PowerShell command");
+  if (start === -1 || flags.some((word) => isFlagFor(word.text, "file")))
+    return;
+  return classifyLine(rest.slice(start), depth);
+};
+var classifyCmd = (rest, depth) => {
+  const flagged = rest.findIndex((word) => /^(\/\/?|-)[ckr]$/i.test(word.text));
+  return flagged === -1 ? undefined : classifyLine(rest.slice(flagged + 1), depth);
+};
+var operandFrom = (rest, from) => {
+  let index = from;
+  for (;; ) {
+    const text = rest[index]?.text ?? "";
+    if (!text.startsWith("-") || text === "-")
+      return index;
+    index += RUNTIME_VALUE_FLAGS.has(text) ? 2 : 1;
+  }
+};
+var classifyRuntime = (name, rest, depth) => {
+  let at = operandFrom(rest, 0);
+  if (name === "node" && rest.slice(0, at).some((word) => word.text === "--check"))
+    return;
+  const subcommand = rest[at]?.text ?? "";
+  const runner = PACKAGE_RUNNERS.has(name) || RUNNER_SUBCOMMANDS.has(subcommand);
+  if (subcommand === "run" || RUNNER_SUBCOMMANDS.has(subcommand))
+    at = operandFrom(rest, at + 1);
+  const operand = rest[at];
+  if (operand === undefined)
+    return;
+  if (isEntry(operand.text))
+    return classifyHolyclaude(rest.slice(at + 1));
+  return runner ? classifyWords(rest.slice(at), depth + 1) : undefined;
 };
 var classifyWords = (input, depth) => {
-  let words = input;
+  if (depth > MAX_DEPTH)
+    return REASONS.unsure("commands nested too deeply");
+  let start = 0;
   for (;; ) {
-    const head = words[0];
+    const head = input[start];
     if (head === undefined)
       return;
     if (!head.dynamic && BREAKS.has(head.text))
       return;
-    if (!head.dynamic && OPENERS.has(head.text))
-      words = words.slice(1);
-    else if (isAssignment(head.text))
-      words = words.slice(1);
+    if (!head.dynamic && head.text === "function")
+      start += 2;
+    else if (!head.dynamic && OPENERS.has(head.text) || isAssignment(head.text))
+      start += 1;
     else
       break;
   }
-  const [head, ...rest] = words;
+  const [head, ...rest] = input.slice(start);
   if (head === undefined)
     return;
-  if (head.dynamic)
+  const name = programOf(head);
+  if (name === undefined)
     return REASONS.unsure("the program name is computed");
-  const name = basename2(head.text);
   if (name === "git")
     return classifyGit(rest);
   if (name === "gh")
     return classifyGh(rest);
-  if (/^holyclaude(\.js)?$/.test(name))
+  if (HOLYCLAUDE.test(name))
     return classifyHolyclaude(rest);
-  if (name in WRAPPERS) {
-    const inner = unwrap(name, rest);
-    return typeof inner === "string" ? inner : classifyWords(inner, depth);
+  if (Object.hasOwn(WRAPPERS, name)) {
+    const inner = unwrap(name, rest, depth);
+    if (typeof inner === "string")
+      return inner;
+    return classifyWords(name === "xargs" ? [...inner, ...XARGS_INPUT] : inner, depth + 1);
   }
   if (SHELLS.has(name))
     return classifyShell(rest, depth);
-  if (name === "eval") {
+  if (name === "powershell" || name === "pwsh")
+    return classifyPowerShell(rest, depth);
+  if (name === "cmd")
+    return classifyCmd(rest, depth);
+  if (name === "eval" || name === "iex" || name === "invoke-expression") {
     if (rest.some((word) => word.dynamic))
-      return REASONS.unsure("eval text is computed");
+      return REASONS.unsure(`${name} text is computed`);
     return classifyScript(texts(rest).join(" "), depth + 1);
   }
   if (RUNTIMES.has(name))
-    return classifyRuntime(rest);
+    return classifyRuntime(name, rest, depth);
   if (name === "find") {
     const inner = findAfter(rest, ["-exec", "-execdir", "-ok", "-okdir"]);
     if (inner !== undefined)
-      return classifyWords(inner, depth);
+      return classifyWords(inner, depth + 1);
   }
   if (name === "fd" || name === "fdfind") {
     const inner = findAfter(rest, ["-x", "-X", "--exec", "--exec-batch"]);
     if (inner !== undefined)
-      return classifyWords(inner, depth);
+      return classifyWords(inner, depth + 1);
   }
   if (FILE_WRITERS.has(name) && rest.some((word) => touchesState(word.text)))
     return REASONS.state;
@@ -9153,6 +9468,20 @@ var classifyScript = (source, depth) => {
   return;
 };
 var denyReason = (command) => classifyScript(command, 0);
+var UNREADABLE = REASONS.unsure("it is nested too deeply to read");
+var SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
+var FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var denyToolReason = (toolName, input) => {
+  if (toolName === undefined)
+    return;
+  if (SHELL_TOOLS.has(toolName))
+    return input?.command === undefined ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.` : denyReason(input.command);
+  if (FILE_TOOLS.has(toolName)) {
+    const target = input?.file_path ?? input?.notebook_path;
+    return target !== undefined && touchesState(target) ? REASONS.state : undefined;
+  }
+  return;
+};
 
 // src/hook/pre-tool-use.ts
 var OBSERVATION_BUDGET = "750 millis";
@@ -9186,10 +9515,15 @@ var preToolUse = (stdin) => gen2(function* () {
   const agentId = input.agent_id;
   if (agentId === undefined || agentId === "")
     return "";
-  const command = input.tool_input?.["command"];
-  const reason = input.tool_name === "Bash" ? typeof command === "string" ? denyReason(command) : "This Bash call carries no command text that can be checked. Send the command as a plain string." : undefined;
+  const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
   yield* observe(input, agentId).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
   return reason === undefined ? "" : deny(reason);
+});
+
+// src/state.ts
+var loadStateFile = suspend2(() => {
+  const path = stateFilePath();
+  return loadState(path).pipe(catchTag2("SchemaError", (error) => fail5(new StateCorrupt({ path, detail: error.message }))));
 });
 
 // src/verify.ts
@@ -9213,7 +9547,7 @@ var transcriptModels = (path) => gen2(function* () {
 });
 var compare = (expected, observed, matches = (e, o) => e === o) => observed === undefined ? "unobserved" : matches(expected, observed) ? "match" : "mismatch";
 var verifyAssignment = (id) => gen2(function* () {
-  const state = yield* loadState(stateFilePath());
+  const state = yield* loadStateFile;
   const assignment = yield* findAssignment(state, id);
   const agentId = assignment.agent_id;
   if (agentId === null)
@@ -9292,8 +9626,8 @@ var activeIntent = (state, id) => gen2(function* () {
   const latest = state.intents.at(-1);
   return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }));
 });
-var read = (use) => loadState(stateFilePath()).pipe(flatMap2(use));
-var change = (transition) => updateState(stateFilePath(), transition);
+var read = (use) => loadStateFile.pipe(flatMap2(use));
+var change = (transition) => loadStateFile.pipe(andThen2(updateState(stateFilePath(), transition)));
 var need = (stdin, command) => stdin.pipe(flatMap2((text) => text.trim() === "" ? fail5(new StdinMissing({ command })) : succeed5(text)));
 var fromStdin = (schema, stdin, command) => need(stdin, command).pipe(flatMap2(decodeInput(schema)));
 var IntentUpdateBody = Struct({
@@ -9367,18 +9701,23 @@ var assignmentShow = cmd({
   positionals: 1,
   run: (args) => withRef(args.positionals[0]).pipe(flatMap2((ref) => read((state) => findAssignment(state, ref.assignment_id))), map4((assignment) => ({ value: assignment })))
 });
+var LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}]`;
+var stateFilter = (value) => gen2(function* () {
+  if (value === undefined)
+    return;
+  return yield* decodeStrict(AssignmentState)(value).pipe(mapError2(() => usageError(LIST_USAGE, `State ${value} is not one of ${AssignmentState.literals.join("|")}`)));
+});
 var assignmentList = cmd({
   path: ["assignment", "list"],
-  usage: "assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]",
+  usage: LIST_USAGE,
   summary: "list Assignments, one row each",
   root: false,
   flags: { state: "string" },
   positionals: 0,
-  run: (args) => read((state) => {
-    const wanted = stringFlag(args, "state");
+  run: (args) => stateFilter(stringFlag(args, "state")).pipe(flatMap2((wanted) => read((state) => {
     const rows = state.assignments.filter((assignment) => wanted === undefined || assignment.state === wanted).map(summaryRow);
     return succeed5({ value: { assignments: rows } });
-  })
+  })))
 });
 var assignmentCreate = cmd({
   path: ["assignment", "create"],
@@ -9438,16 +9777,17 @@ var assignmentBind = cmd({
       fingerprint
     });
     const bound = yield* change((state) => bindAgent(state, input));
-    if (model !== undefined || effort !== undefined)
-      yield* appendObservation({
-        kind: "override",
-        assignment_id: bound.id,
-        agent_id: agent,
-        ...model === undefined ? {} : { model },
-        ...effort === undefined ? {} : { effort },
-        at: yield* nowIso
-      }).pipe(mapError2((cause) => new StateIo({ path: observationsPath(), cause })));
-    return { value: summaryRow(bound) };
+    const missed = model === undefined && effort === undefined ? undefined : yield* appendObservation({
+      kind: "override",
+      assignment_id: bound.id,
+      agent_id: agent,
+      ...model === undefined ? {} : { model },
+      ...effort === undefined ? {} : { effort },
+      at: yield* nowIso
+    }).pipe(as2(undefined), catch_2((error) => succeed5(`override not recorded in ${observationsPath()}: ${String(error.cause)}`)));
+    return {
+      value: { ...summaryRow(bound), ...missed === undefined ? {} : { observation: missed } }
+    };
   })
 });
 var assignmentRollback = cmd({
@@ -9555,7 +9895,7 @@ var select = cmd({
       assignment_id: args.positionals[0],
       fingerprint
     });
-    const state = yield* loadState(stateFilePath());
+    const state = yield* loadStateFile;
     const selection = yield* selectWorker(state, input);
     const assignment = yield* findAssignment(state, input.assignment_id);
     const route = routeFor(assignment.role);
@@ -9673,8 +10013,10 @@ var HINTS = {
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence: "Cover exactly the declared labels in criteria_evidence and required_evidence.",
   TooLarge: "Shorten the input to fit the limit.",
-  StateLocked: "Another process holds the state lock; retry in a moment.",
+  StateLocked: "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
+  LockLost: "The state was left untouched; rerun the command.",
   StateIo: "Check HOLYCLAUDE_STATE_FILE or CLAUDE_PROJECT_DIR and the file permissions.",
+  StateCorrupt: "Fix the field the message names in the state file, or restore the file from a backup; a missing file reads as empty state.",
   SchemaError: "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
   NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
@@ -9738,12 +10080,12 @@ var failure = (error) => ({
   out: toon(errorFields(error)),
   code: error instanceof Usage ? 2 : 1
 });
-var program = (argv) => {
+var program2 = (argv) => {
   const hook = argv[0] === "hook";
   const quiet = { out: "", code: 0 };
   return run2(argv).pipe(map4(render), catch_2((error) => succeed5(hook ? quiet : failure(error))), catchCause2((cause) => succeed5(hook ? quiet : failure({ _tag: "Defect", message: pretty(cause) }))));
 };
-var { out, code } = await runPromise2(program(Bun.argv.slice(2)));
+var { out, code } = await runPromise2(program2(Bun.argv.slice(2)));
 if (code === 0)
   process.stdout.write(out);
 else

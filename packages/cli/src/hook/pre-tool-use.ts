@@ -7,7 +7,7 @@ import {
 } from "../observations.ts"
 import { nowIso } from "../clock.ts"
 import { decodeHookInput, effortOf, subagentTranscript, type HookInput } from "./input.ts"
-import { denyReason } from "./policy.ts"
+import { denyToolReason, UNREADABLE } from "./policy.ts"
 
 const OBSERVATION_BUDGET = "750 millis"
 
@@ -46,21 +46,19 @@ const observe = (input: HookInput, agentId: string) =>
 
 /**
  * The PreToolUse hook. Main-thread calls pass through. For subagent calls it records the effort
- * observation within a short bound, never letting a failure block the call, and denies Bash
- * commands that write VCS state or holyclaude state. Returns the hook JSON, or "" to allow.
+ * observation within a short bound, never letting a failure block the call, and denies shell
+ * commands (Bash, PowerShell, Monitor) that write VCS state or holyclaude state, and file writes
+ * into the state directory. The decision reads only `agent_id`, `tool_name` and `tool_input`; a
+ * payload that cannot be judged is denied. Returns the hook JSON, or "" to allow.
  */
 export const preToolUse = (stdin: string) =>
   Effect.gen(function* () {
     const input = yield* decodeHookInput(stdin)
     const agentId = input.agent_id
     if (agentId === undefined || agentId === "") return ""
-    const command = input.tool_input?.["command"]
-    const reason =
-      input.tool_name === "Bash"
-        ? typeof command === "string"
-          ? denyReason(command)
-          : "This Bash call carries no command text that can be checked. Send the command as a plain string."
-        : undefined
+    const reason = yield* Effect.try(() => denyToolReason(input.tool_name, input.tool_input)).pipe(
+      Effect.orElseSucceed(() => UNREADABLE),
+    )
     yield* observe(input, agentId).pipe(
       Effect.timeout(OBSERVATION_BUDGET),
       Effect.catchCause(() => Effect.void),

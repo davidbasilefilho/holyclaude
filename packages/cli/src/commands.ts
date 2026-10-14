@@ -3,6 +3,7 @@ import {
   AcceptanceRecord,
   AssignmentDraft,
   AssignmentRef,
+  AssignmentState,
   BindAgentInput,
   CancelInput,
   CreateIntentInput,
@@ -12,7 +13,6 @@ import {
   ReserveInput,
   ResolveReconcileInput,
   SelectWorkerInput,
-  StateIo,
   Text,
   accept,
   bindAgent,
@@ -25,7 +25,6 @@ import {
   findAssignment,
   findIntent,
   followUp,
-  loadState,
   projectRoot,
   reconcile,
   reserve,
@@ -46,6 +45,7 @@ import { sessionStart } from "./hook/session-start.ts"
 import { preToolUse } from "./hook/pre-tool-use.ts"
 import { appendObservation, observationsPath } from "./observations.ts"
 import { nowIso } from "./clock.ts"
+import { loadStateFile } from "./state.ts"
 import { verifyAssignment } from "./verify.ts"
 
 /** What a command produced: TOON for the model, or raw text for hooks, plus an exit code. */
@@ -109,11 +109,13 @@ const activeIntent = (state: State, id: string | undefined) =>
   })
 
 const read = <A, E>(use: (state: State) => Effect.Effect<A, E>) =>
-  loadState(stateFilePath()).pipe(Effect.flatMap(use))
+  loadStateFile.pipe(Effect.flatMap(use))
 
 const change = <A, E>(
   transition: (state: State) => Effect.Effect<{ readonly state: State; readonly value: A }, E>,
-) => updateState(stateFilePath(), transition)
+) =>
+  // Loading first lets a corrupt file be reported as such, not as bad input to the transition.
+  loadStateFile.pipe(Effect.andThen(updateState(stateFilePath(), transition)))
 
 const need = (stdin: Effect.Effect<string, StdinMissing>, command: string) =>
   stdin.pipe(
@@ -235,21 +237,40 @@ const assignmentShow = cmd({
     ),
 })
 
+const LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}]`
+
+/** The `--state` filter, or a usage error naming the states that exist. */
+const stateFilter = (value: string | undefined) =>
+  Effect.gen(function* () {
+    if (value === undefined) return undefined
+    return yield* decodeStrict(AssignmentState)(value).pipe(
+      Effect.mapError(() =>
+        usageError(
+          LIST_USAGE,
+          `State ${value} is not one of ${AssignmentState.literals.join("|")}`,
+        ),
+      ),
+    )
+  })
+
 const assignmentList = cmd({
   path: ["assignment", "list"],
-  usage: "assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]",
+  usage: LIST_USAGE,
   summary: "list Assignments, one row each",
   root: false,
   flags: { state: "string" },
   positionals: 0,
   run: (args) =>
-    read((state) => {
-      const wanted = stringFlag(args, "state")
-      const rows = state.assignments
-        .filter((assignment) => wanted === undefined || assignment.state === wanted)
-        .map(summaryRow)
-      return Effect.succeed({ value: { assignments: rows } })
-    }),
+    stateFilter(stringFlag(args, "state")).pipe(
+      Effect.flatMap((wanted) =>
+        read((state) => {
+          const rows = state.assignments
+            .filter((assignment) => wanted === undefined || assignment.state === wanted)
+            .map(summaryRow)
+          return Effect.succeed({ value: { assignments: rows } })
+        }),
+      ),
+    ),
 })
 
 const assignmentCreate = cmd({
@@ -326,16 +347,29 @@ const assignmentBind = cmd({
         fingerprint,
       })
       const bound = yield* change((state) => bindAgent(state, input))
-      if (model !== undefined || effort !== undefined)
-        yield* appendObservation({
-          kind: "override",
-          assignment_id: bound.id,
-          agent_id: agent,
-          ...(model === undefined ? {} : { model }),
-          ...(effort === undefined ? {} : { effort }),
-          at: yield* nowIso,
-        }).pipe(Effect.mapError((cause) => new StateIo({ path: observationsPath(), cause })))
-      return { value: summaryRow(bound) }
+      // The bind is committed and authoritative. The override is only a non-authoritative note
+      // for verify, so a failed write is reported in the output and never fails the command.
+      const missed =
+        model === undefined && effort === undefined
+          ? undefined
+          : yield* appendObservation({
+              kind: "override",
+              assignment_id: bound.id,
+              agent_id: agent,
+              ...(model === undefined ? {} : { model }),
+              ...(effort === undefined ? {} : { effort }),
+              at: yield* nowIso,
+            }).pipe(
+              Effect.as(undefined),
+              Effect.catch((error) =>
+                Effect.succeed(
+                  `override not recorded in ${observationsPath()}: ${String(error.cause)}`,
+                ),
+              ),
+            )
+      return {
+        value: { ...summaryRow(bound), ...(missed === undefined ? {} : { observation: missed }) },
+      }
     }),
 })
 
@@ -466,7 +500,7 @@ const select = cmd({
         assignment_id: args.positionals[0],
         fingerprint,
       })
-      const state = yield* loadState(stateFilePath())
+      const state = yield* loadStateFile
       const selection = yield* selectWorker(state, input)
       const assignment = yield* findAssignment(state, input.assignment_id)
       const route = routeFor(assignment.role)
