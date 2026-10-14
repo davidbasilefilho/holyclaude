@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.js"
+    "build": "mise run build"
   },
   "dependencies": {
     "@holyclaude/core": "workspace:*",
