@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import { Conflict, InsufficientEvidence } from "../errors.ts"
 import { AcceptanceRecord } from "../model/acceptance.ts"
 import { isTerminal, type Assignment } from "../model/assignment.ts"
+import { sortedById } from "../model/ids.ts"
 import { Id, Text } from "../model/primitives.ts"
 import {
   findAssignment,
@@ -129,9 +130,30 @@ export const accept = (state: State, input: AcceptInput) =>
     return replaceAssignment(state, { ...assignment, acceptance })
   })
 
-/** Lists Running rows so the root can confirm each worker by agent id. Changes nothing. */
-export const reconcile = (state: State): ReadonlyArray<Assignment> =>
-  state.assignments.filter((assignment) => assignment.state === "Running")
+/** The Running rows of a project, split by the clone that reserved them. */
+export interface RunningRows {
+  /** Reserved by this clone, or by a clone that left no stamp. The root confirms these. */
+  readonly local: ReadonlyArray<Assignment>
+  /** Reserved by another clone. Its own root confirms these, so they are left alone. */
+  readonly elsewhere: ReadonlyArray<Assignment>
+}
+
+/**
+ * Lists Running rows, oldest first, so the root can confirm each worker by agent id. Rows stamped
+ * by another clone are separated, since their workers live in a session this clone cannot see.
+ * Changes nothing.
+ */
+export const reconcile = (state: State, cloneId: string | undefined): RunningRows => {
+  const running = sortedById(
+    state.assignments.filter((assignment) => assignment.state === "Running"),
+  )
+  const isElsewhere = (assignment: Assignment) =>
+    assignment.clone_id !== undefined && assignment.clone_id !== cloneId
+  return {
+    local: running.filter((assignment) => !isElsewhere(assignment)),
+    elsewhere: running.filter(isElsewhere),
+  }
+}
 
 /** Settles one Running row after reconcile: mark it Failed with a reason, or keep it reserved. */
 export const resolveReconcile = (state: State, input: ResolveReconcileInput) =>

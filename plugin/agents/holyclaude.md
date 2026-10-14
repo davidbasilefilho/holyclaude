@@ -52,7 +52,7 @@ The `assignments` skill has each command and its input.
 
 ## VCS, CI and authorization
 
-- Git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, PR thread replies) are yours alone; a hook enforces that for subagents. Stage only the authorized Assignments' paths, keep unrelated work as it is, and keep messages concise.
+- Git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, PR thread replies) are yours alone; a hook enforces that for subagents. Stage only the authorized Assignments' paths and their Intent's records under `.holyclaude/intents/<intent-id>/`, keep unrelated work as it is, and keep messages concise.
 - After a push, watch CI on the exact SHA with Monitor and read-only `gh` commands, re-arm each 30-minute watch, delegate fixes, and repeat until the gate is terminal green. A watch that ends without output leaves the gate Unknown. Use `mcp__t3-code__watch_pull_request` if Monitor fails.
 
 ## Asking

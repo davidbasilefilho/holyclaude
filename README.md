@@ -3,8 +3,52 @@
 holyclaude is a Claude Code plugin that turns the main thread into a root agent. The root
 plans work as an Intent with Assignments, dispatches pinned Haiku and Sonnet specialists,
 judges their reports, and accepts work on evidence. State lives in the project's
-`.holyclaude/` directory and is reached through the `holyclaude` command line tool that the
+`.holyclaude/` directory (see [State](#state)) and is reached through the `holyclaude` command line tool that the
 plugin ships. There is no MCP server.
+
+## State
+
+State is kept as one JSON file per record in the project's `.holyclaude/` directory, and the directory is meant to be committed, so a team or several clones of a project share it through version control:
+
+```text
+.holyclaude/
+  .gitignore                          committed; lists the local files below and an earlier version's
+  intents/<intent-id>/intent.json
+  intents/<intent-id>/assignments/<assignment-id>.json
+  local/                              never committed
+    lock, lock.breaking               the write lock and its guard
+    workers.json                      the worker list: subagent ids, roster fingerprints, history
+    agents.json                       the subagent id of each Assignment, keyed by Assignment id
+    clone.json                        this clone's random id
+    observations.jsonl                what the hooks saw of running subagents, with transcript paths
+  state.json.migrated                 an earlier version's single state file, after migration
+```
+
+Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. The latest Intent is the last in that order, and `assignment list`, `reconcile` and the session summary use it too.
+
+Each record's id must match its file or directory name; a file that does not is rejected as `CorruptRecord`, which names the file. Writes go through a temporary file and a rename under a local lock, and only the records a command changed are written. A committed record file over 256 KiB is refused. The local files have their own 4 MiB cap instead, because they are never merged and only grow (the agent id of a finished Assignment still feeds `verify`, and a worker's history feeds the independence rule), so their entries cannot be pruned safely.
+
+Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every `intents/<id>/` and `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `clone.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, the observations log (which every specialist tool call and `assignment verify` read, and which is also refused over the 4 MiB local cap), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store.
+
+The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log.
+
+The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
+
+A record that arrives through a pull or a merge is unauthenticated input from whoever wrote it, like any other committed file. An objective, a constraint or a result is read by your root and by workers as instructions and evidence, so review changes under `.holyclaude/` as you would code before you rely on them.
+
+The worker VCS guard recognizes the state directory by its name: it refuses a specialist's writes to any path that contains `.holyclaude`. A `HOLYCLAUDE_STATE_DIR` outside a folder with that name is therefore not protected from specialists, so keep it under a `.holyclaude` folder.
+
+### Clones and reconcile
+
+Each clone gets a random id in `local/clone.json` on first use. When an Assignment enters Running, the store stamps that id on it as `clone_id`. `holyclaude reconcile` lists the Running rows this clone reserved under `running` (rows without a stamp count as its own), and rows another clone reserved under `running_elsewhere`. It leaves the latter alone, since the other clone's root confirms them; `holyclaude reconcile resolve <id>` still settles one when you name it, while `assignment bind`, `rollback`, `cancel` and `finish` on such a row are refused as `OwnedElsewhere`, naming the clone, since its worker lives in that clone's session. Only this clone's Running writers (and unstamped ones) hold their ownership paths against a local `reserve`; a row another clone reserved does not, because git shows an overlap at merge. Deleting `.holyclaude/local/` gives the clone a new id, so its earlier Running rows then show as running elsewhere.
+
+### Where state lives
+
+The state directory is `$CLAUDE_PROJECT_DIR/.holyclaude`, or `.holyclaude` in the working directory when that variable is unset. `HOLYCLAUDE_STATE_DIR` overrides it with a directory of your choice. It replaces `HOLYCLAUDE_STATE_FILE`, which named the single state file and is no longer read.
+
+### Migrating from the single file
+
+The first time a command that changes state runs against the `.holyclaude/state.json` of an earlier version, the file becomes record files. Legacy ids are kept, agent ids and workers move to the local files, the observations log moves into `local/`, the old file is renamed `state.json.migrated`, and the old lock files (`state.json.lock` and `state.json.lock.breaking`) are deleted last, under the new lock. A `.holyclaude/.gitignore` that holds only the old `*` rule is replaced by the list above before the migration starts, and it already covers the old file, its lock files and its log, so nothing the migration has yet to move can be staged by accident. Any other `.gitignore` there is left as it is, so check that it covers the files in the list. A `state.json.migrated` that is already there is never overwritten: if it holds the same text as `state.json` (a migration that stopped before its last step), `state.json` is simply removed; if it differs, the migration stops with `MigratedFileInTheWay` before writing any record and keeps both files, and you move the old copy away (or delete it) and run the command again. It does not rename to a suffixed name, because such a name would not be covered by the `.gitignore` and could be committed. Record files already on disk, such as a teammate's, are kept; the ones the old file also has must agree with it, or the migration stops with `CorruptRecord`. An observations log already in `local/` gets the old lines in front of it. Read-only commands read an unmigrated file together with the record files. Commit `.holyclaude/` after the first migration. The repository's own `.gitignore` no longer lists `.holyclaude/`.
 
 ## Requirements
 

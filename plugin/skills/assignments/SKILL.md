@@ -5,7 +5,7 @@ description: Use when you are about to create, launch, finish, accept, follow up
 
 # Assignments through the CLI
 
-The `holyclaude` CLI is the interface to Intent and Assignment state, and it keeps the state file consistent for you. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
+The `holyclaude` CLI is the interface to Intent and Assignment state, and it keeps the state records consistent for you. The records are one file each under `.holyclaude/`, committed with the project, so free text in an Intent or Assignment stays free of absolute paths and secrets. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
 
 Read-only commands are open to every agent: `holyclaude intent show`, `holyclaude assignment show <id>`, `holyclaude assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]`, `holyclaude assignment verify <id>`, `holyclaude routes` and `holyclaude reconcile`. The commands that change state are yours as the root, and workers leave them to you.
 
@@ -118,4 +118,4 @@ Running workers finish on their own. If the user stops one, wait for the stopped
 
 ## 12. Reconcile after a restart
 
-A resumed or compacted session loses pending notifications. `holyclaude reconcile` lists Running rows. Confirm each worker's state by its agent id, then run `holyclaude reconcile resolve <id> --fail "<reason>"` when there is evidence the worker stopped, or `holyclaude reconcile resolve <id> --keep` to leave it reserved. Choose exactly one of the two flags.
+A resumed or compacted session loses pending notifications. `holyclaude reconcile` lists Running rows. Confirm each worker's state by its agent id, then run `holyclaude reconcile resolve <id> --fail "<reason>"` when there is evidence the worker stopped, or `holyclaude reconcile resolve <id> --keep` to leave it reserved. Choose exactly one of the two flags. Rows under `running_elsewhere` were reserved by another clone of the project, whose root confirms them: leave them unless you have evidence about their worker, and resolve one only by naming it.

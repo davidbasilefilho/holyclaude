@@ -100,3 +100,21 @@ describe("the shipped core rules", () => {
     )
   })
 })
+
+describe("the Intent in the summary", () => {
+  test("is the latest by id order, so a generated id beats legacy intent-1000", () => {
+    const intent = (id: string) => ({
+      id,
+      objective: `objective of ${id}`,
+      requirements: "",
+      revision: 1,
+    })
+    const state: State = {
+      ...stateWith(0),
+      intents: [intent("intent-0mg8k2x1a-7f3q"), intent("intent-1000"), intent("intent-0999")],
+    }
+    const context = composeForState(undefined, state)
+    expect(context).toContain("objective of intent-0mg8k2x1a-7f3q")
+    expect(context).not.toContain("objective of intent-1000")
+  })
+})

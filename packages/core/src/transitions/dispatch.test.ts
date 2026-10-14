@@ -62,3 +62,43 @@ describe("reserve and the writable roots", () => {
     },
   )
 })
+
+describe("reserve and the ownership of other clones", () => {
+  const holder = (cloneId?: string): Assignment => ({
+    ...assignment(["src/a.ts"]),
+    id: "assignment-0002",
+    state: "Running",
+    ...(cloneId === undefined ? {} : { clone_id: cloneId }),
+  })
+  const stateWithHolder = (row: Assignment): State => {
+    const base = stateWith(["src/a.ts"])
+    return { ...base, assignments: [...base.assignments, row] }
+  }
+  const reserveWith = (row: Assignment, cloneId: string | undefined) =>
+    Effect.runPromise(
+      reserve(stateWithHolder(row), input, { ...context, cloneId }).pipe(
+        Effect.flip,
+        Effect.option,
+      ),
+    )
+
+  test("a Running writer of this clone holds its paths", async () => {
+    const refused = await reserveWith(holder("clone-mine"), "clone-mine")
+    expect(refused._tag).toBe("Some")
+    expect(refused._tag === "Some" && refused.value).toMatchObject({
+      reason: "OwnershipConflict",
+      detail: "paths overlap assignment-0002",
+    })
+  })
+
+  test("a Running writer without a stamp counts as this clone's", async () => {
+    expect((await reserveWith(holder(), "clone-mine"))._tag).toBe("Some")
+    expect((await reserveWith(holder(), undefined))._tag).toBe("Some")
+  })
+
+  test("a Running writer of another clone does not hold them", async () => {
+    expect((await reserveWith(holder("clone-other"), "clone-mine"))._tag).toBe("None")
+    // A clone that has no id yet cannot own a stamped row either.
+    expect((await reserveWith(holder("clone-other"), undefined))._tag).toBe("None")
+  })
+})
