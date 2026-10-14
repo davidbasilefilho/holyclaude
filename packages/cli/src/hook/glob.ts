@@ -80,8 +80,9 @@ const automaton = (name: string): Automaton => {
     ...new Set([...name.split(""), ".", " ", ":", ...SEPARATORS.split(""), "-", "0", "x"]),
   ]
   // A wildcard produces no separator, and no `.` that starts a part: bash's globbing, and
-  // PowerShell's, which leaves out hidden files, keep `*` from naming `.git`.
-  const wildChars = representatives.filter((char) => !SEPARATORS.includes(char))
+  // PowerShell's, which leaves out hidden files, keep `*` from naming `.git`. It names files that
+  // exist, so no `:` of an alternate data stream either.
+  const wildChars = representatives.filter((char) => !SEPARATORS.includes(char) && char !== ":")
   const table = (chars: ReadonlyArray<string>, wildcard: boolean) =>
     all.map((state) =>
       chars

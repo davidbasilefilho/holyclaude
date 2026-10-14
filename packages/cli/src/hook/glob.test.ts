@@ -43,6 +43,8 @@ describe("a path pattern is judged by every path it expands to", () => {
       ".github/*",
       ".gitattrib*",
       "x{.,}git",
+      ".*a",
+      "{a,.}*[a]",
     ])
       expect([pattern, protectedNameOf(pattern)]).toEqual([pattern, undefined])
   })
