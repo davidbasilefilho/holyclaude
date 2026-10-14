@@ -34,6 +34,8 @@ export interface HookInput {
   readonly tool_input: ToolInput | undefined
   readonly agent_type: string | undefined
   readonly transcript_path: string | undefined
+  /** The subagent's own transcript, which a SubagentStop payload carries. */
+  readonly agent_transcript_path: string | undefined
   readonly effort: typeof Effort.Type | undefined
 }
 
@@ -74,6 +76,7 @@ export const decodeHookInput = (text: string) =>
       tool_input: toolInput(envelope["tool_input"]),
       agent_type: lenient(Schema.String, envelope["agent_type"]),
       transcript_path: lenient(Schema.String, envelope["transcript_path"]),
+      agent_transcript_path: lenient(Schema.String, envelope["agent_transcript_path"]),
       effort: lenient(Effort, envelope["effort"]),
     })),
   )

@@ -1,16 +1,8 @@
 import { Effect } from "effect"
 
-import { nowIso } from "../clock.ts"
-import {
-  appendObservation,
-  latestObserved,
-  readObservations,
-  type ObservationRecord,
-} from "../observations.ts"
-import { decodeHookInput, effortOf, subagentTranscript, type HookInput } from "./input.ts"
+import { decodeHookInput, effortOf, subagentTranscript } from "./input.ts"
+import { observe } from "./observe.ts"
 import { denyToolReason, UNREADABLE } from "./policy.ts"
-
-const OBSERVATION_BUDGET = "750 millis"
 
 /**
  * The most stdin the hook reads, in bytes. A payload over it is denied for every caller, so the
@@ -39,37 +31,14 @@ const deny = (reason: string): string =>
     },
   })
 
-const observe = (input: HookInput, agentId: string) =>
-  Effect.gen(function* () {
-    const effort = effortOf(input)
-    const transcript = subagentTranscript(input)
-    if (effort === undefined && input.agent_type === undefined && transcript === undefined) return
-    const known = latestObserved(yield* readObservations(), agentId)
-    if (
-      known !== undefined &&
-      known.effort === effort &&
-      known.agent_type === input.agent_type &&
-      known.transcript === transcript
-    )
-      return
-    const record: ObservationRecord = {
-      kind: "observed",
-      agent_id: agentId,
-      ...(input.agent_type ? { agent_type: input.agent_type } : {}),
-      ...(effort ? { effort } : {}),
-      ...(transcript ? { transcript } : {}),
-      at: yield* nowIso,
-    }
-    yield* appendObservation(record)
-  })
-
 /**
- * The PreToolUse hook. It reads at most `MAX_HOOK_BYTES` of stdin, and a payload that is over that
- * limit, empty or not a JSON object is denied for every caller, the main thread included: the guard
- * cannot tell whose call it is, and Claude Code sends no such payload. A call is a subagent's when
- * its payload carries an `agent_id` that is not null, absent or empty, whatever the value's type;
- * every other call is the main thread's and passes untouched. For subagent calls it records the
- * effort observation within a short bound, never letting a failure block the call, and denies shell
+ * The PreToolUse hook. hooks.json runs it only for the tools the guard judges; any other tool skips
+ * the hook. It reads at most `MAX_HOOK_BYTES` of stdin, and a payload that is over that limit,
+ * empty or not a JSON object is denied for every caller, the main thread included: the guard cannot
+ * tell whose call it is, and Claude Code sends no such payload. A call is a subagent's when its
+ * payload carries an `agent_id` that is not null, absent or empty, whatever the value's type; every
+ * other call is the main thread's and passes untouched. For subagent calls it records the effort
+ * observation within a short bound, never letting a failure block the call, and denies shell
  * commands (Bash, PowerShell, Monitor) that write VCS state or holyclaude state, and file writes
  * into the `.holyclaude` and `.git` directories. A subagent call that cannot be judged is denied: a
  * command or file path over `MAX_JUDGED_BYTES`, or a text read out of a command that is (a nested
@@ -93,9 +62,10 @@ export const preToolUse = (stdin: string) =>
       Effect.orElseSucceed(() => UNREADABLE),
     )
     if (agent.id !== undefined)
-      yield* observe(input, agent.id).pipe(
-        Effect.timeout(OBSERVATION_BUDGET),
-        Effect.catchCause(() => Effect.void),
-      )
+      yield* observe(agent.id, {
+        agent_type: input.agent_type,
+        effort: effortOf(input),
+        transcript: subagentTranscript(input),
+      })
     return reason === undefined ? "" : deny(reason)
   })

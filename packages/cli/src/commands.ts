@@ -45,6 +45,7 @@ import { NoIntent, StdinMissing, Usage } from "./errors.ts"
 import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
 import { sessionStart } from "./hook/session-start.ts"
+import { subagentStart, subagentStop } from "./hook/subagent.ts"
 import { appendObservation, observationsPath } from "./observations.ts"
 import { loadStateFile } from "./state.ts"
 import { verifyAssignment } from "./verify.ts"
@@ -608,6 +609,38 @@ const hookPreToolUse = cmd({
     ),
 })
 
+const hookSubagentStart = cmd({
+  path: ["hook", "subagent-start"],
+  usage: "hook subagent-start",
+  summary: "SubagentStart hook: observe the agent type",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) =>
+    stdin.pipe(
+      Effect.flatMap(subagentStart),
+      Effect.map((text) => ({ text })),
+    ),
+})
+
+const hookSubagentStop = cmd({
+  path: ["hook", "subagent-stop"],
+  usage: "hook subagent-stop",
+  summary: "SubagentStop hook: observe the effort and transcript path, never block",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) =>
+    stdin.pipe(
+      Effect.flatMap(subagentStop),
+      Effect.map((text) => ({ text })),
+    ),
+})
+
 /** Every command, longest paths first so `reconcile resolve` wins over `reconcile`. */
 export const COMMANDS: ReadonlyArray<Command> = [
   intentShow,
@@ -630,4 +663,6 @@ export const COMMANDS: ReadonlyArray<Command> = [
   reconcileList,
   hookSessionStart,
   hookPreToolUse,
+  hookSubagentStart,
+  hookSubagentStop,
 ].toSorted((a, b) => b.path.length - a.path.length)

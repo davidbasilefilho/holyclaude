@@ -1083,6 +1083,12 @@ const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
 const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
 
 /**
+ * The tools the guard judges. The plugin's hooks.json matcher must list all of them, since a tool
+ * the matcher leaves out never reaches the guard.
+ */
+export const JUDGED_TOOLS: ReadonlySet<string> = new Set([...SHELL_TOOLS, ...FILE_TOOLS])
+
+/**
  * Judges one tool call of a subagent. Tools that carry a shell command (Bash, PowerShell, Monitor)
  * are judged by {@link denyReason}; file tools are refused on the `.holyclaude` state directory,
  * which only the root changes, through the CLI, and on the `.git` directory, whose hooks and

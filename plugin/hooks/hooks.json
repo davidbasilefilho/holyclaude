@@ -6,7 +6,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/holyclaude\" hook session-start",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "hook",
+              "session-start"
+            ],
             "timeout": 30
           }
         ]
@@ -14,10 +21,54 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|PowerShell|Monitor|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/holyclaude\" hook pre-tool-use",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "hook",
+              "pre-tool-use"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "hook",
+              "subagent-start"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "hook",
+              "subagent-stop"
+            ],
             "timeout": 30
           }
         ]

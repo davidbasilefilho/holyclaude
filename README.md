@@ -9,8 +9,9 @@ plugin ships. There is no MCP server.
 ## Requirements
 
 - Claude Code 2.1.293 or later.
-- [Bun](https://bun.sh) on `PATH`. Without it the hooks exit quietly and the CLI prints a one-line
-  error.
+- [Bun](https://bun.sh) on `PATH`, as a real `bun` executable that Claude Code can start without a
+  shell. Without it the hooks do not start and the `holyclaude` command prints a one-line error; see
+  [Hooks](#hooks).
 
 ## Install and test in plain Claude Code
 
@@ -123,6 +124,71 @@ What the mechanism does, read from the Claude Code documentation and source:
 This setup has not been observed taking effect in a live session. Watch for the first compaction near
 450,000 tokens before relying on it.
 
+## Hooks
+
+`plugin/hooks/hooks.json` registers four hooks. Each runs in Claude Code's exec form, which spawns
+`bun` directly with an argument list and no shell:
+
+```json
+{
+  "type": "command",
+  "command": "bun",
+  "args": [
+    "--no-env-file",
+    "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
+    "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+    "hook",
+    "<name>"
+  ],
+  "timeout": 30
+}
+```
+
+| Event           | Matcher                                                           | `<name>`         | What it does                                                            |
+| --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
+| `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
+| `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
+| `SubagentStart` | none                                                              | `subagent-start` | Records the agent type. It cannot block.                                |
+| `SubagentStop`  | none                                                              | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.    |
+
+A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
+`Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
+the two in step.
+
+`holyclaude assignment verify` combines the three observation sources field by field, the newest
+record winning: the agent type from `SubagentStart`, the effort from `PreToolUse` or `SubagentStop`,
+and the transcript path, which gives the model, from `SubagentStop` or `PreToolUse`. A read-only
+reviewer that never calls a guarded tool therefore verifies completely after it stops. The
+observations log keeps its format: one JSON line per sighting, each with only the fields it saw.
+
+`--no-env-file` and `--config` keep Bun from reading the project's `.env` and `bunfig.toml`, which
+would otherwise let the project redirect the state file or preload code into every hook. The config
+is an empty file shipped in the plugin, because `/dev/null` exists only under MSYS or Unix.
+
+### On Windows
+
+Exec form needs `command` to be a real `.exe`, and `bun` is one: Claude Code finds it on `PATH`
+without Git Bash, so a hook costs one Bun process and no shell. Through a mise shim (a `bun.exe` in
+`mise\shims`) it costs more, because the shim starts further processes before Bun runs; put the
+real Bun directory on `PATH` for the cheapest hook. On the development machine, a `PreToolUse` call
+took 13 processes and about 270 ms through Git Bash and the shell wrapper, 6 processes and 183 ms
+in exec form through the mise shim, and 2 processes and 64 ms with the real `bun.exe`. Each figure is
+the median of 30 calls.
+
+The `holyclaude` command on the root's `PATH` is still the shell wrapper `plugin/bin/holyclaude`.
+Its common path forks nothing (no command substitution, only parameter expansion and the
+`command -v` builtin), which spares Git Bash four processes per call. Only a symlinked wrapper forks,
+for `readlink`.
+
+### Without Bun
+
+Claude Code cannot start a hook whose `bun` is not on `PATH`. For each hook that is a non-blocking
+error: the call, start or stop goes ahead and the transcript shows a hook error notice. So the guard
+is off and nothing is observed until Bun is installed, and the notice repeats on every matched tool
+call. A Bun in `~/.bun/bin` that is not on `PATH` is not found either; the wrapper falls back to it
+for the `holyclaude` command, the hooks do not. The `holyclaude` command without Bun prints one TOON
+error line and exits 127.
+
 ## Skills
 
 The plugin ships five skills. `assignments`, `continue-work`, `grill-me` and `handoff` serve the root.
@@ -155,9 +221,11 @@ which review Assignments call; it is neither vendored nor wrapped.
   the work of one judgement are bounded; the slowest input found at the cap took about 3.3 seconds
   on the development machine, so a machine about nine times slower would still lose the guard on
   it.
-- Without Bun on `PATH` the hooks exit silently and the guard is off.
-- The hook runs on every tool call and costs about 0.35 to 3.6 seconds per call, varying with load: one run on the Windows machine
-  where it was measured gave a median of about 0.35 seconds and another gave 1.6 to 3.6 seconds.
+- Without Bun on `PATH` the hooks do not start, Claude Code reports a hook error and goes on, and
+  the guard is off.
+- The `PreToolUse` hook runs only for the tools its matcher lists. Per call it costs about 64 ms with
+  the real `bun.exe` on the Windows development machine, and more through a shim or under load; see
+  [On Windows](#on-windows).
 - Installing the plugin makes holyclaude the default main-thread agent for sessions where it is enabled.
 - Reviewer.code, Worker.validation and Reviewer.testing hold Bash under an instruction-only
   no-mutation boundary.
