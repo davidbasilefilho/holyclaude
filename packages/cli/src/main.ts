@@ -22,7 +22,8 @@ const HINTS: Readonly<Record<string, string>> = {
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence:
     "Cover exactly the declared labels in criteria_evidence and required_evidence.",
-  TooLarge: "Shorten the input to fit the limit.",
+  TooLarge:
+    "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
   StateLocked:
     "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",

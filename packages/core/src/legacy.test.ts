@@ -5,8 +5,8 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { decodeJsonStrict } from "./codec.ts"
-import { State } from "./model/state.ts"
+import { decodeJsonStrict, MAX_RECORD_BYTES } from "./codec.ts"
+import { emptyState, State } from "./model/state.ts"
 import { loadState, updateState } from "./store.ts"
 
 /** The state file as the single-file store wrote it: two-space JSON, ids from the counter. */
@@ -273,6 +273,19 @@ describe("the folder's .gitignore", () => {
     await writeFile(join(directory, ".gitignore"), "*.log\n")
     await touch()
     expect(await text(".gitignore")).toBe("*.log\n")
+  })
+
+  test("is refused over the record cap rather than read whole, and left as it is", async () => {
+    const huge = `*.log\n${"#".repeat(MAX_RECORD_BYTES)}\n`
+    await writeFile(join(directory, ".gitignore"), huge)
+    expect(
+      await failure(updateState(directory, () => Effect.succeed({ state: emptyState, value: 0 }))),
+    ).toMatchObject({
+      _tag: "TooLarge",
+      subject: join(directory, ".gitignore"),
+    })
+    expect(await text(".gitignore")).toBe(huge)
+    expect(await exists("state.json")).toBe(true)
   })
 })
 

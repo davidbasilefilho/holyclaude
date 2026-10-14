@@ -125,6 +125,23 @@ describe("lock staleness", () => {
     expect(await breaks()).toBe(false)
   })
 
+  test("a lock file over the owner cap is not read, so it is judged by age only", async () => {
+    // Valid JSON naming a dead owner, padded past the cap. Read whole, the dead pid would break it.
+    const padded = record(owner({ pid: DEAD_PID })) + " ".repeat(8 * 1024)
+    await plant(lockFile, padded)
+    expect(await breaks()).toBe(false)
+    await utimes(lockFile, LONG_AGO, LONG_AGO)
+    expect(await breaks()).toBe(true)
+  })
+
+  test("a guard over the owner cap is not read, so a live-looking breaker is judged by age", async () => {
+    await plant(lockFile, record(owner({ pid: DEAD_PID })))
+    await plant(guardFile, record(owner()) + " ".repeat(8 * 1024), LONG_AGO)
+    expect(await breaks()).toBe(false)
+    expect(await Bun.file(guardFile).exists()).toBe(false)
+    expect(await breaks()).toBe(true)
+  })
+
   test("a guard left by a dead breaker expires, and the next attempt breaks the lock", async () => {
     await plant(lockFile, record(owner({ pid: DEAD_PID })))
     await plant(guardFile, record(owner({ pid: DEAD_PID })))

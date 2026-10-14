@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs"
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, truncateSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -306,5 +306,38 @@ describe("assignment verify", () => {
         .pipe(Effect.flip),
     )
     expect(error).toMatchObject({ _tag: "SymlinkRefused" })
+  })
+
+  const observeTranscript = async (transcript: string) => {
+    await runCommand("assignment bind", ["assignment-0001"], {
+      agent: "agent-1",
+      fingerprint: "roster:test",
+    })
+    const seen = { kind: "observed", agent_id: "agent-1", transcript, at: "2026-01-01T00:00:00Z" }
+    appendFileSync(observationsPath(directory), `${JSON.stringify(seen)}\n`)
+  }
+
+  const verify = command("assignment verify").run(
+    { positionals: ["assignment-0001"], flags: {} },
+    Effect.succeed(""),
+  )
+
+  test("reads the model from a transcript within the cap", async () => {
+    const transcript = join(outside, "transcript.jsonl")
+    await Bun.write(transcript, `${JSON.stringify({ message: { model: "claude-sonnet-x" } })}\n`)
+    await observeTranscript(transcript)
+    const outcome = await Effect.runPromise(verify)
+    expect(outcome.value).toMatchObject({
+      checks: [{ field: "model", observed: "claude-sonnet-x" }, {}, {}],
+    })
+  })
+
+  test("refuses a transcript over the cap rather than reading it whole", async () => {
+    const transcript = join(outside, "transcript.jsonl")
+    // A sparse file: its size is past the cap without writing the bytes.
+    await Bun.write(transcript, "")
+    truncateSync(transcript, 64 * 1024 * 1024 + 1)
+    await observeTranscript(transcript)
+    expect(await Effect.runPromise(Effect.flip(verify))).toMatchObject({ _tag: "TooLarge" })
   })
 })

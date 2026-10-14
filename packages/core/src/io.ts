@@ -1,6 +1,6 @@
 import { Effect, Schedule } from "effect"
 
-import { StateIo } from "./errors.ts"
+import { StateIo, TooLarge } from "./errors.ts"
 
 /** Runs a promise as an effect whose failure is the raw cause. */
 export const attempt = <A>(run: () => Promise<A>) =>
@@ -27,3 +27,20 @@ export const attemptTransient = <A>(run: () => Promise<A>) =>
       while: (cause) => hasCode(cause, "EPERM") || hasCode(cause, "EBUSY"),
     }),
   )
+
+/**
+ * Reads a file as text. A missing file reads as undefined; a file over the limit is TooLarge. The
+ * read itself stops one byte past the limit, so a file that grows after its size was taken, or one
+ * whose size the system does not report, is never read whole. It does not look for symbolic links,
+ * so call `refuseSymlinks` first.
+ */
+export const readText = (path: string, limit: number) =>
+  Effect.gen(function* () {
+    const file = Bun.file(path)
+    if (!(yield* io(path, () => file.exists()))) return undefined
+    if (file.size > limit) return yield* new TooLarge({ subject: path, bytes: file.size, limit })
+    const bytes = yield* io(path, () => file.slice(0, limit + 1).bytes())
+    if (bytes.byteLength > limit)
+      return yield* new TooLarge({ subject: path, bytes: bytes.byteLength, limit })
+    return new TextDecoder().decode(bytes)
+  })

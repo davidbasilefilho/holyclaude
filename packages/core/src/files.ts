@@ -6,22 +6,10 @@ import { rename } from "node:fs/promises"
 import { Effect, Schema } from "effect"
 
 import { decodeJsonStrict, MAX_RECORD_BYTES, withinLimit } from "./codec.ts"
-import { CorruptRecord, LockLost, StateIo, TooLarge } from "./errors.ts"
-import { attempt, attemptTransient, hasCode, io } from "./io.ts"
+import { CorruptRecord, LockLost, StateIo } from "./errors.ts"
+import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
 import { ownsFile, type Lock } from "./lock.ts"
 import { refuseSymlinks } from "./safety.ts"
-
-/**
- * Reads a file as text. A missing file reads as undefined; a file over the limit is TooLarge. It
- * does not look for symbolic links, so call {@link refuseSymlinks} first.
- */
-export const readText = (path: string, limit: number) =>
-  Effect.gen(function* () {
-    const file = Bun.file(path)
-    if (!(yield* io(path, () => file.exists()))) return undefined
-    if (file.size > limit) return yield* new TooLarge({ subject: path, bytes: file.size, limit })
-    return yield* io(path, () => file.text())
-  })
 
 /**
  * Reads and strictly decodes a JSON file. A missing file reads as undefined. A file that is not

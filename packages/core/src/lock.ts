@@ -5,10 +5,13 @@ import { Clock, Effect, Schedule, Schema } from "effect"
 
 import { decodeJsonStrict } from "./codec.ts"
 import { StateIo, StateLocked } from "./errors.ts"
-import { attempt, attemptTransient, hasCode } from "./io.ts"
+import { attempt, attemptTransient, hasCode, readText } from "./io.ts"
 import { Text } from "./model/primitives.ts"
 
 const LOCK_STALE_MS = 30_000
+
+/** Largest lock or guard file read, in bytes. An owner record is well under 1 KiB. */
+const MAX_OWNER_BYTES = 4 * 1024
 
 /** Who holds a lock file. The token tells a holder's lock from a successor's. */
 const LockOwner = Schema.Struct({
@@ -19,10 +22,15 @@ const LockOwner = Schema.Struct({
 })
 type LockOwner = typeof LockOwner.Type
 
-/** The owner recorded in a lock file; undefined when the file is missing, unreadable or malformed. */
+/**
+ * The owner recorded in a lock file; undefined when the file is missing, unreadable, malformed or
+ * over the owner cap. The read is capped, so a planted file cannot make every writer load it.
+ */
 const readOwner = (file: string) =>
-  attempt(() => Bun.file(file).text()).pipe(
-    Effect.flatMap(decodeJsonStrict(LockOwner)),
+  readText(file, MAX_OWNER_BYTES).pipe(
+    Effect.flatMap((text) =>
+      text === undefined ? Effect.succeed(undefined) : decodeJsonStrict(LockOwner)(text),
+    ),
     Effect.orElseSucceed((): LockOwner | undefined => undefined),
   )
 
