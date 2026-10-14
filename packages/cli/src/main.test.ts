@@ -63,3 +63,14 @@ describe("assignment list --state", () => {
     expect(err).toBe("")
   })
 })
+
+describe("--version", () => {
+  test("prints the version declared in packages/cli/package.json", async () => {
+    const manifest: { version: string } = await Bun.file(
+      join(import.meta.dir, "..", "package.json"),
+    ).json()
+    const { code, out } = await run("--version")
+    expect(code).toBe(0)
+    expect(out).toBe(`${manifest.version}\n`)
+  })
+})

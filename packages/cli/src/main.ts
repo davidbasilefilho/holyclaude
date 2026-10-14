@@ -1,11 +1,13 @@
 import { Cause, Effect } from "effect"
 
+import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args.ts"
 import { COMMANDS, type Command, type Outcome } from "./commands.ts"
 import { StdinMissing, Usage } from "./errors.ts"
 import { toon } from "./toon.ts"
 
-const VERSION = "0.1.0"
+/** The CLI version, taken from package.json so a version bump needs no source edit. */
+const { version: VERSION } = packageJson
 
 const HINTS: Readonly<Record<string, string>> = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
