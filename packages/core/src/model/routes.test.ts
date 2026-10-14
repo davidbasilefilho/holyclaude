@@ -92,15 +92,28 @@ describe("the agent prompts", () => {
   test("have every specialist preload the shared conduct skill", async () => {
     for (const route of ROUTES) {
       const { skills = [] } = frontmatterOf(await readPlugin(`agents/${route.agent}.md`))
-      expect({ role: route.role, conduct: skills.includes("holyclaude:specialist-conduct") }).toEqual(
-        { role: route.role, conduct: true },
-      )
+      expect({
+        role: route.role,
+        conduct: skills.includes("holyclaude:specialist-conduct"),
+      }).toEqual({ role: route.role, conduct: true })
     }
   })
 
-  test("ask for a one-hour cache on the root, which holds the longest session", async () => {
+  test("ask for a one-hour cache on the Sonnet specialists, the only ones the root resumes", async () => {
+    for (const route of ROUTES) {
+      const { experimental } = frontmatterOf(await readPlugin(`agents/${route.agent}.md`))
+      expect({ role: route.role, cacheTtl: experimental?.cacheTtl }).toEqual({
+        role: route.role,
+        cacheTtl: route.model === "sonnet" ? "1h" : undefined,
+      })
+    }
+  })
+
+  test("leave the root's cache lifetime to the main-conversation setting", async () => {
+    // Claude Code reads `experimental.cacheTtl` only for a subagent's requests; the root runs as
+    // the main conversation, whose lifetime comes from `promptCacheTtl`.
     const root = frontmatterOf(await readPlugin("agents/holyclaude.md"))
-    expect(root.experimental?.cacheTtl).toBe("1h")
+    expect(root.experimental?.cacheTtl).toBeUndefined()
   })
 
   test("leave reports and skills uncapped in words", async () => {
