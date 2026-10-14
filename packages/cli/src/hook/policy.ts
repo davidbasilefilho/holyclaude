@@ -321,8 +321,8 @@ const GIT_DIR_PART = /^(\.git[. ]*|git~\d+)(:|$)/
 const PATH_PART_END = /[\\/=]/
 /**
  * The reason to deny a write to `text` when it names the `.holyclaude` state, which the root writes
- * through the CLI, or the `.git` directory, whose hooks and settings run at the root's next
- * commit. A part is `.git` itself: `.gitignore` and `.github` are ordinary files.
+ * through the CLI, or the `.git` directory, whose hooks and settings run at the root's next commit.
+ * A part is `.git` itself: `.gitignore` and `.github` are ordinary files.
  */
 const protectedReason = (text: string): Verdict => {
   const lower = text.toLowerCase()
@@ -334,7 +334,10 @@ const protectedReason = (text: string): Verdict => {
 /** The first reason among `reasons`, or undefined when none denies. */
 const firstReason = (reasons: ReadonlyArray<Verdict>): Verdict =>
   reasons.find((reason) => reason !== undefined)
-/** {@link protectedReason} for a word, read as the shell reads it and as Windows reads its backslashes. */
+/**
+ * {@link protectedReason} for a word, read as the shell reads it and as Windows reads its
+ * backslashes.
+ */
 const wordReason = (word: Word): Verdict =>
   protectedReason(word.text) ??
   (word.literal === undefined ? undefined : protectedReason(word.literal))

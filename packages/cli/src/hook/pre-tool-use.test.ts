@@ -680,7 +680,12 @@ const writeOfSize = (bytes: number) => `git commit${" ".repeat(bytes - "git comm
 
 /** The policy's verdict on one tool call, without the payload around it. */
 const judged = (tool: string, input: Partial<ToolInput>) =>
-  denyToolReason(tool, { command: undefined, file_path: undefined, notebook_path: undefined, ...input })
+  denyToolReason(tool, {
+    command: undefined,
+    file_path: undefined,
+    notebook_path: undefined,
+    ...input,
+  })
 
 /** A payload of exactly `bytes` bytes: a read, padded outside its command. */
 const payloadOfSize = (caller: Caller, bytes: number) => {
@@ -715,7 +720,10 @@ describe("the payload is limited as a whole, for every caller", () => {
   })
 
   test("a payload over the limit is denied before it is read as JSON", async () => {
-    for (const stdin of ["x".repeat(MAX_HOOK_BYTES + 1), `{"agent_id":"a"${" ".repeat(MAX_HOOK_BYTES)}}`])
+    for (const stdin of [
+      "x".repeat(MAX_HOOK_BYTES + 1),
+      `{"agent_id":"a"${" ".repeat(MAX_HOOK_BYTES)}}`,
+    ])
       expect(await reasonOf(stdin)).toContain("payload is over")
   })
 
@@ -743,9 +751,9 @@ describe("only the judged fields are judged: padding elsewhere in the payload is
   test("a read padded outside the command passes", async () => {
     const input = { command: "git status", description: filler(LIMIT / 2) }
     expect(await decide(call("Bash", input, "subagent"))).toBe("allow")
-    expect(
-      await decide(call("Bash", { command: "git status" }, "subagent", { x: input })),
-    ).toBe("allow")
+    expect(await decide(call("Bash", { command: "git status" }, "subagent", { x: input }))).toBe(
+      "allow",
+    )
   })
 
   test("a write padded outside the command is still judged and denied for what it is", async () => {
@@ -801,7 +809,9 @@ describe("a command or path over the judged limit is denied unread", () => {
     ["NotebookEdit", "notebook_path"],
   ] as const)
     test(`${tool}: a ${key} over the limit is denied, one at the limit is judged`, () => {
-      expect(judged(tool, { [key]: filler(LIMIT + 1) })).toContain(`file path is ${LIMIT + 1} bytes`)
+      expect(judged(tool, { [key]: filler(LIMIT + 1) })).toContain(
+        `file path is ${LIMIT + 1} bytes`,
+      )
       expect(judged(tool, { [key]: filler(LIMIT) })).toBeUndefined()
     })
 })

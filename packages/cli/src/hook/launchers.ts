@@ -260,7 +260,8 @@ const classifyStartProcess = (
       index += list.length - (inline === undefined ? 0 : 1)
     } else if (isStartFlag(name, START_OUTPUTS)) {
       const target = inline ?? words[index + 1]
-      if (target !== undefined) written.push(target.text, ...(target.literal ? [target.literal] : []))
+      if (target !== undefined)
+        written.push(target.text, ...(target.literal ? [target.literal] : []))
       if (inline === undefined) index += 1
     } else if (isStartFlag(name, START_VALUED)) {
       const valueAt = inline === undefined ? index + 1 : index

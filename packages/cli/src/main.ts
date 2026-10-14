@@ -66,7 +66,10 @@ const errorFields = (error: unknown) => {
   return { error: tag, message: message.split("\n").slice(0, 6).join("\n").slice(0, 600), hint }
 }
 
-/** Reads stdin, or only its first `limit + 1` bytes when a limit is given: one byte over shows the input was longer. */
+/**
+ * Reads stdin, or only its first `limit + 1` bytes when a limit is given: one byte over shows the
+ * input was longer.
+ */
 const stdinOf = (limit: number | undefined) =>
   Effect.suspend(() =>
     process.stdin.isTTY
