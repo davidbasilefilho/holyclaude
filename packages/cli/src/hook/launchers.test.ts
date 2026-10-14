@@ -174,7 +174,9 @@ describe("Start-Process", () => {
     expect(denyReason("Start-Process wsl -ArgumentList '-e','git','push'")).toBeDefined()
     expect(denyReason("Start-Process bash -ArgumentList '-c','\"git commit -m x\"'")).toBeDefined()
     expect(
-      denyReason("Start-Process bun -ArgumentList 'plugin/bin/holyclaude.js','intent','create'"),
+      denyReason(
+        "Start-Process bun -ArgumentList 'plugin/scripts/holyclaude.js','intent','create'",
+      ),
     ).toBeDefined()
   })
 })

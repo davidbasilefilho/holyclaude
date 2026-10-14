@@ -9,8 +9,8 @@
             "command": "bun",
             "args": [
               "--no-env-file",
-              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
-              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js",
               "hook",
               "session-start"
             ],
@@ -28,8 +28,8 @@
             "command": "bun",
             "args": [
               "--no-env-file",
-              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
-              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js",
               "hook",
               "pre-tool-use"
             ],
@@ -46,8 +46,8 @@
             "command": "bun",
             "args": [
               "--no-env-file",
-              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
-              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js",
               "hook",
               "subagent-start"
             ],
@@ -64,8 +64,8 @@
             "command": "bun",
             "args": [
               "--no-env-file",
-              "--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml",
-              "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js",
               "hook",
               "subagent-stop"
             ],

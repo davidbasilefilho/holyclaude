@@ -88,12 +88,12 @@ describe("the hooks run in exec form on Bun", () => {
       expect(hook.type).toBe("command")
       expect(hook.command).toBe("bun")
       expect(hook.args).toContain("--no-env-file")
-      expect(hook.args).toContain("--config=${CLAUDE_PLUGIN_ROOT}/bin/empty-bunfig.toml")
-      expect(hook.args).toContain("${CLAUDE_PLUGIN_ROOT}/bin/holyclaude.js")
+      expect(hook.args).toContain("--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml")
+      expect(hook.args).toContain("${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js")
     })
 
   test("the empty config file the hooks point Bun at ships in the plugin", async () => {
-    expect(await Bun.file(join(PLUGIN, "bin", "empty-bunfig.toml")).exists()).toBe(true)
+    expect(await Bun.file(join(PLUGIN, "scripts", "empty-bunfig.toml")).exists()).toBe(true)
   })
 })
 
@@ -105,12 +105,15 @@ describe("a hook as Claude Code spawns it", () => {
     const base = mkdtempSync(join(tmpdir(), "holyclaude-hooks-"))
     root = join(base, "plugin")
     project = join(base, "project")
-    mkdirSync(join(root, "bin"), { recursive: true })
+    mkdirSync(join(root, "scripts"), { recursive: true })
     mkdirSync(project)
-    copyFileSync(join(PLUGIN, "bin", "empty-bunfig.toml"), join(root, "bin", "empty-bunfig.toml"))
+    copyFileSync(
+      join(PLUGIN, "scripts", "empty-bunfig.toml"),
+      join(root, "scripts", "empty-bunfig.toml"),
+    )
     // A stand-in bundle that echoes what Bun let it see.
     writeFileSync(
-      join(root, "bin", "holyclaude.js"),
+      join(root, "scripts", "holyclaude.js"),
       "console.log(JSON.stringify({ probe: process.env.HC_PROBE ?? null, argv: process.argv.slice(2) }))\n",
     )
     writeFileSync(join(project, ".env"), "HC_PROBE=from-env\n")

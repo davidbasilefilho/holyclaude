@@ -1,8 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import type { Assignment, State } from "@holyclaude/core"
+import { Effect } from "effect"
 
-import { clip, composeForState, extractRules } from "./session-start.ts"
+import { clip, composeForState, extractRules, sessionStart } from "./session-start.ts"
 
 const running = (index: number): Assignment => ({
   id: `assignment-${String(index).padStart(4, "0")}`,
@@ -98,5 +102,59 @@ describe("the shipped core rules", () => {
     expect(rules).toContain(
       "When a material choice cannot be settled from the repository, the documentation or the user's own words, load the `grill-me` skill",
     )
+  })
+})
+
+describe("the plugin root in injected text", () => {
+  const AGENT = new URL("../../../../plugin/agents/holyclaude.md", import.meta.url)
+  const saved = {
+    root: process.env["CLAUDE_PLUGIN_ROOT"],
+    state: process.env["HOLYCLAUDE_STATE_FILE"],
+  }
+  let base = ""
+
+  afterEach(() => {
+    for (const [key, value] of [
+      ["CLAUDE_PLUGIN_ROOT", saved.root],
+      ["HOLYCLAUDE_STATE_FILE", saved.state],
+    ] as const)
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    if (base !== "") rmSync(base, { recursive: true, force: true })
+  })
+
+  test("extractRules substitutes a given root and leaves the text alone without one", () => {
+    const file =
+      '<!-- holyclaude:core-rules:start -->\nrun `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" routes`\n<!-- holyclaude:core-rules:end -->'
+    expect(extractRules(file, "/opt/hc")).toBe('run `"/opt/hc/scripts/holyclaude" routes`')
+    expect(extractRules(file)).toBe('run `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" routes`')
+  })
+
+  test("extractRules inserts a root with replacement patterns literally", () => {
+    const file =
+      '<!-- holyclaude:core-rules:start -->\nrun `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`\n<!-- holyclaude:core-rules:end -->'
+    expect(extractRules(file, "/home/u/a$&b$'c")).toBe(
+      'run `"/home/u/a$&b$\'c/scripts/holyclaude"`',
+    )
+  })
+
+  test("the pointer names the CLI as given", () => {
+    const context = composeForState(RULES, stateWith(150), '"/opt/hc/scripts/holyclaude"')
+    expect(context).toContain(
+      'Full state: "/opt/hc/scripts/holyclaude" intent show; "/opt/hc/scripts/holyclaude" assignment list',
+    )
+  })
+
+  test("the SessionStart hook injects the shipped rules with the real plugin root", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_FILE"] = join(base, "state.json")
+    const output = JSON.parse(await Effect.runPromise(sessionStart))
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).not.toContain("${CLAUDE_PLUGIN_ROOT}")
+    expect(context).toContain(`"${root}/scripts/holyclaude"`)
   })
 })
