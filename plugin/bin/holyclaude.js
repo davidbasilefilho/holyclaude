@@ -7134,6 +7134,7 @@ class StateIo extends TaggedError2("StateIo") {
 var MAX_INPUT_BYTES = 64 * 1024;
 var MAX_RECORD_BYTES = 256 * 1024;
 var MAX_LOCAL_BYTES = 4 * 1024 * 1024;
+var OBSERVATIONS_ROTATE_BYTES = 1024 * 1024;
 var MAX_LEGACY_STATE_BYTES = 1024 * 1024;
 var strict = { onExcessProperty: "error" };
 var decodeStrict = (schema) => decodeUnknownEffect2(schema, strict);
@@ -7147,9 +7148,6 @@ var decodeInput = (schema) => {
   const decode = decodeJsonStrict(schema);
   return (text) => withinLimit("Input", text, MAX_INPUT_BYTES).pipe(flatMap2((ok) => decode(ok)));
 };
-// ../core/src/files.ts
-import { rename } from "fs/promises";
-
 // ../core/src/io.ts
 var attempt = (run) => tryPromise2({ try: run, catch: (cause) => cause });
 var io = (path, run) => attempt(run).pipe(mapError2((cause) => new StateIo({ path, cause })));
@@ -7159,10 +7157,77 @@ var attemptTransient = (run) => attempt(run).pipe(retry2({
   times: 4,
   while: (cause) => hasCode(cause, "EPERM") || hasCode(cause, "EBUSY")
 }));
+var readText = (path, limit) => gen2(function* () {
+  const file = Bun.file(path);
+  if (!(yield* io(path, () => file.exists())))
+    return;
+  if (file.size > limit)
+    return yield* new TooLarge({ subject: path, bytes: file.size, limit });
+  const bytes = yield* io(path, () => file.slice(0, limit + 1).bytes());
+  if (bytes.byteLength > limit)
+    return yield* new TooLarge({ subject: path, bytes: bytes.byteLength, limit });
+  return new TextDecoder().decode(bytes);
+});
+// ../core/src/layout.ts
+import { join as join2 } from "path";
 
+// ../core/src/safety.ts
+import { lstat } from "fs/promises";
+import { join, relative, sep } from "path";
+var lstatIfPresent = (path) => attempt(() => lstat(path)).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5(undefined) : fail5(new StateIo({ path, cause }))));
+var refuseSymlinks = (directory, path) => gen2(function* () {
+  const parts = relative(directory, path).split(sep).filter((part) => part !== "" && part !== ".");
+  let current = directory;
+  for (const part of [undefined, ...parts]) {
+    if (part !== undefined)
+      current = join(current, part);
+    const info = yield* lstatIfPresent(current);
+    if (info === undefined)
+      return;
+    if (info.isSymbolicLink())
+      return yield* new SymlinkRefused({ path: current });
+  }
+});
+
+// ../core/src/layout.ts
+var STORE_DIRECTORY = ".holyclaude";
+var LOCAL_DIRECTORY = "local";
+var LEGACY_FILE = "state.json";
+var MIGRATED_FILE = "state.json.migrated";
+var projectRoot = (env = process.env) => env["CLAUDE_PROJECT_DIR"] || process.cwd();
+var stateDirPath = (env = process.env) => env["HOLYCLAUDE_STATE_DIR"] || join2(projectRoot(env), STORE_DIRECTORY);
+var intentFile = (directory, intentId) => join2(directory, "intents", intentId, "intent.json");
+var assignmentFile = (directory, intentId, id) => join2(directory, "intents", intentId, "assignments", `${id}.json`);
+var localFile = (directory, name) => join2(directory, LOCAL_DIRECTORY, name);
+var observationsFile = (directory) => localFile(directory, "observations.jsonl");
+var previousObservationsFile = (directory) => localFile(directory, "observations.1.jsonl");
+var lockFile = (directory) => localFile(directory, "lock");
+var legacyFile = (directory) => join2(directory, LEGACY_FILE);
+var migratedFile = (directory) => join2(directory, MIGRATED_FILE);
+var legacyLockFiles = (directory) => [
+  join2(directory, `${LEGACY_FILE}.lock`),
+  join2(directory, `${LEGACY_FILE}.lock.breaking`)
+];
+var IGNORE_RULES = [
+  `/${LOCAL_DIRECTORY}/`,
+  "*.tmp",
+  `/${MIGRATED_FILE}`,
+  `/${LEGACY_FILE}`,
+  `/${LEGACY_FILE}.lock*`,
+  "/state.observations.jsonl"
+].join(`
+`) + `
+`;
+var LEGACY_IGNORE_RULES = `*
+`;
+var keepLocalFilesOutOfVersionControl = (directory) => {
+  const path = join2(directory, ".gitignore");
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, MAX_RECORD_BYTES)), map4((current) => current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(path, rules))), asVoid2);
+};
 // ../core/src/lock.ts
-import { open, rm, stat } from "fs/promises";
+import { mkdir, open, rm, stat } from "fs/promises";
 import { hostname } from "os";
+import { dirname } from "path";
 
 // ../core/src/model/primitives.ts
 var Text = String4.check(isPattern2(/\S/));
@@ -7174,13 +7239,14 @@ var TextList = ArraySchema(Text).pipe(withDecodingDefaultKey(succeed5([])));
 
 // ../core/src/lock.ts
 var LOCK_STALE_MS = 30000;
+var MAX_OWNER_BYTES = 4 * 1024;
 var LockOwner = Struct({
   pid: Int.check(isGreaterThanOrEqualTo2(1)),
   host: Text,
   token: Text,
   acquired_at: Int
 });
-var readOwner = (file) => attempt(() => Bun.file(file).text()).pipe(flatMap2(decodeJsonStrict(LockOwner)), orElseSucceed2(() => {
+var readOwner = (file) => readText(file, MAX_OWNER_BYTES).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(LockOwner)(text)), orElseSucceed2(() => {
   return;
 }));
 var ownsFile = (file, token) => readOwner(file).pipe(map4((owner) => owner?.token === token));
@@ -7225,33 +7291,30 @@ var acquireLock = (directory, lockFile) => {
     while: (error) => error._tag === "StateLocked"
   }));
 };
-
-// ../core/src/safety.ts
-import { lstat } from "fs/promises";
-import { join, relative, sep } from "path";
-var lstatIfPresent = (path) => attempt(() => lstat(path)).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5(undefined) : fail5(new StateIo({ path, cause }))));
-var refuseSymlinks = (directory, path) => gen2(function* () {
-  const parts = relative(directory, path).split(sep).filter((part) => part !== "" && part !== ".");
-  let current = directory;
-  for (const part of [undefined, ...parts]) {
-    if (part !== undefined)
-      current = join(current, part);
-    const info = yield* lstatIfPresent(current);
-    if (info === undefined)
-      return;
-    if (info.isSymbolicLink())
-      return yield* new SymlinkRefused({ path: current });
-  }
-});
-
+var withStateLock = (directory, use) => {
+  const file = lockFile(directory);
+  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(io(directory, () => mkdir(dirname(file), { recursive: true }))), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
+};
 // ../core/src/files.ts
-var readText = (path, limit) => gen2(function* () {
+import { rename } from "fs/promises";
+var fromNextLine = (text) => {
+  const at = text.indexOf(`
+`);
+  return at === -1 ? "" : text.slice(at + 1);
+};
+var keepNewestLines = (text, limit) => {
+  const bytes = new TextEncoder().encode(text);
+  return bytes.byteLength <= limit ? text : fromNextLine(new TextDecoder().decode(bytes.subarray(bytes.byteLength - limit - 1)));
+};
+var readNewestLines = (path, limit) => gen2(function* () {
   const file = Bun.file(path);
   if (!(yield* io(path, () => file.exists())))
     return;
-  if (file.size > limit)
-    return yield* new TooLarge({ subject: path, bytes: file.size, limit });
-  return yield* io(path, () => file.text());
+  const size = file.size;
+  if (size <= limit)
+    return yield* readText(path, limit);
+  const bytes = yield* io(path, () => file.slice(size - limit - 1, size).bytes());
+  return fromNextLine(new TextDecoder().decode(bytes));
 });
 var readJson = (schema, path, limit = MAX_RECORD_BYTES) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
 var encodeJson = (schema, value, path, limit = MAX_RECORD_BYTES) => encodeEffect(schema)(value).pipe(map4((encoded) => `${JSON.stringify(encoded, null, 2)}
@@ -7269,41 +7332,7 @@ var commitFile = (path, content, lock) => {
   return refuseSymlinks(lock.directory, path).pipe(andThen2(io(path, () => Bun.write(temporary, content))), andThen2(moveFile(temporary, path, lock)), tapError2(() => deleteIfPresent(temporary).pipe(ignore2)));
 };
 var removeFile = (path, lock) => refuseSymlinks(lock.directory, path).pipe(andThen2(deleteIfPresent(path)));
-// ../core/src/layout.ts
-import { join as join2 } from "path";
-var STORE_DIRECTORY = ".holyclaude";
-var LOCAL_DIRECTORY = "local";
-var LEGACY_FILE = "state.json";
-var MIGRATED_FILE = "state.json.migrated";
-var projectRoot = (env = process.env) => env["CLAUDE_PROJECT_DIR"] || process.cwd();
-var stateDirPath = (env = process.env) => env["HOLYCLAUDE_STATE_DIR"] || join2(projectRoot(env), STORE_DIRECTORY);
-var intentFile = (directory, intentId) => join2(directory, "intents", intentId, "intent.json");
-var assignmentFile = (directory, intentId, id) => join2(directory, "intents", intentId, "assignments", `${id}.json`);
-var localFile = (directory, name) => join2(directory, LOCAL_DIRECTORY, name);
-var lockFile = (directory) => localFile(directory, "lock");
-var legacyFile = (directory) => join2(directory, LEGACY_FILE);
-var migratedFile = (directory) => join2(directory, MIGRATED_FILE);
-var legacyLockFiles = (directory) => [
-  join2(directory, `${LEGACY_FILE}.lock`),
-  join2(directory, `${LEGACY_FILE}.lock.breaking`)
-];
-var IGNORE_RULES = [
-  `/${LOCAL_DIRECTORY}/`,
-  "*.tmp",
-  `/${MIGRATED_FILE}`,
-  `/${LEGACY_FILE}`,
-  `/${LEGACY_FILE}.lock*`,
-  "/state.observations.jsonl"
-].join(`
-`) + `
-`;
-var LEGACY_IGNORE_RULES = `*
-`;
-var keepLocalFilesOutOfVersionControl = (directory) => {
-  const path = join2(directory, ".gitignore");
-  const ignore = Bun.file(path);
-  return refuseSymlinks(directory, path).pipe(andThen2(io(path, () => ignore.exists())), flatMap2((exists) => exists ? io(path, () => ignore.text()).pipe(map4((current) => current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined)) : succeed5(IGNORE_RULES)), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(ignore, rules))), asVoid2);
-};
+
 // ../core/src/model/ids.ts
 var TIME_DIGITS = 9;
 var RANDOM_DIGITS = 4;
@@ -7444,6 +7473,13 @@ var writeLocal = (directory, before, after, lock) => gen2(function* () {
   if (agents !== agentsBefore)
     yield* commitFile(agentsFile, agents, lock);
 });
+// ../core/src/observations.ts
+var rotateObservations = (directory) => {
+  const current = observationsFile(directory);
+  const previous = previousObservationsFile(directory);
+  const full = io(current, async () => Bun.file(current).size > OBSERVATIONS_ROTATE_BYTES);
+  return refuseSymlinks(directory, current).pipe(andThen2(refuseSymlinks(directory, previous)), andThen2(full), flatMap2((outgrown) => outgrown ? withStateLock(directory, (lock) => full.pipe(flatMap2((still) => still ? moveFile(current, previous, lock) : void_3))) : void_3));
+};
 // ../core/src/paths.ts
 import { isAbsolute, relative as relative2, resolve as resolve3, sep as sep2 } from "path";
 var FORBIDDEN_CHARACTERS = /[:*?"<>|]/;
@@ -7483,10 +7519,6 @@ var isInsideRoots = (path, roots, base) => {
     return inside.split(sep2)[0] !== ".." && !isAbsolute(inside);
   });
 };
-// ../core/src/store.ts
-import { mkdir } from "fs/promises";
-import { dirname } from "path";
-
 // ../core/src/legacy.ts
 import { join as join4 } from "path";
 
@@ -7695,20 +7727,18 @@ var mergeLegacy = (legacy, existing) => {
 };
 var moveObservations = (directory, lock) => {
   const from = join4(directory, "state.observations.jsonl");
-  const to = localFile(directory, "observations.jsonl");
+  const to = previousObservationsFile(directory);
   return gen2(function* () {
     yield* refuseSymlinks(directory, from);
     yield* refuseSymlinks(directory, to);
-    const older = yield* readText(from, MAX_LOCAL_BYTES);
+    const older = yield* readNewestLines(from, MAX_LOCAL_BYTES);
     if (older === undefined)
       return;
-    const newer = yield* readText(to, MAX_LOCAL_BYTES);
-    if (newer === undefined)
-      return yield* moveFile(from, to, lock);
+    const newer = (yield* readNewestLines(to, MAX_LOCAL_BYTES)) ?? "";
     const separator = older === "" || older.endsWith(`
 `) ? "" : `
 `;
-    yield* commitFile(to, `${older}${separator}${newer}`, lock);
+    yield* commitFile(to, keepNewestLines(`${older}${separator}${newer}`, MAX_LOCAL_BYTES), lock);
     yield* removeFile(from, lock);
   });
 };
@@ -7747,7 +7777,7 @@ var loadState = (directory) => gen2(function* () {
   const existing = yield* loadRecordState(directory);
   return legacy === undefined ? existing : mergeLegacy(legacy, existing);
 });
-var updateState = (directory, transition) => acquireUseRelease2(refuseSymlinks(directory, `${lockFile(directory)}.breaking`).pipe(andThen2(refuseSymlinks(directory, lockFile(directory))), andThen2(io(directory, () => mkdir(dirname(lockFile(directory)), { recursive: true }))), andThen2(acquireLock(directory, lockFile(directory)))), (lock) => gen2(function* () {
+var updateState = (directory, transition) => withStateLock(directory, (lock) => gen2(function* () {
   yield* keepLocalFilesOutOfVersionControl(directory);
   yield* migrateLegacy(directory, lock);
   const before = yield* loadRecordState(directory);
@@ -7756,7 +7786,7 @@ var updateState = (directory, transition) => acquireUseRelease2(refuseSymlinks(d
   if (state !== before)
     yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock);
   return value;
-}), (lock) => releaseIfOwned(lock.file, lock.token));
+}));
 // ../core/src/model/ci.ts
 var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
@@ -8065,10 +8095,9 @@ var Override = Struct({
   at: String4
 });
 var ObservationRecord = Union2([Observed, Override]);
-var observationsPath = (directory = stateDirPath()) => localFile(directory, "observations.jsonl");
+var observationsPath = (directory = stateDirPath()) => observationsFile(directory);
 var decodeLine = decodeJsonStrict(ObservationRecord);
-var readObservations = (directory = stateDirPath()) => gen2(function* () {
-  const path = observationsPath(directory);
+var readGeneration = (directory, path) => gen2(function* () {
   yield* refuseSymlinks(directory, path);
   const text = (yield* readText(path, MAX_LOCAL_BYTES)) ?? "";
   const records = [];
@@ -8082,12 +8111,17 @@ var readObservations = (directory = stateDirPath()) => gen2(function* () {
   }
   return records;
 });
+var readObservations = (directory = stateDirPath()) => gen2(function* () {
+  const current = yield* readGeneration(directory, observationsPath(directory));
+  const previous = yield* readGeneration(directory, previousObservationsFile(directory));
+  return [...previous, ...current];
+});
 var appendObservation = (record, directory = stateDirPath()) => {
   const path = observationsPath(directory);
   return refuseSymlinks(directory, path).pipe(andThen2(tryPromise2({
     try: () => mkdir2(dirname2(path), { recursive: true }),
     catch: (cause) => new StateIo({ path, cause })
-  })), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(tryPromise2({
+  })), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
     try: () => appendFile(path, `${JSON.stringify(record)}
 `),
     catch: (cause) => new StateIo({ path, cause })
@@ -9920,8 +9954,9 @@ var TranscriptLine = Struct({
   message: optionalKey2(Struct({ model: optionalKey2(String4) }))
 });
 var decodeLine2 = decodeUnknownEffect2(fromJsonString2(TranscriptLine));
+var MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
 var transcriptModels = (path) => gen2(function* () {
-  const text = yield* tryPromise2(() => Bun.file(path).text()).pipe(orElseSucceed2(() => ""));
+  const text = yield* readText(path, MAX_TRANSCRIPT_BYTES).pipe(map4((read) => read ?? ""), catchTag2("StateIo", () => succeed5("")));
   const models = new Set;
   for (const line of text.split(`
 `)) {
@@ -10416,7 +10451,7 @@ var HINTS = {
   DispatchRefused: "Fix the condition named in the message, then reserve again.",
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence: "Cover exactly the declared labels in criteria_evidence and required_evidence.",
-  TooLarge: "Shorten the input to fit the limit.",
+  TooLarge: "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
   StateLocked: "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
   StateIo: "Check HOLYCLAUDE_STATE_DIR or CLAUDE_PROJECT_DIR and the file permissions.",
