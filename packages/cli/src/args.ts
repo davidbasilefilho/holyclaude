@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+
 import { Usage } from "./errors.ts"
 
 /** The kind of value a flag takes. `list` flags repeat and collect their values. */

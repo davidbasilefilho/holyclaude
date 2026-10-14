@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+
 import type { Assignment, State } from "@holyclaude/core"
+
 import { clip, composeForState } from "./session-start.ts"
 
 const running = (index: number): Assignment => ({

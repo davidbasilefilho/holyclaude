@@ -1,11 +1,12 @@
 import { Effect } from "effect"
+
+import { nowIso } from "../clock.ts"
 import {
   appendObservation,
   latestObserved,
   readObservations,
   type ObservationRecord,
 } from "../observations.ts"
-import { nowIso } from "../clock.ts"
 import { decodeHookInput, effortOf, subagentTranscript, type HookInput } from "./input.ts"
 import { denyToolReason, UNREADABLE } from "./policy.ts"
 

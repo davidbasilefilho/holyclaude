@@ -1,6 +1,8 @@
 import { join } from "node:path"
-import { Effect } from "effect"
+
 import { loadState, stateFilePath, type Assignment, type State } from "@holyclaude/core"
+import { Effect } from "effect"
+
 import { pluginRoot } from "../fingerprint.ts"
 import { toon } from "../toon.ts"
 

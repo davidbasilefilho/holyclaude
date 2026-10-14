@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+
 import { scanScript, type Simple } from "./shell.ts"
 
 const commandsOf = (source: string): ReadonlyArray<Simple> => {

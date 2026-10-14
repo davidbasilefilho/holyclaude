@@ -1,4 +1,5 @@
 import { Cause, Effect } from "effect"
+
 import { parseArgs } from "./args.ts"
 import { COMMANDS, type Command, type Outcome } from "./commands.ts"
 import { StdinMissing, Usage } from "./errors.ts"

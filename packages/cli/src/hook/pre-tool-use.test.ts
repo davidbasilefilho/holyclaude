@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+
 import { Effect } from "effect"
+
 import { observationsPath, readObservations } from "../observations.ts"
 import { preToolUse } from "./pre-tool-use.ts"
 
