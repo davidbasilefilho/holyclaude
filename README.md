@@ -132,7 +132,8 @@ which review Assignments call; it is neither vendored nor wrapped.
 ## Limits
 
 - The worker VCS-write hook is a guardrail for well-meaning workers, not a sandbox. Interpreters,
-  scripts and PowerShell script blocks are out of its reach.
+  scripts and PowerShell script blocks other than those given to Invoke-Command (icm), Start-Job
+  (sajb) and Start-ThreadJob are out of its reach.
 - The guard treats a call as a specialist's when its payload carries an `agent_id` that is not null,
   absent or empty, whatever the type of the value; every other call is the main thread's and passes
   untouched, at any size. It denies a specialist call it cannot judge: a command or file path over

@@ -66,14 +66,16 @@ const errorFields = (error: unknown) => {
   return { error: tag, message: message.split("\n").slice(0, 6).join("\n").slice(0, 600), hint }
 }
 
-const stdin = Effect.suspend(() =>
-  process.stdin.isTTY
-    ? Effect.fail(new StdinMissing({ command: "this command" }))
-    : Effect.tryPromise({
-        try: () => Bun.stdin.text(),
-        catch: () => new StdinMissing({ command: "this command" }),
-      }),
-)
+/** Reads stdin, or only its first `limit + 1` bytes when a limit is given: one byte over shows the input was longer. */
+const stdinOf = (limit: number | undefined) =>
+  Effect.suspend(() =>
+    process.stdin.isTTY
+      ? Effect.fail(new StdinMissing({ command: "this command" }))
+      : Effect.tryPromise({
+          try: () => (limit === undefined ? Bun.stdin : Bun.stdin.slice(0, limit + 1)).text(),
+          catch: () => new StdinMissing({ command: "this command" }),
+        }),
+  )
 
 const find = (argv: ReadonlyArray<string>) =>
   COMMANDS.find((command) => command.path.every((part, index) => argv[index] === part))
@@ -98,7 +100,7 @@ const run = (argv: ReadonlyArray<string>): Effect.Effect<Outcome, unknown> =>
         message: `Expected ${command.positionals} argument(s), got ${parsed.positionals.length}`,
         hint: `Usage: holyclaude ${command.usage}`,
       })
-    return yield* command.run(parsed, stdin)
+    return yield* command.run(parsed, stdinOf(command.stdinLimit))
   })
 
 const render = (outcome: Outcome): { readonly out: string; readonly code: number } => ({

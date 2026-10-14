@@ -43,7 +43,7 @@ import { booleanFlag, listFlag, stringFlag, type FlagSpec, type Parsed } from ".
 import { nowIso } from "./clock.ts"
 import { NoIntent, StdinMissing, Usage } from "./errors.ts"
 import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
-import { preToolUse } from "./hook/pre-tool-use.ts"
+import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
 import { sessionStart } from "./hook/session-start.ts"
 import { appendObservation, observationsPath } from "./observations.ts"
 import { loadStateFile } from "./state.ts"
@@ -70,6 +70,11 @@ export interface Command {
   readonly optional?: true
   /** Hook commands read stdin themselves and must never fail loudly. */
   readonly hook?: boolean
+  /**
+   * The most bytes of stdin the command reads. Longer input is cut one byte past the limit, so the
+   * command can tell it was longer without the rest being read.
+   */
+  readonly stdinLimit?: number
   readonly run: (
     args: Parsed,
     stdin: Effect.Effect<string, StdinMissing>,
@@ -593,6 +598,7 @@ const hookPreToolUse = cmd({
   input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
   run: (_args, stdin) =>

@@ -46,6 +46,24 @@ describe("globs and brace lists make a word dynamic", () => {
   })
 })
 
+describe("a command cut short by a parenthesis", () => {
+  const lastWord = (source: string, command = 0) => commandsOf(source)[command]?.words.at(-1)
+  test("marks its last word as open", () => {
+    expect(lastWord("Start-Process (Get-Command git).Source push")?.open).toBe(true)
+    expect(lastWord("Start-Process git -ArgumentList @('a')")?.text).toBe("@")
+    expect(lastWord("Start-Process git -ArgumentList @('a')")?.open).toBe(true)
+    expect(lastWord("Start-Process git -WorkingDirectory (pwd)")?.text).toBe("-WorkingDirectory")
+  })
+
+  test("marks no other word, and no command that a parenthesis does not cut", () => {
+    expect(lastWord("Start-Process git -ArgumentList a")?.open).toBeUndefined()
+    expect(lastWord("echo $(date)")?.open).toBeUndefined()
+    expect(lastWord("(git status)")?.open).toBeUndefined()
+    expect(lastWord("a && (git status)")?.open).toBeUndefined()
+    expect(lastWord("Start-Process (Get-Command git).Source push", 2)?.open).toBeUndefined()
+  })
+})
+
 describe("scanning is linear in the length of the command", () => {
   const SIZE = 200_000
   const shapes: ReadonlyArray<readonly [string, string]> = [
@@ -88,5 +106,53 @@ describe("text scanned again on its own is nested a bounded depth", () => {
     const started = performance.now()
     expect(scanScript(`${chain(1000)}${"\n".repeat(300_000)}`).ok).toBe(false)
     expect(performance.now() - started).toBeLessThan(1000)
+  })
+})
+
+describe("ANSI-C quoting", () => {
+  const first = (source: string) => commandsOf(source)[0]?.words[0]?.text
+  test("decodes the hex, unicode, long unicode and octal escapes", () => {
+    expect(first("$'\\x67it' commit")).toBe("git")
+    expect(first("$'\\u0067it' commit")).toBe("git")
+    expect(first("$'\\U00000067it' commit")).toBe("git")
+    expect(first("$'\\U67it' commit")).toBe("git")
+    expect(first("$'\\147it' commit")).toBe("git")
+    expect(first("$'\\U0001F600'")).toBe("\u{1F600}")
+  })
+
+  test("keeps a \\U that is not a code point as written, without failing", () => {
+    expect(first("$'\\UFFFFFFFF'")).toBe("\\UFFFFFFFF")
+    expect(first("$'\\U'")).toBe("\\U")
+  })
+})
+
+describe("a backslash in an unquoted Windows path", () => {
+  const word = (source: string) => commandsOf(source)[0]?.words[0]
+  test("is dropped as bash drops it, and kept in the literal reading", () => {
+    expect(word("C:\\Git\\cmd\\git.exe commit")).toEqual({
+      text: "C:Gitcmdgit.exe",
+      dynamic: false,
+      literal: "C:\\Git\\cmd\\git.exe",
+    })
+  })
+
+  test("has no literal reading when the word has no such backslash", () => {
+    expect(word("git commit")).toEqual({ text: "git", dynamic: false })
+    expect(word("'C:\\Git\\cmd\\git.exe' commit")).toEqual({
+      text: "C:\\Git\\cmd\\git.exe",
+      dynamic: false,
+    })
+    expect(word('"C:\\Git\\cmd\\git.exe" commit')).toEqual({
+      text: "C:\\Git\\cmd\\git.exe",
+      dynamic: false,
+    })
+    expect(word("a\\ b commit")).toEqual({ text: "a b", dynamic: false })
+  })
+
+  test("gives a redirect target both readings", () => {
+    expect(commandsOf("echo x > .git\\hooks\\x")[0]?.outputs).toEqual([
+      ".githooksx",
+      ".git\\hooks\\x",
+    ])
   })
 })
