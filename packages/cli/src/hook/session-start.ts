@@ -10,9 +10,11 @@ const RULES_START = "<!-- holyclaude:core-rules:start -->"
 const RULES_END = "<!-- holyclaude:core-rules:end -->"
 const POINTER = "Full state: holyclaude intent show; holyclaude assignment list"
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
+const RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]"
 
-const clip = (text: string, max: number) =>
-  text.length <= max ? text : `${text.slice(0, max - 1)}…`
+/** Shortens text to at most `max` characters, ending in an ellipsis when it was cut. */
+export const clip = (text: string, max: number) =>
+  max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}…`
 
 const cutRules = (rules: string, room: number) => {
   const cut = rules.slice(0, room)
@@ -99,7 +101,9 @@ const composeContext = (rules: string | undefined, summary: Summary): string => 
   const room = CAP - tail.length - `\n\n${state}`.length - RULES_CUT.length
   if (rules !== undefined && room > 0)
     return `${cutRules(rules, room)}${RULES_CUT}\n\n${state}${tail}`
-  return `${fitSummary(summary, CAP - tail.length)}${tail}`.trimStart()
+  // The rules are dropped whole. Say so, so the root knows to read its agent prompt.
+  const marker = rules === undefined ? "" : `${RULES_DROPPED}\n\n`
+  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart()
 }
 
 /** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */

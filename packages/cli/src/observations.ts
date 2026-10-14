@@ -53,7 +53,12 @@ export const readObservations = (path: string = observationsPath()) =>
     return records
   })
 
-/** Appends one record. A single small append is atomic, so no lock is needed. */
+/**
+ * Appends one record. A single small append is atomic, so no lock is needed. Bun has no append
+ * write: `Bun.write` and `Bun.file().writer()` truncate the file, and a read-then-rewrite would
+ * lose records to concurrent hooks. So the append uses `node:fs` `appendFile`, and `mkdir` stands
+ * in for the missing Bun directory creation; the read side already uses `Bun.file`.
+ */
 export const appendObservation = (record: ObservationRecord, path: string = observationsPath()) =>
   Effect.tryPromise(() => mkdir(dirname(path), { recursive: true })).pipe(
     Effect.andThen(Effect.tryPromise(() => appendFile(path, `${JSON.stringify(record)}\n`))),

@@ -24,3 +24,13 @@ export class StdinMissing extends Data.TaggedError("StdinMissing")<{
     return `${this.command} reads JSON from stdin and none was provided`
   }
 }
+
+/** The state file exists but does not decode as the state schema. */
+export class StateCorrupt extends Data.TaggedError("StateCorrupt")<{
+  readonly path: string
+  readonly detail: string
+}> {
+  override get message() {
+    return `State file ${this.path} does not match the state schema: ${this.detail}`
+  }
+}

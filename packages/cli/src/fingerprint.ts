@@ -23,22 +23,26 @@ export const pluginRoot = Effect.gen(function* () {
 })
 
 /**
- * The fingerprint of the installed roster and tools: a digest of every agent file. It changes when
- * a preset's prompt, model, effort or tools change, which is when a worker can no longer be
- * reused.
+ * The fingerprint of the roster under a plugin root: a digest of every agent file. It changes when
+ * a preset's prompt, model, effort or tools change, which is when a worker can no longer be reused.
+ * Without a root there is nothing to digest, so the result is unique to each call: a constant would
+ * make every unknown roster look unchanged and let a worker be reused across them.
  */
-export const rosterFingerprint = Effect.gen(function* () {
-  const root = yield* pluginRoot
-  if (root === undefined) return "roster:unknown"
-  const names = yield* Effect.tryPromise(() =>
-    Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join(root, "agents") })),
-  ).pipe(Effect.orElseSucceed(() => [] as string[]))
-  const hasher = new Bun.CryptoHasher("sha256")
-  for (const name of names.toSorted()) {
-    const text = yield* Effect.tryPromise(() => Bun.file(join(root, "agents", name)).text()).pipe(
-      Effect.orElseSucceed(() => ""),
-    )
-    hasher.update(`${name}\n${text}\n`)
-  }
-  return `roster:${hasher.digest("hex").slice(0, 16)}`
-})
+export const rosterFingerprintAt = (root: string | undefined) =>
+  Effect.gen(function* () {
+    if (root === undefined) return `roster:unknown:${crypto.randomUUID()}`
+    const names = yield* Effect.tryPromise(() =>
+      Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join(root, "agents") })),
+    ).pipe(Effect.orElseSucceed(() => [] as string[]))
+    const hasher = new Bun.CryptoHasher("sha256")
+    for (const name of names.toSorted()) {
+      const text = yield* Effect.tryPromise(() => Bun.file(join(root, "agents", name)).text()).pipe(
+        Effect.orElseSucceed(() => ""),
+      )
+      hasher.update(`${name}\n${text}\n`)
+    }
+    return `roster:${hasher.digest("hex").slice(0, 16)}`
+  })
+
+/** The fingerprint of the installed roster and tools, found through {@link pluginRoot}. */
+export const rosterFingerprint = pluginRoot.pipe(Effect.flatMap(rosterFingerprintAt))
