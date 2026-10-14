@@ -55,7 +55,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 3. Select
 
-`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same specialist whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id.
+`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same specialist whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id. Take a reuse only for a Sonnet specialist's follow-up: a repair, a re-review and every Haiku specialist get a new worker even when `select` offers one, so answer `spawn` there.
 
 ## 4. Reserve
 
@@ -68,9 +68,13 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 6. Bind or roll back
 
-- `holyclaude assignment bind <id> --agent <agentId>` records the agent id from the spawn result (or the reused worker's id) and attaches the worker to the Running Assignment. When you escalated with a per-call override, add `--model haiku|sonnet|opus|fable` and `--effort low..max` with the values you passed, so `verify` expects them. `--fingerprint` defaults to the live roster, so omit it.
+- `holyclaude assignment bind <id> --agent <agentId>` records the agent id from the spawn result (or the reused worker's id) and attaches the worker to the Running Assignment. `--fingerprint` defaults to the live roster, so omit it.
+- Escalation is a per-call override on a new worker, so the specialist's file stays as it is: the haiku step passes `model: sonnet` and keeps the specialist's effort, and the effort steps are medium, high, xhigh. Bind it with `--model` and `--effort` set to the values you passed (`--model haiku|sonnet|opus|fable`, `--effort low..max`), so `verify` expects them.
 - If the spawn or resume failed, `holyclaude assignment rollback <id>` returns the unbound reservation to Ready. Fix the cause or report the blocker. A bound Assignment moves on by finish.
-- `holyclaude assignment verify <id>` compares expected and observed model, effort and agent type. The output lists `checks` with `field`, `expected`, `observed` and `status` for model, effort and agent_type, and `expected_source` says whether the route or your override set the expectation. The verdict is `match`, `mismatch` (exit code 3) or `incomplete`. The SubagentStart hook records the agent type, PreToolUse the effort at a guarded tool call, and SubagentStop the effort and transcript path; the observed model comes from the worker's transcript, so a running worker reads `unobserved` and `incomplete` until it has stopped or made a guarded call. A mismatch is a failed dispatch to redo with the right model and effort.
+- After each bind, `holyclaude assignment verify <id>` checks what actually ran, which is more reliable than a host's display of the requested values. The SubagentStart hook records the agent type, PreToolUse the effort (and transcript path) at the worker's first guarded tool call, and SubagentStop the effort and transcript path; the observed model is read from the subagent transcript. The output lists `checks` with `field`, `expected`, `observed` and `status` (`match`, `mismatch` or `unobserved`) for model, effort and agent_type, and `expected_source` says whether the route or your override set the expectation. The verdict is:
+  - `ok`: every field matches, so the worker runs on the model, effort and type you chose;
+  - `mismatch` (exit code 3): it ran on something else, a failed dispatch to redo with the right model and effort, noting the cause;
+  - `incomplete`: a field is still `unobserved`, which is normal while the worker runs, before its first guarded tool call or its stop; check again after its notification.
 
 Run steps 3 to 6 for every ready independent Assignment in one message, then end the turn.
 
@@ -96,7 +100,7 @@ After you have judged the evidence, `holyclaude assignment accept <id>` takes on
 }
 ```
 
-Both maps cover exactly the declared labels, each with non-blank support, and the revision equals the Assignment's and the live one. Only a Succeeded Assignment can be accepted. The CLI checks coverage and you judge truth, so write the rationale from the evidence you reviewed. An `InsufficientEvidence` error lists the missing and unknown labels.
+Both maps cover exactly the declared labels, each with non-blank support, and the revision equals the Assignment's and the live one. Only a Succeeded Assignment can be accepted, and accepting again with different content is refused. The CLI checks coverage and you judge truth, so write the rationale from the evidence you reviewed. An `InsufficientEvidence` error lists the missing and unknown labels.
 
 ## 9. Follow up
 
