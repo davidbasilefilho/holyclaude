@@ -29,3 +29,15 @@ run = "bun test"
 description = "Bundle the CLI into plugin/bin/holyclaude.js"
 dir = "{{config_root}}/packages/cli"
 run = "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.js"
+
+[tasks."bump:minor"]
+description = "Bump the minor version in all six version files and reset patch and hotfix"
+run = ["bun scripts/bump-version.ts minor", { task = "build" }]
+
+[tasks."bump:patch"]
+description = "Bump the patch version in all six version files and reset hotfix"
+run = ["bun scripts/bump-version.ts patch", { task = "build" }]
+
+[tasks."bump:hotfix"]
+description = "Bump the hotfix version in all six version files"
+run = ["bun scripts/bump-version.ts hotfix", { task = "build" }]
