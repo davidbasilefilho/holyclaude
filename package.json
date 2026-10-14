@@ -8,11 +8,12 @@
   ],
   "type": "module",
   "scripts": {
-    "fmt": "oxfmt --write",
-    "fmt:readonly": "oxfmt --check",
-    "lint": "oxlint --fix",
-    "lint:readonly": "oxlint",
-    "typecheck": "bun check"
+    "fmt": "mise run fmt",
+    "fmt:readonly": "mise run fmt:readonly",
+    "lint": "mise run lint",
+    "lint:readonly": "mise run lint:readonly",
+    "typecheck": "mise run typecheck",
+    "test": "mise run test"
   },
   "devDependencies": {
     "@types/bun": "^1.0.0",
