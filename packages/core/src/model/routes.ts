@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-/** Every `Role.task` preset the plugin ships. */
+/** Every `Role.task` specialist the plugin ships. */
 export const Role = Schema.Literals([
   "Explorer.map",
   "Explorer.lookup",
@@ -21,7 +21,7 @@ export const Role = Schema.Literals([
   "Reviewer.artifact",
   "Reviewer.visual",
 ])
-/** A `Role.task` preset name. */
+/** A `Role.task` specialist name. */
 export type Role = typeof Role.Type
 
 /** What an Assignment may change: nothing, or only its declared ownership paths. */
@@ -43,17 +43,17 @@ export const Independence = Schema.Literals([
 /** The independence invariant of a route. */
 export type Independence = typeof Independence.Type
 
-/** Model alias pinned by a preset. */
+/** Model alias pinned by a specialist. */
 export const Model = Schema.Literals(["haiku", "sonnet"])
 /** A pinned model alias. */
 export type Model = typeof Model.Type
 
-/** Reasoning effort pinned by a preset. Low and max are deliberately absent. */
+/** Reasoning effort pinned by a specialist. Low and max are deliberately absent. */
 export const Effort = Schema.Literals(["medium", "high", "xhigh"])
 /** A pinned reasoning effort. */
 export type Effort = typeof Effort.Type
 
-/** Everything the runtime enforces about one preset. */
+/** Everything the runtime enforces about one specialist. */
 export interface Route {
   readonly role: Role
   /** The plugin agent name, derived from the role. */
@@ -110,5 +110,5 @@ export const routeFor = (role: Role): Route => ({
   ...SPECS[role],
 })
 
-/** The 18 presets, in the order the plugin documents them. */
+/** The 18 specialists, in the order the plugin documents them. */
 export const ROUTES: ReadonlyArray<Route> = Role.literals.map(routeFor)

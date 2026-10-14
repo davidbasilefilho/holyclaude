@@ -25,9 +25,9 @@ export const pluginRoot = Effect.gen(function* () {
 
 /**
  * The fingerprint of the roster under a plugin root: a digest of every agent file. It changes when
- * a preset's prompt, model, effort or tools change, which is when a worker can no longer be reused.
- * Without a root there is nothing to digest, so the result is unique to each call: a constant would
- * make every unknown roster look unchanged and let a worker be reused across them.
+ * a specialist's prompt, model, effort or tools change, which is when a worker can no longer be
+ * reused. Without a root there is nothing to digest, so the result is unique to each call: a
+ * constant would make every unknown roster look unchanged and let a worker be reused across them.
  */
 export const rosterFingerprintAt = (root: string | undefined) =>
   Effect.gen(function* () {
