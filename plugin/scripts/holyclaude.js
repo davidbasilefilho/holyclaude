@@ -7797,8 +7797,160 @@ var observe = (agentId, sighting) => gen2(function* () {
   });
 }).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
 
+// src/hook/glob.ts
+var SEPARATORS = "/\\=";
+var RANGE = /^(-?\d+\.\.-?\d+|[a-z]\.\.[a-z])(\.\.-?\d+)?$/;
+var MAX_BRACE_DEPTH = 32;
+var bit = (state) => 1 << state;
+var through = (mask, steps) => {
+  let out = 0;
+  for (let state = 0;mask >> state !== 0; state += 1)
+    if ((mask & bit(state)) !== 0)
+      out |= steps[state] ?? 0;
+  return out;
+};
+var closure = (mask, steps) => {
+  let reached = mask;
+  for (;; ) {
+    const grown = reached | through(reached, steps);
+    if (grown === reached)
+      return reached;
+    reached = grown;
+  }
+};
+var START = 0;
+var OTHER = 1;
+var NAMED = 2;
+var automaton = (name) => {
+  const states = 3 + name.length + 1 + 1;
+  const next = (state, char) => {
+    if (state === NAMED)
+      return NAMED;
+    const separator = SEPARATORS.includes(char);
+    if (state === START || state === OTHER) {
+      if (separator)
+        return START;
+      return state === START && char === name[0] ? 3 + 1 : OTHER;
+    }
+    const read = state - 3;
+    if (read >= name.length) {
+      if (separator || char === ":")
+        return NAMED;
+      return char === "." || char === " " ? 3 + name.length + 1 : OTHER;
+    }
+    if (separator)
+      return START;
+    return char === name[read] ? state + 1 : OTHER;
+  };
+  const all = Array.from({ length: states }, (_, state) => state);
+  const representatives = [
+    ...new Set([...name.split(""), ".", " ", ":", ...SEPARATORS.split(""), "-", "0", "x"])
+  ];
+  const wildChars = representatives.filter((char) => !SEPARATORS.includes(char) && char !== ":");
+  const table = (chars, wildcard) => all.map((state) => chars.filter((char) => !wildcard || state !== START || char !== ".").reduce((mask, char) => mask | bit(next(state, char)), 0));
+  const one = table(wildChars, true);
+  return {
+    states,
+    accepting: all.filter((state) => state === NAMED || state - 3 >= name.length).reduce((mask, state) => mask | bit(state), 0),
+    representatives,
+    literal: new Map(representatives.map((char) => [char, table([char], false)])),
+    wild: new Map(wildChars.map((char) => [char, table([char], true)])),
+    one,
+    star: all.map((state) => closure(bit(state), one)),
+    range: table(wildChars.filter((char) => /[a-z0-9-]/.test(char)), true),
+    any: table(representatives, false)
+  };
+};
+var PROTECTED = [".git", ".holyclaude"].map((name) => [name, automaton(name)]);
+var classStep = (machine, mask, body) => {
+  const negated = body.startsWith("!") || body.startsWith("^");
+  const listed = negated ? body.slice(1) : body;
+  const ranges = [...listed.matchAll(/(.)-(.)/g)];
+  const holds = (char) => negated || listed.includes("[:") || listed.includes(char) || ranges.some(([, low = "", high = ""]) => low <= char && char <= high);
+  let out = 0;
+  for (const [char, steps] of machine.wild)
+    if (holds(char))
+      out |= through(mask, steps);
+  return out;
+};
+var bracesOf = (pattern) => {
+  const braces = { close: new Map, commas: new Map, nesting: new Set };
+  const open = [];
+  for (let index = 0;index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === "{") {
+      const parent = open[open.length - 1];
+      if (parent !== undefined)
+        braces.nesting.add(parent.at);
+      open.push({ at: index, commas: [] });
+    } else if (char === ",")
+      open[open.length - 1]?.commas.push(index);
+    else if (char === "}") {
+      const group = open.pop();
+      if (group !== undefined) {
+        braces.close.set(group.at, index);
+        braces.commas.set(group.at, group.commas);
+      }
+    }
+  }
+  return braces;
+};
+var bracketsOf = (text) => {
+  const found = new Int32Array(text.length + 1).fill(-1);
+  for (let index = text.length - 1;index >= 0; index -= 1)
+    found[index] = text[index] === "]" ? index : found[index + 1] ?? -1;
+  return found;
+};
+var canName = (machine, pattern, braces, brackets) => {
+  const run = (from, to, start, depth) => {
+    let mask = start;
+    let index = from;
+    while (index < to && mask !== 0) {
+      const char = pattern[index] ?? "";
+      const end = char === "{" ? braces.close.get(index) ?? -1 : -1;
+      const commas = end !== -1 && end < to ? braces.commas.get(index) ?? [] : [];
+      const closing = char === "[" ? brackets[index + 2] ?? -1 : -1;
+      if (char === "*")
+        mask = through(mask, machine.star);
+      else if (char === "?")
+        mask = through(mask, machine.one);
+      else if (closing !== -1 && closing < to) {
+        mask = classStep(machine, mask, pattern.slice(index + 1, closing));
+        index = closing;
+      } else if (commas.length > 0) {
+        const bounds = [index, ...commas, end];
+        let out = 0;
+        if (depth >= MAX_BRACE_DEPTH)
+          out = closure(mask, machine.any);
+        else
+          for (let part = 0;part + 1 < bounds.length; part += 1)
+            out |= run((bounds[part] ?? 0) + 1, bounds[part + 1] ?? 0, mask, depth + 1);
+        mask = out;
+        index = end;
+      } else if (end !== -1 && end < to && !braces.nesting.has(index) && RANGE.test(pattern.slice(index + 1, end))) {
+        mask = closure(through(mask, machine.range), machine.range);
+        index = end;
+      } else {
+        const key = machine.representatives.includes(char) ? char : "x";
+        mask = through(mask, machine.literal.get(key) ?? []);
+      }
+      index += 1;
+    }
+    return mask;
+  };
+  return (run(0, pattern.length, bit(START), 0) & machine.accepting) !== 0;
+};
+var NO_BRACES = { close: new Map, commas: new Map, nesting: new Set };
+var protectedNameOf = (pattern) => {
+  const lower = pattern.toLowerCase();
+  const braces = lower.includes("{") ? bracesOf(lower) : NO_BRACES;
+  const brackets = lower.includes("[") ? bracketsOf(lower) : new Int32Array(0);
+  return PROTECTED.find(([, machine]) => canName(machine, lower, braces, brackets))?.[0];
+};
+
 // src/hook/shell.ts
 var MAX_NESTING = 3;
+var KEPT_BACKSLASH = /[A-Za-z0-9_.\-~@+,%=:/\\]/;
 var WORD_END = /[\s;&|()<>]/;
 var ANSI_ESCAPES = {
   n: `
@@ -7808,13 +7960,24 @@ var ANSI_ESCAPES = {
   a: "\x07",
   b: "\b",
   e: "\x1B",
+  E: "\x1B",
   f: "\f",
   v: "\v",
   "\\": "\\",
   "'": "'",
   '"': '"'
 };
-var decodeAnsi = (body) => body.replace(/\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|[0-7]{1,3}|.)/g, (_, code) => code.length > 1 && code[0] === "x" ? String.fromCharCode(Number.parseInt(code.slice(1), 16)) : code.length > 1 && code[0] === "u" ? String.fromCharCode(Number.parseInt(code.slice(1), 16)) : /^[0-7]+$/.test(code) ? String.fromCharCode(Number.parseInt(code, 8)) : ANSI_ESCAPES[code] ?? `\\${code}`);
+var MAX_CODE_POINT = 1114111;
+var control = (char) => char === "?" ? "\x7F" : String.fromCharCode(char.toUpperCase().charCodeAt(0) & 31);
+var decodeAnsi = (body) => body.replace(/\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c(?:\\\\|[\s\S])|.)/g, (whole, code) => {
+  if (code.length > 1 && code[0] === "c")
+    return control(code[1] ?? "");
+  if (code.length > 1 && /[xuU]/.test(code[0] ?? "")) {
+    const point = Number.parseInt(code.slice(1), 16);
+    return point <= MAX_CODE_POINT ? String.fromCodePoint(point) : whole;
+  }
+  return /^[0-7]+$/.test(code) ? String.fromCharCode(Number.parseInt(code, 8)) : ANSI_ESCAPES[code] ?? `\\${code}`;
+});
 var closingParen = (text, from) => {
   let depth = 0;
   for (let index = from;index < text.length; index += 1) {
@@ -7967,6 +8130,7 @@ var scanScript = (source, nesting = 0) => {
     let words = [];
     let outputs = [];
     let current = null;
+    let literal = "";
     let dynamic = false;
     let redirect = null;
     let parenDepth = 0;
@@ -7976,13 +8140,15 @@ var scanScript = (source, nesting = 0) => {
       if (current === null)
         return;
       const text = current;
+      const windows = literal;
       current = null;
+      literal = "";
       const isDynamic = dynamic;
       dynamic = false;
       if (redirect === "out")
-        outputs.push(text);
+        outputs.push(...windows === text ? [text] : [text, windows]);
       else if (redirect === null)
-        words.push({ text, dynamic: isDynamic });
+        words.push({ text, dynamic: isDynamic, ...windows === text ? {} : { literal: windows } });
       redirect = null;
     };
     const endCommand = () => {
@@ -7993,8 +8159,9 @@ var scanScript = (source, nesting = 0) => {
       outputs = [];
       redirect = null;
     };
-    const append = (text, computed = false) => {
+    const append = (text, computed = false, windows = text) => {
       current = (current ?? "") + text;
+      literal += windows;
       if (computed)
         dynamic = true;
     };
@@ -8079,6 +8246,7 @@ var scanScript = (source, nesting = 0) => {
       const char = source[pos] ?? "";
       if (current !== null && /^\d+$/.test(current)) {
         current = null;
+        literal = "";
         dynamic = false;
       } else
         endWord();
@@ -8109,7 +8277,7 @@ var scanScript = (source, nesting = 0) => {
         const next = source[pos + 1];
         if (next !== undefined && next !== `
 `)
-          append(next);
+          append(next, false, KEPT_BACKSLASH.test(next) ? `\\${next}` : next);
         pos += 2;
       } else if (char === "'") {
         const end = source.indexOf("'", pos + 1);
@@ -8147,6 +8315,10 @@ var scanScript = (source, nesting = 0) => {
       } else if (char === "<" || char === ">")
         redirection();
       else if (char === "(") {
+        endWord();
+        const last = words[words.length - 1];
+        if (last !== undefined)
+          words[words.length - 1] = { ...last, open: true };
         endCommand();
         const open = source[pos + 1] === "(" ? 2 : 1;
         if (open === 2 && arithmeticBase === -1)
@@ -8179,6 +8351,344 @@ var scanScript = (source, nesting = 0) => {
   return failure === undefined ? { ok: true, commands } : { ok: false, reason: failure };
 };
 
+// src/hook/launchers.ts
+var WORK_LIMIT = 8000000;
+var newBudget = () => ({ left: WORK_LIMIT });
+var overBudget = (budget, units) => {
+  budget.left -= units;
+  return budget.left < 0;
+};
+var TOO_LARGE_WHY = "it is too large to read";
+var CUT_SHORT = { text: "$(...)", dynamic: true };
+var CUT_OPEN = { ...CUT_SHORT, open: true };
+var isCut = (words) => words[words.length - 1]?.open === true;
+var START_VALUED = [
+  "workingdirectory",
+  "verb",
+  "windowstyle",
+  "credential",
+  "environment",
+  "redirectstandardinput",
+  "erroraction",
+  "ea",
+  "warningaction",
+  "wa",
+  "informationaction",
+  "infa",
+  "errorvariable",
+  "ev",
+  "warningvariable",
+  "wv",
+  "informationvariable",
+  "iv",
+  "outvariable",
+  "ov",
+  "outbuffer",
+  "ob",
+  "pipelinevariable",
+  "pv",
+  "progressaction"
+];
+var START_OUTPUTS = ["redirectstandardoutput", "redirectstandarderror"];
+var START_SWITCHES = ["wait", "nonewwindow", "passthru", "loaduserprofile", "usenewenvironment"];
+var CMD_START_SWITCH = /^\/(\?|b|i|min|max|wait|separate|shared|low|normal|high|realtime|abovenormal|belownormal)$/i;
+var CMD_START_VALUED = /^\/(d|node|affinity|machine)$/i;
+var START_WORD = { text: "start", dynamic: false };
+var FILE_FLAGS = ["filepath"];
+var FILE_FLAGS_FIRST = ["filepath", "f"];
+var LIST_FLAGS = ["argumentlist", "args"];
+var LIST_FLAGS_FIRST = ["argumentlist", "args", "a"];
+var NO_ARGUMENTS = { words: [], outputs: [] };
+var isStartFlag = (text, names) => {
+  if (text.charCodeAt(0) !== 45 || !/^-[A-Za-z]+$/.test(text))
+    return false;
+  const spelled = text.slice(1).toLowerCase();
+  return names.some((full) => full.startsWith(spelled) && (spelled.length > 1 || spelled === full));
+};
+var attachedValue = (word) => {
+  const colon = word.text.startsWith("-") ? word.text.indexOf(":") : -1;
+  if (colon <= 1)
+    return [word.text, undefined];
+  const literal = word.literal?.slice(word.literal.indexOf(":") + 1);
+  return [
+    word.text.slice(0, colon),
+    {
+      text: word.text.slice(colon + 1),
+      dynamic: word.dynamic,
+      ...literal === undefined ? {} : { literal }
+    }
+  ];
+};
+var listFrom = (words, from, first) => {
+  const list = first === undefined ? [] : [first];
+  for (let index = from;index < words.length; index += 1) {
+    const word = words[index];
+    if (word === undefined)
+      break;
+    const previous = list[list.length - 1];
+    if (previous !== undefined && !previous.text.endsWith(",") && !word.text.startsWith(","))
+      break;
+    list.push(word);
+  }
+  return list;
+};
+var argumentText = (elements) => elements.map((element) => {
+  if (element.dynamic)
+    return element.text;
+  const text = element.literal ?? element.text;
+  return text === "@" ? CUT_SHORT.text : text.replaceAll(",", " ");
+}).join(" ").replaceAll(/\$\(\.\.\.\)|\$\{\.\.\.\}|`\.\.\.`/g, "$_");
+var argumentCommands = (text) => {
+  const scan = scanScript(text);
+  if (scan.ok)
+    return scan.commands;
+  const words = text.split(/\s+/).filter((part) => part !== "");
+  return [{ words: words.map((part) => ({ text: part, dynamic: false })), outputs: [] }];
+};
+var afterHashtable = (judge, words, flagAt, valueAt, depth, budget) => {
+  const before = words.slice(0, flagAt);
+  const judgeAfter = (after) => judge.words([...before, ...after.length === 0 ? [CUT_OPEN] : after], depth + 1, budget);
+  let closed = false;
+  for (let end = valueAt;end < words.length; end += 1) {
+    if (words[end]?.text.includes("}") !== true)
+      continue;
+    closed = true;
+    const verdict = judgeAfter(words.slice(end + 1));
+    if (verdict !== undefined)
+      return verdict;
+  }
+  return closed ? undefined : judgeAfter([]);
+};
+var environmentOf = (judge, words, valueAt, inline) => {
+  const value = inline ?? words[valueAt];
+  if (value === undefined)
+    return;
+  let end = valueAt;
+  if (value.text.startsWith("@{")) {
+    for (let index = valueAt;index < words.length; index += 1)
+      if (words[index]?.text.includes("}") === true)
+        end = index;
+  }
+  const texts = [value.text, ...words.slice(valueAt + 1, end + 1).map((word) => word.text)];
+  for (const text of texts)
+    for (const [name] of text.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
+      const verdict = judge.variable(name);
+      if (verdict !== undefined)
+        return verdict;
+    }
+  return;
+};
+var classifyStartProcess = (judge, words, depth, budget, speculative = false) => {
+  if (depth > judge.maxDepth)
+    return judge.unsure("commands nested too deeply");
+  if (overBudget(budget, words.length))
+    return judge.unsure(TOO_LARGE_WHY);
+  const head = words[0] ?? START_WORD;
+  let file;
+  let fileAt = -1;
+  const elements = [];
+  const written = [];
+  for (let index = 1;index < words.length; index += 1) {
+    const word = words[index];
+    if (word === undefined)
+      break;
+    const [name, inline] = attachedValue(word);
+    if (word.text.charCodeAt(0) === 64 && /^@[A-Za-z_]\w*$/.test(word.text)) {
+      if (file === undefined && !speculative)
+        file = CUT_SHORT;
+      else
+        elements.push(CUT_SHORT);
+    } else if (isStartFlag(name, file === undefined ? FILE_FLAGS_FIRST : FILE_FLAGS)) {
+      file = inline ?? words[index + 1] ?? CUT_SHORT;
+      fileAt = -1;
+      if (inline === undefined)
+        index += 1;
+    } else if (isStartFlag(name, file === undefined ? LIST_FLAGS_FIRST : LIST_FLAGS)) {
+      const list = listFrom(words, index + 1, inline);
+      elements.push(...list.length === 0 ? [CUT_SHORT] : list);
+      index += list.length - (inline === undefined ? 0 : 1);
+    } else if (isStartFlag(name, START_OUTPUTS)) {
+      const target = inline ?? words[index + 1];
+      if (target !== undefined)
+        written.push(target.text, ...target.literal ? [target.literal] : []);
+      if (inline === undefined)
+        index += 1;
+    } else if (isStartFlag(name, START_VALUED)) {
+      const valueAt = inline === undefined ? index + 1 : index;
+      if (isStartFlag(name, ["environment"])) {
+        const verdict = environmentOf(judge, words, valueAt, inline);
+        if (verdict !== undefined)
+          return verdict;
+      }
+      if ((inline ?? words[index + 1])?.text.startsWith("@{") === true)
+        return afterHashtable(judge, words, index, valueAt, depth, budget);
+      if (inline === undefined)
+        index += 1;
+    } else if (isStartFlag(name, START_SWITCHES))
+      continue;
+    else if (file === undefined) {
+      if (CMD_START_VALUED.test(word.text))
+        index += 1;
+      else if (word.text.startsWith("-")) {
+        const without = (count) => [...words.slice(0, index), ...words.slice(index + count)];
+        return classifyStartProcess(judge, without(1), depth + 1, budget, speculative) ?? classifyStartProcess(judge, without(2), depth + 1, budget, true);
+      } else if (!CMD_START_SWITCH.test(word.text)) {
+        file = word;
+        fileAt = index;
+      }
+    } else {
+      const list = listFrom(words, index + 1, word);
+      elements.push(...list);
+      index += list.length - 1;
+    }
+  }
+  if (isCut(words)) {
+    if (file === undefined)
+      file = speculative ? undefined : CUT_SHORT;
+    else if (elements.length === 0 || elements[elements.length - 1]?.open === true)
+      elements.push(CUT_SHORT);
+  }
+  if (file === undefined)
+    return;
+  const text = argumentText(elements);
+  const large = judge.oversize(text);
+  if (large !== undefined)
+    return large;
+  if (overBudget(budget, text.length >> 1))
+    return judge.unsure(TOO_LARGE_WHY);
+  const [first = NO_ARGUMENTS, ...others] = argumentCommands(text);
+  const launched = {
+    words: [file, ...first.words],
+    outputs: [...first.outputs, ...written]
+  };
+  let verdict = judge.simple(launched, depth + 1, budget);
+  for (const other of others)
+    verdict ??= judge.simple(other, depth + 1, budget);
+  if (verdict !== undefined || speculative || fileAt === -1)
+    return verdict;
+  return classifyStartProcess(judge, [head, ...words.slice(fileAt + 1)], depth + 1, budget, true);
+};
+var HOSTS = {
+  wsl: {
+    valued: ["-d", "--distribution", "--distribution-id", "-u", "--user", "--cd", "--shell-type"],
+    switches: ["-e", "--exec", "--system"]
+  },
+  conhost: { valued: ["--width", "--height", "--signal", "--server"], switches: ["--headless"] },
+  wt: {
+    valued: [
+      "-w",
+      "--window",
+      "-d",
+      "--startingDirectory",
+      "-p",
+      "--profile",
+      "--title",
+      "--tabColor",
+      "--colorScheme",
+      "--pos",
+      "--size",
+      "-s"
+    ],
+    switches: [
+      "-M",
+      "--maximized",
+      "-F",
+      "--fullscreen",
+      "-f",
+      "--focus",
+      "-H",
+      "-V",
+      "-D",
+      "--duplicate",
+      "--suppressApplicationTitle"
+    ]
+  }
+};
+var NO_HOST = { valued: [], switches: [] };
+var TERMINAL_SUBCOMMANDS = new Set(["new-tab", "nt", "split-pane", "sp"]);
+var terminalCommands = (words) => {
+  let current = [];
+  const commands = [current];
+  for (const word of words) {
+    if (word.dynamic || !word.text.endsWith(";"))
+      current.push(word);
+    else {
+      if (word.text !== ";")
+        current.push({
+          ...word,
+          text: word.text.slice(0, -1),
+          ...word.literal === undefined ? {} : { literal: word.literal.slice(0, -1) }
+        });
+      current = [];
+      commands.push(current);
+    }
+  }
+  return commands;
+};
+var isHostLeader = (name, text) => name === "wsl" ? text === "~" : name === "wt" && TERMINAL_SUBCOMMANDS.has(text.toLowerCase());
+var readOptions = (host, command, from) => {
+  for (let index = from;index < command.length; index += 1) {
+    const text = command[index]?.text ?? "";
+    if (text === "--")
+      return { start: index + 1 };
+    if (!text.startsWith("-") || text === "-")
+      return { start: index };
+    if (host.valued.includes(text))
+      index += 1;
+    else if (!host.switches.includes(text))
+      return { start: index, unknown: index };
+  }
+  return { start: command.length };
+};
+var hostedCommand = (judge, name, head, command, cut, depth, budget) => {
+  const host = HOSTS[name] ?? NO_HOST;
+  let options = readOptions(host, command, 0);
+  if (options.unknown === undefined && isHostLeader(name, command[options.start]?.text ?? ""))
+    options = readOptions(host, command, options.start + 1);
+  if (options.unknown !== undefined) {
+    const at = options.unknown;
+    const without = (count) => [head, ...command.slice(0, at), ...command.slice(at + count)];
+    return judge.words(without(1), depth + 1, budget) ?? judge.words(without(2), depth + 1, budget);
+  }
+  const inner = command.slice(options.start);
+  const run = cut ? [...inner, CUT_SHORT] : inner;
+  if (run.length > 1)
+    return judge.line(run, depth, budget);
+  return judge.words(run, depth + 1, budget) ?? judge.line(run, depth, budget);
+};
+var hosted = (name) => (judge, words, depth, budget) => {
+  if (overBudget(budget, words.length))
+    return judge.unsure(TOO_LARGE_WHY);
+  const head = words[0] ?? { text: name, dynamic: false };
+  const rest = words.slice(1);
+  const commands = name === "wt" ? terminalCommands(rest) : [rest];
+  for (const [position, command] of commands.entries()) {
+    const cut = isCut(words) && position === commands.length - 1;
+    const verdict = hostedCommand(judge, name, head, command, cut, depth, budget);
+    if (verdict !== undefined)
+      return verdict;
+  }
+  return;
+};
+var NEEDS_QUOTES = /[\s'"\\$`;&|<>()#*?[]/;
+var blockWord = (word) => {
+  const text = word.literal ?? word.text;
+  if (word.dynamic && /[\s#]/.test(text))
+    return `"${text.replaceAll("\\", "\\\\").replaceAll('"', "\\\"")}"`;
+  if (!word.dynamic && (text === "" || NEEDS_QUOTES.test(text)))
+    return `'${text.replaceAll("'", "'\\''")}'`;
+  return text.replaceAll(/[{}]/g, ";");
+};
+var classifyScriptBlock = (judge, words, depth, budget) => judge.script(`: ${words.slice(1).map(blockWord).join(" ")}`, depth + 1, budget);
+var startProcess = (judge, words, depth, budget) => classifyStartProcess(judge, words, depth, budget);
+var launchersNamed = (names, launcher) => names.map((name) => [name, launcher]);
+var LAUNCHERS = Object.fromEntries([
+  ...launchersNamed(["start-process", "saps", "start"], startProcess),
+  ...["wsl", "conhost", "wt"].map((name) => [name, hosted(name)]),
+  ...launchersNamed([...TERMINAL_SUBCOMMANDS], hosted("wt")),
+  ...launchersNamed(["invoke-command", "icm", "start-job", "sajb", "start-threadjob"], classifyScriptBlock)
+]);
+
 // src/hook/policy.ts
 var MAX_DEPTH = 6;
 var MAX_JUDGED_BYTES = 1024 * 1024;
@@ -8187,11 +8697,20 @@ var REASONS = {
   gh: (sub) => `gh ${sub} is a write or an unlisted gh command, and gh writes belong to the root. Put the finding in your report. Open to you: gh pr view|checks|diff|list|status, run view|list, issue view|list, repo view, and gh api for plain reads.`,
   holyclaude: (sub) => `holyclaude ${sub} changes Intent and Assignment state, which the root owns. Read it with holyclaude intent show, assignment show, assignment list, assignment verify, routes and reconcile.`,
   state: `The .holyclaude state files are written by the root through the holyclaude CLI. Describe the state you need in your report.`,
+  gitDir: `The .git directory holds the hooks and settings that run at the root's next commit, so only the root changes it. Reading it is open to you; describe the change you need in your report.`,
   config: (key) => `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
+  env: (name) => `${name} makes git run a program or read configuration the guard cannot check, as git -c does for most keys. Drop the variable; to change how a git read looks, use git -c with a display setting (color.*, core.quotepath, diff.renames and similar).`,
   unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`,
   oversized: (what, bytes) => `This ${what} is ${bytes} bytes and the guard reads at most ${MAX_JUDGED_BYTES}, so it cannot be checked. Shorten it, or send the work in smaller calls, for example one shorter command at a time.`,
   noTool: `This tool call names no tool that can be read, so it cannot be checked. Retry the call, and report it to the root if it recurs.`,
   noPath: (tool) => `This ${tool} call names no file path that can be read, so it cannot be checked. Send the path as a plain string.`
+};
+var TOO_LARGE = REASONS.unsure(TOO_LARGE_WHY);
+var oversize = (what, text) => {
+  if (text.length * 3 <= MAX_JUDGED_BYTES)
+    return;
+  const bytes = Buffer.byteLength(text);
+  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined;
 };
 var GIT_READS = new Set([
   "status",
@@ -8244,6 +8763,23 @@ var GIT_INLINE_GLOBALS = /^--(git-dir|work-tree|namespace|super-prefix|attr-sour
 var GIT_INFO_GLOBALS = new Set(["--version", "--help", "-h", "--html-path", "--man-path"]);
 var GIT_DISPLAY_CONFIG = /^(color\.|column\.|advice\.|core\.(quotepath|abbrev|whitespace|autocrlf|safecrlf|filemode|ignorecase|precomposeunicode|longpaths|symlinks)$|diff\.(algorithm|context|renames|colormoved|colormovedws|noprefix|mnemonicprefix|ignoresubmodules|interhunkcontext|wserrorhighlight)$|log\.(abbrevcommit|date|decorate|follow|showroot)$|status\.(short|branch|showuntrackedfiles|renames|aheadbehind)$)/;
 var GIT_EXEC_FLAGS = /^--(upload-pack|receive-pack|exec|ext-diff|open-files-in-pager|config-env)(=|$)/;
+var GIT_EXEC_ENV = /^(git_(external_diff|pager|ssh|ssh_command|askpass|proxy_command|exec_path|allow_protocol|config(_(count|parameters|global|system|(key|value)_\d+))?)|pager|ssh_askpass)$/i;
+var ENV_SETTERS = new Set(["export", "declare", "typeset", "readonly", "local", "set"]);
+var ENV_NAMERS = new Set(["setenv", "setx"]);
+var ITEM_WRITERS = new Set([
+  "set-item",
+  "si",
+  "new-item",
+  "ni",
+  "copy-item",
+  "cpi",
+  "rename-item",
+  "rni",
+  "set-content",
+  "sc",
+  "add-content",
+  "ac"
+]);
 var BRANCH_FLAGS = new Set([
   "-l",
   "--list",
@@ -8336,12 +8872,15 @@ var WRAPPERS = {
   chronic: { values: [], leading: 0 },
   taskset: { values: [], leading: 1 },
   flock: { values: ["-w", "-E"], leading: 1, script: ["-c", "--command"] },
-  busybox: { values: [], leading: 0 }
+  busybox: { values: [], leading: 0 },
+  call: { values: [], leading: 0 },
+  ".": { values: [], leading: 0 }
 };
 var XARGS_INPUT = [
   { text: "x", dynamic: false },
   { text: "x:x", dynamic: false }
 ];
+var PLAIN_WORD = /^[\w./:=@%+,-]+$/;
 var SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh"]);
 var RUNTIMES = new Set(["bun", "bunx", "node", "npx", "deno", "tsx", "ts-node", "pnpm", "yarn"]);
 var BREAKS = new Set(["for", "select", "case", "fi", "done", "esac", "}", "[["]);
@@ -8382,7 +8921,26 @@ var FILE_WRITERS = new Set([
   "ni",
   "rename-item",
   "rni",
-  "tee-object"
+  "tee-object",
+  "mkdir",
+  "md",
+  "chmod",
+  "chown",
+  "patch",
+  "curl",
+  "wget",
+  "invoke-webrequest",
+  "iwr",
+  "invoke-restmethod",
+  "irm",
+  "tar",
+  "unzip",
+  "expand-archive",
+  "mklink",
+  "xcopy",
+  "robocopy",
+  "ren",
+  "rename"
 ]);
 var HOLYCLAUDE = /^holyclaude(\.js)?$/;
 var RUNTIME_VALUE_FLAGS = new Set([
@@ -8407,10 +8965,50 @@ var RUNNER_SUBCOMMANDS = new Set(["x", "dlx", "exec"]);
 var partStart = (path) => Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
 var program = (path) => path.slice(partStart(path)).toLowerCase().replace(/\.(exe|cmd|bat)$/, "");
 var isAssignment = (text) => /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(text);
+var classifyAssignment = (text) => {
+  if (!isAssignment(text))
+    return;
+  const name = text.slice(0, text.indexOf("=")).replace(/\+$/, "");
+  return GIT_EXEC_ENV.test(name) ? REASONS.env(name) : undefined;
+};
 var texts = (words) => words.map((word) => word.text);
-var touchesState = (text) => text.toLowerCase().includes(".holyclaude");
+var GIT_DIR_PART = /^(\.git|git~\d+)[. ]*(:|$)/;
+var STATE_SHORT_PART = /^holycl~\d+[. ]*(:|$)/;
+var PATH_PART_END = /[\\/=]/;
+var PATTERN = /[*?[{]/;
+var protectedReason = (text) => {
+  const lower = text.toLowerCase();
+  if (lower.includes(".holyclaude"))
+    return REASONS.state;
+  const parts = lower.split(PATH_PART_END);
+  if (parts.some((part) => STATE_SHORT_PART.test(part)))
+    return REASONS.state;
+  return parts.some((part) => GIT_DIR_PART.test(part)) ? REASONS.gitDir : undefined;
+};
+var writtenReason = (text) => {
+  const named = protectedReason(text);
+  if (named !== undefined || !PATTERN.test(text))
+    return named;
+  const name = protectedNameOf(text);
+  if (name === undefined)
+    return;
+  return name === ".git" ? REASONS.gitDir : REASONS.state;
+};
+var firstReason = (reasons) => reasons.find((reason) => reason !== undefined);
+var pathsOf = (text) => {
+  if (!text.startsWith("-"))
+    return [text];
+  const colon = text.indexOf(":");
+  return [
+    text,
+    ...text.startsWith("--") ? [] : [text.slice(2)],
+    ...colon === -1 ? [] : [text.slice(colon + 1)]
+  ];
+};
+var wordReason = (word) => firstReason([word.text, ...word.literal === undefined ? [] : [word.literal]].flatMap(pathsOf).map(writtenReason));
 var isHolyclaude = (path) => HOLYCLAUDE.test(program(path));
 var isEntry = (path) => isHolyclaude(path) || /packages\/cli\/(src\/)?main\.(ts|js)$/.test(path.replaceAll("\\", "/").toLowerCase());
+var readsAs = (word, test) => test(word.text) || word.literal !== undefined && test(word.literal);
 var programOf = (word) => word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text))) ? undefined : program(word.text);
 var classifyGitBranch = (args) => {
   let listing = false;
@@ -8676,13 +9274,17 @@ var classifyHolyclaude = (args) => {
     return;
   return HOLYCLAUDE_READS.has(`${first} ${second ?? ""}`) ? undefined : REASONS.holyclaude(second === undefined || second.startsWith("-") ? first : `${first} ${second}`);
 };
-var classifyLine = (words, depth) => {
+var classifyLine = (words, depth, budget) => {
   const [first] = words;
   if (first === undefined)
     return;
   if (first.dynamic)
     return REASONS.unsure("the command text is computed");
-  return classifyScript(texts(words).join(" "), depth + 1);
+  const asWords = words.length > 1 ? classifyWords(words, depth + 1, budget) : undefined;
+  if (words.length > 1 && words.every((word) => !word.dynamic && PLAIN_WORD.test(word.text)))
+    return asWords;
+  const line = words.map((word) => word.literal ?? word.text).join(" ");
+  return asWords ?? classifyScript(line, depth + 1, budget);
 };
 var carriedScript = (wrapper, rest, index) => {
   const word = rest[index];
@@ -8699,7 +9301,7 @@ var carriedScript = (wrapper, rest, index) => {
   }
   return;
 };
-var unwrap = (name, rest, depth) => {
+var unwrap = (name, rest, depth, budget) => {
   const wrapper = WRAPPERS[name];
   if (wrapper === undefined)
     return rest;
@@ -8720,7 +9322,7 @@ var unwrap = (name, rest, depth) => {
     if (carried !== undefined) {
       if (carried.text === undefined || carried.dynamic)
         return REASONS.unsure(`the ${name} command text is computed`);
-      const verdict = classifyScript(carried.text, depth + 1);
+      const verdict = classifyScript(carried.text, depth + 1, budget);
       if (verdict !== undefined)
         return verdict;
       index += carried.width;
@@ -8731,6 +9333,9 @@ var unwrap = (name, rest, depth) => {
       continue;
     }
     if (name === "env" && isAssignment(text)) {
+      const verdict = classifyAssignment(text);
+      if (verdict !== undefined)
+        return verdict;
       index += 1;
       continue;
     }
@@ -8742,7 +9347,7 @@ var unwrap = (name, rest, depth) => {
     break;
   }
   const tail = rest.slice(index);
-  return wrapper.line === true ? classifyLine(tail, depth) ?? [] : tail;
+  return wrapper.line === true ? classifyLine(tail, depth, budget) ?? [] : tail;
 };
 var findAfter = (words, markers) => {
   const start = words.findIndex((word) => markers.includes(word.text));
@@ -8753,7 +9358,7 @@ var findAfter = (words, markers) => {
   return end === -1 ? tail : tail.slice(0, end);
 };
 var isCommandFlag = (text) => /^-[A-Za-z]+$/.test(text) && text.includes("c");
-var classifyShell = (rest, depth) => {
+var classifyShell = (rest, depth, budget) => {
   const flagged = rest.findIndex((word) => isCommandFlag(word.text));
   if (flagged !== -1) {
     const script = rest.slice(flagged + 1).find((word) => !word.text.startsWith("-"));
@@ -8761,31 +9366,83 @@ var classifyShell = (rest, depth) => {
       return;
     if (script.dynamic)
       return REASONS.unsure("the shell script text is computed");
-    return classifyScript(script.text, depth + 1);
+    return classifyScript(script.text, depth + 1, budget);
   }
   if (rest.some((word) => ["--version", "--help", "-V"].includes(word.text)))
     return;
   const file = rest.find((word) => !word.text.startsWith("-") || word.text === "-");
   if (file === undefined || file.text === "-" || rest.some((word) => word.text === "-s"))
     return REASONS.unsure("a shell reading commands from input");
-  if (isHolyclaude(file.text))
+  if (readsAs(file, isHolyclaude))
     return classifyHolyclaude(rest.slice(rest.indexOf(file) + 1));
   return;
 };
 var isFlagFor = (text, full) => /^[-/][A-Za-z]+$/.test(text) && full.startsWith(text.slice(1).toLowerCase());
-var classifyPowerShell = (rest, depth) => {
+var POWERSHELL_SWITCHES = [
+  "noprofile",
+  "nologo",
+  "noninteractive",
+  "noexit",
+  "sta",
+  "mta",
+  "login",
+  "interactive"
+];
+var POWERSHELL_VALUED = [
+  "executionpolicy",
+  "ep",
+  "windowstyle",
+  "outputformat",
+  "inputformat",
+  "version",
+  "psconsolefile",
+  "configurationname",
+  "workingdirectory",
+  "wd",
+  "custompipename",
+  "settingsfile"
+];
+var POWERSHELL_OTHER = ["encodedcommand", "file"];
+var classifyPowerShell = (rest, depth, budget) => {
+  if (depth > MAX_DEPTH)
+    return REASONS.unsure("commands nested too deeply");
+  if (overBudget(budget, rest.length))
+    return TOO_LARGE;
   const flagged = rest.findIndex((word) => isFlagFor(word.text, "command"));
-  const start = flagged === -1 ? rest.findIndex((word) => !word.text.startsWith("-")) : flagged + 1;
+  let start = flagged === -1 ? -1 : flagged + 1;
+  for (let index = 0;flagged === -1 && index < rest.length; index += 1) {
+    const text = rest[index]?.text ?? "";
+    const named = (names) => names.some((full) => isFlagFor(text, full));
+    if (!text.startsWith("-")) {
+      start = index;
+      break;
+    }
+    if (named(POWERSHELL_VALUED))
+      index += 1;
+    else if (!named(POWERSHELL_SWITCHES) && !named(POWERSHELL_OTHER)) {
+      const without = (count) => [...rest.slice(0, index), ...rest.slice(index + count)];
+      return classifyPowerShell(without(1), depth + 1, budget) ?? classifyPowerShell(without(2), depth + 1, budget);
+    }
+  }
   const flags = start === -1 ? rest : rest.slice(0, start);
   if (flags.some((word) => isFlagFor(word.text, "encodedcommand")))
     return REASONS.unsure("an encoded PowerShell command");
   if (start === -1 || flags.some((word) => isFlagFor(word.text, "file")))
     return;
-  return classifyLine(rest.slice(start), depth);
+  return classifyLine(rest.slice(start), depth, budget);
 };
-var classifyCmd = (rest, depth) => {
-  const flagged = rest.findIndex((word) => /^(\/\/?|-)[ckr]$/i.test(word.text));
-  return flagged === -1 ? undefined : classifyLine(rest.slice(flagged + 1), depth);
+var CMD_RUN = /^(?:\/+(?:[adqsuxy]|[eftv]:\w*))*\/+[ckr]|^-[ckr]$/i;
+var classifyCmd = (rest, depth, budget) => {
+  for (const [index, word] of rest.entries()) {
+    const run = CMD_RUN.exec(word.text)?.[0];
+    if (run === undefined)
+      continue;
+    const glued = word.text.slice(run.length);
+    const literal = word.literal?.slice(run.length);
+    const line = glued === "" ? [] : [{ text: glued, dynamic: word.dynamic, ...literal === undefined ? {} : { literal } }];
+    return classifyLine([...line, ...rest.slice(index + 1)], depth, budget);
+  }
+  return;
 };
 var operandFrom = (rest, from) => {
   let index = from;
@@ -8796,7 +9453,7 @@ var operandFrom = (rest, from) => {
     index += RUNTIME_VALUE_FLAGS.has(text) ? 2 : 1;
   }
 };
-var classifyRuntime = (name, rest, depth) => {
+var classifyRuntime = (name, rest, depth, budget) => {
   let at = operandFrom(rest, 0);
   if (name === "node" && rest.slice(0, at).some((word) => word.text === "--check"))
     return;
@@ -8807,13 +9464,29 @@ var classifyRuntime = (name, rest, depth) => {
   const operand = rest[at];
   if (operand === undefined)
     return;
-  if (isEntry(operand.text))
+  if (readsAs(operand, isEntry))
     return classifyHolyclaude(rest.slice(at + 1));
-  return runner ? classifyWords(rest.slice(at), depth + 1) : undefined;
+  return runner ? classifyWords(rest.slice(at), depth + 1, budget) : undefined;
 };
-var classifyWords = (input, depth) => {
+var environmentReason = (name, rest) => {
+  for (const word of rest) {
+    const text = word.text;
+    const at = ITEM_WRITERS.has(name) ? text.toLowerCase().lastIndexOf("env:") : -1;
+    const variable = at === -1 ? text : text.slice(at + "env:".length).replace(/^[\\/]/, "");
+    if (ENV_SETTERS.has(name)) {
+      const verdict = classifyAssignment(text);
+      if (verdict !== undefined)
+        return verdict;
+    } else if ((ENV_NAMERS.has(name) || at !== -1) && GIT_EXEC_ENV.test(variable))
+      return REASONS.env(variable);
+  }
+  return;
+};
+var classifyWords = (input, depth, budget) => {
   if (depth > MAX_DEPTH)
     return REASONS.unsure("commands nested too deeply");
+  if (overBudget(budget, input.length))
+    return TOO_LARGE;
   let start = 0;
   for (;; ) {
     const head = input[start];
@@ -8823,85 +9496,115 @@ var classifyWords = (input, depth) => {
       return;
     if (!head.dynamic && head.text === "function")
       start += 2;
-    else if (!head.dynamic && OPENERS.has(head.text) || isAssignment(head.text))
+    else if (!head.dynamic && OPENERS.has(head.text))
       start += 1;
-    else
+    else if (isAssignment(head.text)) {
+      const verdict = classifyAssignment(head.text);
+      if (verdict !== undefined)
+        return verdict;
+      start += 1;
+    } else
       break;
   }
   const [head, ...rest] = input.slice(start);
   if (head === undefined)
     return;
+  if (head.literal !== undefined) {
+    const windows = { text: head.literal, dynamic: head.dynamic };
+    const verdict = classifyWords([windows, ...rest], depth, budget);
+    if (verdict !== undefined)
+      return verdict;
+  }
+  if (!head.dynamic && /^[.&]?\{/.test(head.text)) {
+    const block = { text: head.text.replace(/^[.&]/, ""), dynamic: false };
+    return LAUNCHERS["invoke-command"]?.(judge, [head, block, ...rest], depth, budget);
+  }
   const name = programOf(head);
   if (name === undefined)
     return REASONS.unsure("the program name is computed");
+  const variable = environmentReason(name, rest);
+  if (variable !== undefined)
+    return variable;
   if (name === "git")
     return classifyGit(rest);
+  if (name.startsWith("git-"))
+    return classifyGitSub(name.slice(4), rest);
   if (name === "gh")
     return classifyGh(rest);
   if (HOLYCLAUDE.test(name))
     return classifyHolyclaude(rest);
+  const launcher = Object.hasOwn(LAUNCHERS, name) ? LAUNCHERS[name] : undefined;
+  if (launcher !== undefined)
+    return launcher(judge, [head, ...rest], depth, budget);
   if (Object.hasOwn(WRAPPERS, name)) {
-    const inner = unwrap(name, rest, depth);
+    const inner = unwrap(name, rest, depth, budget);
     if (typeof inner === "string")
       return inner;
-    return classifyWords(name === "xargs" ? [...inner, ...XARGS_INPUT] : inner, depth + 1);
+    return classifyWords(name === "xargs" ? [...inner, ...XARGS_INPUT] : inner, depth + 1, budget);
   }
   if (SHELLS.has(name))
-    return classifyShell(rest, depth);
+    return classifyShell(rest, depth, budget);
   if (name === "powershell" || name === "pwsh")
-    return classifyPowerShell(rest, depth);
+    return classifyPowerShell(rest, depth, budget);
   if (name === "cmd")
-    return classifyCmd(rest, depth);
+    return classifyCmd(rest, depth, budget);
   if (name === "eval" || name === "iex" || name === "invoke-expression") {
     if (rest.some((word) => word.dynamic))
       return REASONS.unsure(`${name} text is computed`);
-    return classifyScript(texts(rest).join(" "), depth + 1);
+    return classifyScript(texts(rest).join(" "), depth + 1, budget);
   }
   if (RUNTIMES.has(name))
-    return classifyRuntime(name, rest, depth);
+    return classifyRuntime(name, rest, depth, budget);
   if (name === "find") {
     const inner = findAfter(rest, ["-exec", "-execdir", "-ok", "-okdir"]);
     if (inner !== undefined)
-      return classifyWords(inner, depth + 1);
+      return classifyWords(inner, depth + 1, budget);
   }
   if (name === "fd" || name === "fdfind") {
     const inner = findAfter(rest, ["-x", "-X", "--exec", "--exec-batch"]);
     if (inner !== undefined)
-      return classifyWords(inner, depth + 1);
+      return classifyWords(inner, depth + 1, budget);
   }
-  if (FILE_WRITERS.has(name) && rest.some((word) => touchesState(word.text)))
-    return REASONS.state;
-  if ((name === "sed" || name === "perl") && rest.some((word) => /^(-[A-Za-z]*i|--in-place)/.test(word.text)) && rest.some((word) => touchesState(word.text)))
-    return REASONS.state;
-  return;
+  const writesInPlace = FILE_WRITERS.has(name) || (name === "sed" || name === "perl") && rest.some((word) => /^(-[A-Za-z]*i|--in-place)/.test(word.text));
+  return writesInPlace ? firstReason(rest.map(wordReason)) : undefined;
 };
-var classifySimple = (simple, depth) => {
-  if (simple.outputs.some(touchesState))
-    return REASONS.state;
-  return classifyWords(simple.words, depth);
+var classifySimple = (simple, depth, budget) => {
+  const written = firstReason(simple.outputs.map(writtenReason));
+  return written ?? classifyWords(simple.words, depth, budget);
 };
-var classifyScript = (source, depth) => {
+var classifyScript = (source, depth, budget) => {
   if (depth > MAX_DEPTH)
     return REASONS.unsure("commands nested too deeply");
+  const large = oversize("command", source);
+  if (large !== undefined)
+    return large;
+  if (overBudget(budget, source.length >> 1))
+    return TOO_LARGE;
   const scan = scanScript(source);
   if (!scan.ok)
     return REASONS.unsure(scan.reason);
   for (const simple of scan.commands) {
-    const verdict = classifySimple(simple, depth);
+    const verdict = classifySimple(simple, depth, budget);
     if (verdict !== undefined)
       return verdict;
   }
   return;
 };
-var denyReason = (command) => classifyScript(command, 0);
+var judge = {
+  maxDepth: MAX_DEPTH,
+  unsure: REASONS.unsure,
+  oversize: (text) => oversize("command", text),
+  variable: (name) => GIT_EXEC_ENV.test(name) ? REASONS.env(name) : undefined,
+  words: classifyWords,
+  script: classifyScript,
+  simple: classifySimple,
+  line: classifyLine
+};
+var denyReason = (command) => classifyScript(command, 0, newBudget());
 var UNREADABLE = REASONS.unsure("it is nested too deeply to read");
 var SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
 var FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 var JUDGED_TOOLS = new Set([...SHELL_TOOLS, ...FILE_TOOLS]);
-var oversize = (what, text) => {
-  const bytes = Buffer.byteLength(text);
-  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined;
-};
 var denyToolReason = (toolName, input) => {
   if (toolName === undefined)
     return REASONS.noTool;
@@ -8914,7 +9617,7 @@ var denyToolReason = (toolName, input) => {
     if (targets.length === 0)
       return REASONS.noPath(toolName);
     for (const target of targets) {
-      const verdict = oversize("file path", target) ?? (touchesState(target) ? REASONS.state : undefined);
+      const verdict = oversize("file path", target) ?? protectedReason(target);
       if (verdict !== undefined)
         return verdict;
     }
@@ -8924,6 +9627,11 @@ var denyToolReason = (toolName, input) => {
 };
 
 // src/hook/pre-tool-use.ts
+var MAX_HOOK_BYTES = 1024 * 1024;
+var REFUSALS = {
+  oversized: `This call's payload is over ${MAX_HOOK_BYTES} bytes, so the guard cannot check it. Send the work in smaller calls, for example one shorter command or a smaller write at a time.`,
+  unreadable: `This call's payload is empty or not valid JSON, so the guard cannot check it. Send the call again; if it is refused again, say so in your report.`
+};
 var MAX_REASON_CHARS = 1000;
 var deny = (reason) => JSON.stringify({
   hookSpecificOutput: {
@@ -8933,11 +9641,15 @@ var deny = (reason) => JSON.stringify({
   }
 });
 var preToolUse = (stdin) => gen2(function* () {
+  if (Buffer.byteLength(stdin) > MAX_HOOK_BYTES)
+    return deny(REFUSALS.oversized);
   const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
     return;
   }));
-  const agent = input?.agent;
-  if (input === undefined || agent === undefined)
+  if (input === undefined)
+    return deny(REFUSALS.unreadable);
+  const agent = input.agent;
+  if (agent === undefined)
     return "";
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
   if (agent.id !== undefined)
@@ -10057,6 +10769,7 @@ var hookPreToolUse = cmd({
   input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
   run: (_args, stdin) => stdin.pipe(flatMap2(preToolUse), map4((text) => ({ text })))
@@ -10149,8 +10862,8 @@ var errorFields = (error) => {
 `).slice(0, 6).join(`
 `).slice(0, 600), hint };
 };
-var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ command: "this command" })) : tryPromise2({
-  try: () => Bun.stdin.text(),
+var stdinOf = (limit) => suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ command: "this command" })) : tryPromise2({
+  try: () => (limit === undefined ? Bun.stdin : Bun.stdin.slice(0, limit + 1)).text(),
   catch: () => new StdinMissing({ command: "this command" })
 }));
 var find = (argv) => COMMANDS.find((command) => command.path.every((part, index) => argv[index] === part));
@@ -10178,7 +10891,7 @@ var run2 = (argv) => gen2(function* () {
       message: `Expected ${command.positionals} argument(s), got ${parsed.positionals.length}`,
       hint: `Usage: holyclaude ${command.usage}`
     });
-  return yield* command.run(parsed, stdin);
+  return yield* command.run(parsed, stdinOf(command.stdinLimit));
 });
 var render = (outcome) => ({
   out: outcome.text ?? toon(outcome.value),

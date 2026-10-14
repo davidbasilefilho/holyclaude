@@ -65,10 +65,7 @@ const isAgentId = (value: unknown): boolean => value !== undefined && value !== 
 
 const decode = Schema.decodeUnknownEffect(Envelope)
 
-/**
- * Decodes the JSON Claude Code writes to a hook's stdin, whatever its size. Fails when the text is
- * not a JSON object.
- */
+/** Decodes the JSON Claude Code writes to a hook's stdin. Fails when the text is not a JSON object. */
 export const decodeHookInput = (text: string) =>
   decode(text).pipe(
     Effect.map((envelope): HookInput => ({
