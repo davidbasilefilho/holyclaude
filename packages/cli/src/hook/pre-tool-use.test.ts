@@ -346,12 +346,20 @@ const TABLE: ReadonlyArray<Row> = [
     "$'\\147it' commit",
     "$'gh' pr create",
     "$'\\U00000067\\U00000068' pr create",
+    // \cJ is a newline, which ends a command in the text eval and bash -c read.
+    "eval $'true\\cJgit commit -m x'",
+    "eval $'true\\cjgit push'",
+    "bash -c $'true\\cJgit push'",
+    "eval $'true\\c\\\\\\cJgit push'",
   ),
   ...allowed(
     "$'\\U00000067it' status",
     "echo $'\\U0001F600'",
     "echo $'\\UFFFFFFFF'",
     "echo $'\\U'",
+    "eval $'true\\cJgit status'",
+    "eval $'git\\cIstatus'",
+    "echo $'\\c'",
   ),
 
   // A Windows path keeps its backslashes in PowerShell and cmd and loses them in bash, so the

@@ -50,6 +50,7 @@ const ANSI_ESCAPES: Readonly<Record<string, string>> = {
   a: "\u0007",
   b: "\b",
   e: "\u001b",
+  E: "\u001b",
   f: "\f",
   v: "\v",
   "\\": "\\",
@@ -60,11 +61,20 @@ const ANSI_ESCAPES: Readonly<Record<string, string>> = {
 // The largest code point `\U` can name; a longer value is not a character, so it stays as written.
 const MAX_CODE_POINT = 0x10ffff
 
-/** Decodes the escapes of `$'...'` as bash does: `\xHH`, `\uHHHH`, `\UHHHHHHHH`, octal and named. */
+/** The control character `\cX` names: X's code with all but its low five bits cleared, DEL for `?`. */
+const control = (char: string): string =>
+  char === "?" ? "\u007f" : String.fromCharCode(char.toUpperCase().charCodeAt(0) & 0x1f)
+
+/**
+ * Decodes the escapes of `$'...'` as bash does: `\xHH`, `\uHHHH`, `\UHHHHHHHH`, octal, `\cX` and
+ * named. `\cX` takes the character after it, two backslashes counting as one, so `\cJ` is a newline
+ * that `eval` or `bash -c` reads as the end of a command.
+ */
 const decodeAnsi = (body: string): string =>
   body.replace(
-    /\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|.)/g,
+    /\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c(?:\\\\|[\s\S])|.)/g,
     (whole, code: string) => {
+      if (code.length > 1 && code[0] === "c") return control(code[1] ?? "")
       if (code.length > 1 && /[xuU]/.test(code[0] ?? "")) {
         const point = Number.parseInt(code.slice(1), 16)
         return point <= MAX_CODE_POINT ? String.fromCodePoint(point) : whole
