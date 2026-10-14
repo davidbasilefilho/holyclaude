@@ -39,3 +39,14 @@ jobs:
 
       - name: Test
         run: mise run test
+
+      - name: Check bundle is current
+        run: |
+          mise run build
+          # Porcelain output is non-empty when the bundle is modified, untracked or ignored.
+          status="$(git status --porcelain --ignored -- plugin/bin/holyclaude.js)"
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "::error file=plugin/bin/holyclaude.js::The committed bundle is stale. Run 'mise run build' and commit plugin/bin/holyclaude.js."
+            exit 1
+          fi
