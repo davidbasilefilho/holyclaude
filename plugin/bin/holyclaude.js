@@ -6887,6 +6887,26 @@ var arbitraryMinimumZonedDateTimeTimestamp = arbitraryMinimumDateTimestamp + 14 
 var arbitraryMaximumZonedDateTimeTimestamp = arbitraryMaximumDateTimestamp - 14 * 60 * 60 * 1000;
 var arbitraryMinimumTimeZoneOffset = -12 * 60 * 60 * 1000;
 var arbitraryMaximumTimeZoneOffset = 14 * 60 * 60 * 1000;
+// package.json
+var package_default = {
+  name: "@holyclaude/cli",
+  version: "0.1.0",
+  description: "The holyclaude command line: Intent and Assignment state, plugin hooks.",
+  license: "Apache-2.0",
+  bin: {
+    holyclaude: "./src/main.ts"
+  },
+  type: "module",
+  scripts: {
+    build: "mise run build"
+  },
+  dependencies: {
+    "@holyclaude/core": "workspace:*",
+    "@toon-format/toon": "^4.0.0",
+    effect: "^4.0.0"
+  }
+};
+
 // src/errors.ts
 class Usage extends TaggedError2("Usage") {
 }
@@ -10001,7 +10021,7 @@ var COMMANDS = [
 ].toSorted((a, b) => b.path.length - a.path.length);
 
 // src/main.ts
-var VERSION = "0.1.0";
+var { version: VERSION } = package_default;
 var HINTS = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
