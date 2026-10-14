@@ -1,0 +1,13 @@
+{
+  "name": "@holyclaude/core",
+  "version": "0.1.0",
+  "description": "Shared domain schemas, pure transitions and state store for holyclaude.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "effect": "^4.0.0"
+  }
+}

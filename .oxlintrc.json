@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["oxc", "typescript", "unicorn", "import", "jsdoc", "promise", "node", "eslint"],
+  "jsPlugins": [
+    {
+      "name": "jsdoc-js",
+      "specifier": "eslint-plugin-jsdoc"
+    }
+  ],
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "jsdoc-js/require-jsdoc": [
+      "error",
+      {
+        "publicOnly": true,
+        "require": {
+          "FunctionDeclaration": true,
+          "ClassDeclaration": true,
+          "MethodDefinition": true
+        },
+        "contexts": [
+          "TSInterfaceDeclaration",
+          "TSTypeAliasDeclaration",
+          "TSEnumDeclaration",
+          "ExportNamedDeclaration > VariableDeclaration"
+        ]
+      }
+    ]
+  }
+}

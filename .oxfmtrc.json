@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "printWidth": 100,
+  "jsdoc": true,
+  "bracketSameLine": true,
+  "sortImports": true,
+  "sortPackageJson": true
+}

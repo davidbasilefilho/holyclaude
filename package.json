@@ -1,0 +1,27 @@
+{
+  "name": "holyclaude",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "plugin"
+  ],
+  "type": "module",
+  "scripts": {
+    "fmt": "mise run fmt",
+    "fmt:readonly": "mise run fmt:readonly",
+    "lint": "mise run lint",
+    "lint:readonly": "mise run lint:readonly",
+    "typecheck": "mise run typecheck",
+    "test": "mise run test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "eslint-plugin-jsdoc": "^65.0.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.0.0",
+    "oxlint-tsgolint": "^7.0.0",
+    "typescript": "^7.0.0"
+  },
+  "packageManager": "bun@1.4.3"
+}
