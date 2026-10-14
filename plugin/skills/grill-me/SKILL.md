@@ -20,7 +20,7 @@ Before asking, check whether a source already answers the question. Dispatch a s
 
 ## Record each decision
 
-Record each settled decision in the Intent with `holyclaude intent update --material`, passing the revised `objective` or `requirements` as JSON on stdin. `--material` bumps the revision, and reserve refuses a stale one, so reassess the Assignments planned on the old revision against the new one before reserving them. Fold the decision into the existing requirements text, with its reason in a few words, so the Intent stays one readable statement.
+Record each settled decision in the Intent with `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" intent update --material`, passing the revised `objective` or `requirements` as JSON on stdin. `--material` bumps the revision, and reserve refuses a stale one, so reassess the Assignments planned on the old revision against the new one before reserving them. Fold the decision into the existing requirements text, with its reason in a few words, so the Intent stays one readable statement.
 
 ## Stop
 
