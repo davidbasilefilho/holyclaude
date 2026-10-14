@@ -45,12 +45,12 @@ describe("the PreToolUse matcher", () => {
     expect(group?.matcher).toBeString()
   })
 
-  test("runs the guard for every tool it judges, and for Agent, which it only observes", () => {
-    for (const tool of [...JUDGED_TOOLS, "Agent"]) expect(runsFor(group?.matcher, tool)).toBe(true)
+  test("runs the guard for every tool it judges", () => {
+    for (const tool of JUDGED_TOOLS) expect(runsFor(group?.matcher, tool)).toBe(true)
   })
 
   test("lists nothing else, so an unmatched tool never reaches the guard", () => {
-    expect(group?.matcher?.split("|").toSorted()).toEqual([...JUDGED_TOOLS, "Agent"].toSorted())
+    expect(group?.matcher?.split("|").toSorted()).toEqual([...JUDGED_TOOLS].toSorted())
     for (const tool of [
       "Read",
       "Grep",
@@ -60,6 +60,7 @@ describe("the PreToolUse matcher", () => {
       "TodoWrite",
       "Skill",
       "SendMessage",
+      "Agent",
       "mcp__server__write",
       "Bash2",
       "bash",
