@@ -5,5 +5,6 @@
   "jsdoc": true,
   "bracketSameLine": true,
   "sortImports": true,
-  "sortPackageJson": true
+  "sortPackageJson": true,
+  "ignorePatterns": ["plugin/bin/holyclaude.js"]
 }

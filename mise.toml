@@ -24,3 +24,8 @@ run = "bun check"
 [tasks.test]
 description = "Run the test suite"
 run = "bun test"
+
+[tasks.build]
+description = "Bundle the CLI into plugin/bin/holyclaude.js"
+dir = "{{config_root}}/packages/cli"
+run = "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.js"
