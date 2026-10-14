@@ -61,7 +61,9 @@ fallback must not rely on the plugin's own SessionStart hook:
 - the holyclaude root agent file in `~/.claude/agents/` or `.claude/agents/`;
 - the user-level `settings.json` setting `agent` to it;
 - the presets and skills in `.claude/agents` and `.claude/skills`;
-- the CLI on `PATH` through `bun link` in `packages/cli`, replacing `scripts/`;
+- the CLI on `PATH` through `bun link` in `packages/cli`, with
+  `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"` in the copied agents and skills replaced by
+  `holyclaude`, because Claude Code substitutes that variable only in a plugin's own files;
 - the hooks in user or project settings.
 
 If T3 Code ignores `agent` in user settings too, the main thread stays on the default agent. Then a
@@ -175,10 +177,13 @@ took 13 processes and about 270 ms through Git Bash and the shell wrapper, 6 pro
 in exec form through the mise shim, and 2 processes and 64 ms with the real `bun.exe`. Each figure is
 the median of 30 calls.
 
-The `holyclaude` command on the root's `PATH` is still the shell wrapper `plugin/scripts/holyclaude`.
-Its common path forks nothing (no command substitution, only parameter expansion and the
-`command -v` builtin), which spares Git Bash four processes per call. Only a symlinked wrapper forks,
-for `readlink`.
+The `holyclaude` command the root and workers run is the shell wrapper `plugin/scripts/holyclaude`.
+It is not on `PATH`: Claude Code adds only a plugin's `bin/` there, and claude.ai refuses a plugin
+that has one. The agent and skill prompts name it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`,
+which Claude Code replaces with the installed path when it loads them, and the SessionStart hook
+replaces it the same way in the core rules it injects. The wrapper's common path forks nothing (no
+command substitution, only parameter expansion and the `command -v` builtin), which spares Git Bash
+four processes per call. Only a symlinked wrapper forks, for `readlink`.
 
 ### Without Bun
 

@@ -5,7 +5,7 @@ description: Use when you are about to create, launch, finish, accept, follow up
 
 # Assignments through the CLI
 
-The `holyclaude` CLI is the interface to Intent and Assignment state, and it keeps the state file consistent for you. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
+The `holyclaude` CLI is not on `PATH`: run it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`, which every `holyclaude <command>` below stands for. It is the interface to Intent and Assignment state, and it keeps the state file consistent for you. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
 
 Read-only commands are open to every agent: `holyclaude intent show`, `holyclaude assignment show <id>`, `holyclaude assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]`, `holyclaude assignment verify <id>`, `holyclaude routes` and `holyclaude reconcile`. The commands that change state are yours as the root, and workers leave them to you.
 
@@ -20,7 +20,7 @@ Read-only commands are open to every agent: `holyclaude intent show`, `holyclaud
 ## 2. Create
 
 ```
-holyclaude assignment create <<'JSON'
+"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" assignment create <<'JSON'
 {
   "intent_id": "intent-0001",
   "intent_revision": 1,

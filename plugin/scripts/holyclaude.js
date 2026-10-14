@@ -9483,7 +9483,8 @@ var toon = (value) => `${encode2(value)}
 var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
-var POINTER = "Full state: holyclaude intent show; holyclaude assignment list";
+var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
+var pointer = (cli) => `Full state: ${cli} intent show; ${cli} assignment list`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
 var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
@@ -9542,7 +9543,7 @@ var fitSummary = (summary, budget) => {
   }
   return "";
 };
-var composeContext = (rules, summary) => {
+var composeContext = (rules, summary, cli) => {
   const state = block(summary.render(summary.rows, 400));
   const full = [rules, state].filter((part) => part !== undefined).join(`
 
@@ -9551,7 +9552,7 @@ var composeContext = (rules, summary) => {
     return full;
   const tail = `
 
-${POINTER}`;
+${pointer(cli)}`;
   const room = CAP - tail.length - `
 
 ${state}`.length - RULES_CUT.length;
@@ -9564,12 +9565,13 @@ ${state}${tail}`;
 `;
   return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
 };
-var extractRules = (agentFile) => {
+var extractRules = (agentFile, root) => {
   const start = agentFile.indexOf(RULES_START);
   const end = agentFile.indexOf(RULES_END);
   if (start === -1 || end === -1 || end < start)
     return;
-  return agentFile.slice(start + RULES_START.length, end).trim();
+  const rules = agentFile.slice(start + RULES_START.length, end).trim();
+  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, root);
 };
 var sessionStart = gen2(function* () {
   const root = yield* pluginRoot;
@@ -9578,9 +9580,9 @@ var sessionStart = gen2(function* () {
   const file = Bun.file(join3(root, "agents", "holyclaude.md"));
   if (!(yield* tryPromise2(() => file.exists())))
     return "";
-  const rules = extractRules(yield* tryPromise2(() => file.text()));
+  const rules = extractRules(yield* tryPromise2(() => file.text()), root);
   const summary = yield* loadState(stateFilePath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
-  const additionalContext = composeContext(rules, summary);
+  const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
   });
