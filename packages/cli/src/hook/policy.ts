@@ -1,3 +1,4 @@
+import { protectedNameOf } from "./glob.ts"
 import type { ToolInput } from "./input.ts"
 import {
   LAUNCHERS,
@@ -287,6 +288,27 @@ const FILE_WRITERS = new Set([
   "rename-item",
   "rni",
   "tee-object",
+  // Programs that create, change or fill files and directories they are given: downloads,
+  // archives, patches, links and permissions.
+  "mkdir",
+  "md",
+  "chmod",
+  "chown",
+  "patch",
+  "curl",
+  "wget",
+  "invoke-webrequest",
+  "iwr",
+  "invoke-restmethod",
+  "irm",
+  "tar",
+  "unzip",
+  "expand-archive",
+  "mklink",
+  "xcopy",
+  "robocopy",
+  "ren",
+  "rename",
 ])
 const HOLYCLAUDE = /^holyclaude(\.js)?$/
 // Flags that take a value, between a runtime and the file or package it runs.
@@ -325,33 +347,65 @@ const classifyAssignment = (text: string): Verdict => {
   return GIT_EXEC_ENV.test(name) ? REASONS.env(name) : undefined
 }
 const texts = (words: ReadonlyArray<Word>) => words.map((word) => word.text)
-// A path part that is the git directory: `.git`, its 8.3 short name, and the spellings Windows
-// reads as the same name (trailing dots and spaces, an alternate data stream).
-const GIT_DIR_PART = /^(\.git[. ]*|git~\d+)(:|$)/
+// A path part that is the git directory or the state directory's 8.3 short name, or one of the
+// spellings Windows reads as the same name (trailing dots and spaces, an alternate data stream).
+const GIT_DIR_PART = /^(\.git|git~\d+)[. ]*(:|$)/
+const STATE_SHORT_PART = /^holycl~\d+[. ]*(:|$)/
 // `=` splits `of=.git/config`, the form `dd` takes.
 const PATH_PART_END = /[\\/=]/
+// The characters with which a path is a pattern that bash and PowerShell expand.
+const PATTERN = /[*?[{]/
 /**
  * The reason to deny a write to `text` when it names the `.holyclaude` state, which the root writes
  * through the CLI, or the `.git` directory, whose hooks and settings run at the root's next commit.
- * A part is `.git` itself: `.gitignore` and `.github` are ordinary files.
+ * A part is `.git` itself: `.gitignore` and `.github` are ordinary files. Either separator counts,
+ * and case is ignored, as Windows reads a path.
  */
 const protectedReason = (text: string): Verdict => {
   const lower = text.toLowerCase()
   if (lower.includes(".holyclaude")) return REASONS.state
-  return lower.split(PATH_PART_END).some((part) => GIT_DIR_PART.test(part))
-    ? REASONS.gitDir
-    : undefined
+  const parts = lower.split(PATH_PART_END)
+  if (parts.some((part) => STATE_SHORT_PART.test(part))) return REASONS.state
+  return parts.some((part) => GIT_DIR_PART.test(part)) ? REASONS.gitDir : undefined
+}
+/**
+ * {@link protectedReason} for a path a shell command writes, which the shell expands first: a
+ * pattern such as `.gi?/config` or `{.git,x}/hooks/x` that can name a protected directory is
+ * refused like the name.
+ */
+const writtenReason = (text: string): Verdict => {
+  const named = protectedReason(text)
+  if (named !== undefined || !PATTERN.test(text)) return named
+  const name = protectedNameOf(text)
+  if (name === undefined) return undefined
+  return name === ".git" ? REASONS.gitDir : REASONS.state
 }
 /** The first reason among `reasons`, or undefined when none denies. */
 const firstReason = (reasons: ReadonlyArray<Verdict>): Verdict =>
   reasons.find((reason) => reason !== undefined)
 /**
- * {@link protectedReason} for a word, read as the shell reads it and as Windows reads its
- * backslashes.
+ * The paths a word of a writing command may name: the word, and the value of a flag that carries
+ * it, as in `-o.git/x`, `-OutFile:.git\x` and `--output=.git/x`.
+ */
+const pathsOf = (text: string): ReadonlyArray<string> => {
+  if (!text.startsWith("-")) return [text]
+  const colon = text.indexOf(":")
+  return [
+    text,
+    ...(text.startsWith("--") ? [] : [text.slice(2)]),
+    ...(colon === -1 ? [] : [text.slice(colon + 1)]),
+  ]
+}
+/**
+ * {@link writtenReason} for a word of a writing command, read as the shell reads it and as Windows
+ * reads its backslashes.
  */
 const wordReason = (word: Word): Verdict =>
-  protectedReason(word.text) ??
-  (word.literal === undefined ? undefined : protectedReason(word.literal))
+  firstReason(
+    [word.text, ...(word.literal === undefined ? [] : [word.literal])]
+      .flatMap(pathsOf)
+      .map(writtenReason),
+  )
 const isHolyclaude = (path: string) => HOLYCLAUDE.test(program(path))
 /** The bundle, the wrapper or the CLI source: whatever starts the holyclaude CLI. */
 const isEntry = (path: string) =>
@@ -873,7 +927,7 @@ const classifyWords = (input: ReadonlyArray<Word>, depth: number, budget: Budget
 }
 
 const classifySimple = (simple: Simple, depth: number, budget: Budget): Verdict => {
-  const written = firstReason(simple.outputs.map(protectedReason))
+  const written = firstReason(simple.outputs.map(writtenReason))
   return written ?? classifyWords(simple.words, depth, budget)
 }
 
