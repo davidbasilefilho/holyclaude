@@ -22,19 +22,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
+      - name: Set up tools
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Format
-        run: bun run fmt:readonly
+        run: mise run fmt:readonly
 
       - name: Lint
-        run: bun run lint:readonly
+        run: mise run lint:readonly
 
       - name: Typecheck
-        run: bun run typecheck
+        run: mise run typecheck
+
+      - name: Test
+        run: mise run test
