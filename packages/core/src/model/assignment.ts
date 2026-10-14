@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect"
+
 import { AcceptanceRecord } from "./acceptance.ts"
 import { Id, Labels, Revision, StoredRevision, Text, TextList } from "./primitives.ts"
 import { Mutability, Role } from "./routes.ts"

@@ -1,11 +1,13 @@
 import { mkdir, open, rename, rm, stat } from "node:fs/promises"
 import { hostname } from "node:os"
 import { basename, dirname, join } from "node:path"
+
 import { Clock, Effect, Schedule, Schema } from "effect"
+
 import { decodeJsonStrict, MAX_STATE_BYTES, withinLimit } from "./codec.ts"
 import { LockLost, StateIo, StateLocked, TooLarge } from "./errors.ts"
-import { emptyState, State, validateState, type Change } from "./model/state.ts"
 import { Text } from "./model/primitives.ts"
+import { emptyState, State, validateState, type Change } from "./model/state.ts"
 
 const LOCK_STALE_MS = 30_000
 const STORE_DIRECTORY = ".holyclaude"

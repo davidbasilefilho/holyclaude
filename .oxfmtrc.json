@@ -3,5 +3,8 @@
   "semi": false,
   "printWidth": 100,
   "jsdoc": true,
+  "bracketSameLine": true,
+  "sortImports": true,
+  "sortPackageJson": true,
   "ignorePatterns": ["plugin/bin/holyclaude.js"]
 }
