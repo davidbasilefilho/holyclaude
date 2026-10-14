@@ -1032,3 +1032,26 @@ describe("the worst command at the limit is decided in seconds, not minutes", ()
     ).toBe("deny")
   })
 })
+
+describe("a deny reason does not echo the call's own text at length", () => {
+  const long = "a".repeat(500_000)
+  const echoing: ReadonlyArray<readonly [string, string]> = [
+    ["a git subcommand", `git ${long}`],
+    ["a git flag", `git -${long}`],
+    ["a git -c key", `git -c ${long}=1 status`],
+    ["a gh command group", `gh ${long} view`],
+    ["a holyclaude subcommand", `holyclaude ${long}`],
+  ]
+  for (const [name, command] of echoing)
+    test(`${name} is cut`, async () => {
+      const reason = await reasonOf(call("Bash", { command }, "subagent"))
+      expect(reason?.length).toBeLessThanOrEqual(1003)
+      expect(reason?.endsWith("...")).toBe(true)
+    })
+
+  test("an ordinary reason is sent whole", async () => {
+    const reason = await reasonOf(call("Bash", { command: "gh pr create --title t" }, "subagent"))
+    expect(reason).toContain("Put the finding in your report")
+    expect(reason?.endsWith("...")).toBe(false)
+  })
+})

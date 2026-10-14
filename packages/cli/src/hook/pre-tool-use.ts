@@ -23,12 +23,19 @@ const REFUSALS = {
   unreadable: `This call's payload is empty or not valid JSON, so the guard cannot check it. Send the call again; if it is refused again, say so in your report.`,
 }
 
+/**
+ * The longest deny reason sent back: a reason that echoes the call's own text must not echo a
+ * megabyte of it.
+ */
+const MAX_REASON_CHARS = 1000
+
 const deny = (reason: string): string =>
   JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: reason,
+      permissionDecisionReason:
+        reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS)}...` : reason,
     },
   })
 
