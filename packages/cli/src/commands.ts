@@ -1,4 +1,3 @@
-import { Effect, Schema } from "effect"
 import {
   AcceptanceRecord,
   AssignmentDraft,
@@ -38,13 +37,15 @@ import {
   type Assignment,
   type State,
 } from "@holyclaude/core"
+import { Effect, Schema } from "effect"
+
 import { booleanFlag, listFlag, stringFlag, type FlagSpec, type Parsed } from "./args.ts"
+import { nowIso } from "./clock.ts"
 import { NoIntent, StdinMissing, Usage } from "./errors.ts"
 import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
-import { sessionStart } from "./hook/session-start.ts"
 import { preToolUse } from "./hook/pre-tool-use.ts"
+import { sessionStart } from "./hook/session-start.ts"
 import { appendObservation, observationsPath } from "./observations.ts"
-import { nowIso } from "./clock.ts"
 import { loadStateFile } from "./state.ts"
 import { verifyAssignment } from "./verify.ts"
 

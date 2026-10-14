@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect"
 import { findAssignment, routeFor } from "@holyclaude/core"
+import { Effect, Schema } from "effect"
+
 import { NotBound } from "./errors.ts"
 import { PLUGIN_NAME } from "./fingerprint.ts"
 import { latestObserved, latestOverride, readObservations } from "./observations.ts"

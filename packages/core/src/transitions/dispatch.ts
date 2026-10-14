@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
+
 import { DispatchRefused, InvalidRecord } from "../errors.ts"
-import { anyOverlap, isInsideRoots } from "../paths.ts"
 import { Id, Text } from "../model/primitives.ts"
 import { Capability, routeFor } from "../model/routes.ts"
 import {
@@ -12,6 +12,7 @@ import {
   type State,
 } from "../model/state.ts"
 import type { Worker } from "../model/worker.ts"
+import { anyOverlap, isInsideRoots } from "../paths.ts"
 import { reuseProblem } from "./selection.ts"
 
 /** Names one Assignment. Used by every operation that needs nothing else. */

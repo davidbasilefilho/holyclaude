@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join } from "node:path"
+
 import { $ } from "bun"
 
 const WRAPPER = join(import.meta.dir, "..", "..", "..", "plugin", "bin", "holyclaude")

@@ -1,5 +1,5 @@
-import { Effect, Option, Schema } from "effect"
 import { withinLimit } from "@holyclaude/core"
+import { Effect, Option, Schema } from "effect"
 
 /** Largest hook payload read, in bytes. Hook payloads carry whole tool inputs. */
 const MAX_HOOK_BYTES = 1024 * 1024

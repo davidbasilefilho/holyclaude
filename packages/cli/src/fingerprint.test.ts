@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+
 import { Effect } from "effect"
+
 import { rosterFingerprintAt } from "./fingerprint.ts"
 
 describe("rosterFingerprintAt without a plugin root", () => {

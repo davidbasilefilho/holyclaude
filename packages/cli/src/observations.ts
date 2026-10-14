@@ -1,7 +1,8 @@
 import { appendFile, mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
-import { Effect, Schema } from "effect"
+
 import { decodeJsonStrict, stateFilePath } from "@holyclaude/core"
+import { Effect, Schema } from "effect"
 
 const Text = Schema.String.check(Schema.isPattern(/\S/))
 
