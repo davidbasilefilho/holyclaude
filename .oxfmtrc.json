@@ -3,5 +3,5 @@
   "semi": false,
   "printWidth": 100,
   "jsdoc": true,
-  "ignorePatterns": ["plugin/bin/holyclaude.js"]
+  "ignorePatterns": ["plugin/bin/holyclaude.js", "plugin/skills/frontend-design/**"]
 }

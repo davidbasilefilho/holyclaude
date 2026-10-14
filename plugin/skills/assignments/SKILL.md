@@ -44,38 +44,40 @@ JSON
 ```
 
 The reply prints the new `id` in state Ready with the `subagent_type`, `model`, `effort` and `rev`. `metadata` and each of its lists are optional. Mutability is `ReadOnly` or `ScopedWrite`, and it stays within the preset's own (a reviewer is dispatched as ReadOnly). The CLI checks that:
-- `intent_revision` equals the live revision, and acceptance criteria and required-evidence labels are non-empty with no blank label;
+
+- acceptance criteria and required-evidence labels are non-empty with no blank label. `intent_revision` records the revision your plan rests on, and reserve checks it against the live one;
 - a ScopedWrite Assignment names at least one ownership path. Paths are relative and portable: each segment is non-empty, and the path avoids absolute forms, `..`, `.`, a trailing dot or space, control characters and any of `:*?"<>|`. `\` becomes `/` and comparison ignores case. Two paths overlap when equal or when one is a directory prefix of the other. Worker.operations names its specific paths, and a dependency install owns the root package.json, the lockfile and node_modules;
-- a writer's paths do not overlap a Running writer; dispatch is refused with `OwnershipConflict`, so serialize those Assignments yourself;
+- a writer's paths do not overlap a Running writer; reserve is refused with `DispatchRefused` naming `OwnershipConflict`, so serialize those Assignments yourself. Paths outside the writable roots are refused the same way with `OutsideWritableRoots`;
 - every dependency is Succeeded, accepted, in the same Intent and accepted at the same revision;
 - a review Assignment lists the work it must be independent from in `independent_from`.
 
-Writers keep the reviewers' needs in mind: add `diff-file` to a writer's required evidence and ask it to save `git diff` of its change to a file in the session temp area outside the repository and to list the path. The review Assignment then names that diff file, the changed paths and the base, because reviewers read files and have no shell. Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules it needs into its Assignment.
+Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules it needs into its Assignment. Section 10 covers review Assignments and their diff file.
 
 ## 3. Select
 
-`holyclaude select <id>` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. Reuse candidates are idle workers of the same preset whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id.
+`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same preset whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id.
 
 ## 4. Reserve
 
-`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints the dispatch parameters. Spawn after it succeeds. Its optional `--capabilities` and `--root <dir>` default to the preset's capabilities and the project root.
+`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the preset's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`.
 
 ## 5. Spawn or resume
 
 - Spawn with the Agent tool: `subagent_type` from the reply (`holyclaude:<Role.task>`), the `model` and `effort` printed, `run_in_background: true`, and a prompt that carries the Assignment id, objective, scope, constraints, ownership paths, acceptance criteria and required-evidence labels, with the task specifics last.
-- For a reuse, call SendMessage to the `agent_id` from `select` with the new Assignment's text. A reuse is a follow-up and is its own Assignment.
+- For a reuse, call SendMessage to the `agent_id` from `select` with the new Assignment's text. A reuse is a follow-up and is its own Assignment: reserve it first, then bind the same `agent_id` once the message is sent.
 
 ## 6. Bind or roll back
 
-- `holyclaude assignment bind <id> --agent <agentId>` records the agent id from the spawn result and attaches the worker to the Running Assignment. When you escalated with a per-call override, add `--model haiku|sonnet|opus|fable` and `--effort low..max` with the values you passed, so `verify` expects them. `--fingerprint` defaults to the live roster, so omit it.
+- `holyclaude assignment bind <id> --agent <agentId>` records the agent id from the spawn result (or the reused worker's id) and attaches the worker to the Running Assignment. When you escalated with a per-call override, add `--model haiku|sonnet|opus|fable` and `--effort low..max` with the values you passed, so `verify` expects them. `--fingerprint` defaults to the live roster, so omit it.
 - If the spawn or resume failed, `holyclaude assignment rollback <id>` returns the unbound reservation to Ready. Fix the cause or report the blocker. A bound Assignment moves on by finish.
-- `holyclaude assignment verify <id>` compares expected and observed model, effort and agent type. The verdict is `match`, `mismatch` (exit code 3) or `incomplete`, and the PreToolUse hook supplies the observations once the worker makes tool calls. A mismatch is a failed dispatch to redo with the right model and effort.
+- `holyclaude assignment verify <id>` compares expected and observed model, effort and agent type. The output lists `checks` with `field`, `expected`, `observed` and `status` for model, effort and agent_type, and `expected_source` says whether the route or your override set the expectation. The verdict is `match`, `mismatch` (exit code 3) or `incomplete`. The PreToolUse hook records effort and agent type from the worker's tool calls, and the observed model comes from the worker's transcript, so a fresh worker reads `unobserved` and `incomplete` until it has acted. A mismatch is a failed dispatch to redo with the right model and effort.
 
 Run steps 3 to 6 for every ready independent Assignment in one message, then end the turn.
 
 ## 7. Finish from the notification
 
 When a completion notification arrives, run `holyclaude assignment finish <id> --outcome <outcome>` with `{"result": "<the worker's report>"}` on stdin:
+
 - `success` when the report states success and `failure` when it states failure;
 - `errored`, `interrupted` or `stopped` when the notification says so, and these record failure.
 
@@ -100,10 +102,20 @@ Both maps cover exactly the declared labels, each with non-blank support, and th
 
 `holyclaude assignment follow-up <id>` takes the same JSON as create and makes a new Assignment that continues the terminal predecessor `<id>`, with its own criteria, evidence labels and revision. Then run select, reserve, spawn or resume, and bind again. Acceptance is per Assignment.
 
-## 10. Cancel and stop
+## 10. Review Assignments and `/code-review`
+
+A change that touches code, artifacts or behavior is reviewed independently after every writer on its paths is terminal and the local gates pass. Order the work as implement, review, repair, re-review.
+
+- The writer's Assignment lists `diff-file` in its required evidence. Ask the writer to save `git diff` of its change to a file in the host temp directory outside the repository and to name the path in its report.
+- The review Assignment (role `Reviewer.code`, `Reviewer.artifact` and so on, mutability `ReadOnly`) carries `"independent_from": ["<writer assignment id>"]`, and its scope names the diff file path, the changed paths and the base. `Reviewer.audit`, `Reviewer.security` and `Reviewer.artifact` have no shell and read the diff file; `Reviewer.code` has a shell and reads committed work with `git diff <base>...<branch>`, so the diff file matters to it for uncommitted work. A reviewer's whole history must be independent of the work under review, so `select` and `bind` refuse a worker that touched it.
+- For code, the first pass of `Reviewer.code` is the built-in `/code-review` skill, run through the Skill tool at effort `high`. Name the target in the Assignment: `<base>...<branch> high` for committed work, or `<absolute path> high` for uncommitted work on named paths. Reviewers run it without `--comment` and without `--fix`. Add a label such as `code-review-run` to the required evidence: the report gives the exact invocation, the finding count and each finding's disposition, a blocker or optional after the reviewer checked it against the code.
+- When a subagent cannot run the skill, `Worker.validation` runs `claude -p --model sonnet "/code-review <target> high"`, saves the output to a file, and `Reviewer.code` reviews from that file. Docs, agent prose and manifests go to `Reviewer.artifact` and need no `/code-review`.
+- A repair made by a reviewer or validator gets its own independent review, and a re-review after a repair targets the repair's paths.
+
+## 11. Cancel and stop
 
 Running workers finish on their own. If the user stops one, wait for the stopped notification, then run `holyclaude assignment cancel <id> [--reason <text>]`; the ownership paths stay reserved until then. When the user changes the Intent while workers run, let them finish and revalidate their work at the new revision.
 
-## 11. Reconcile after a restart
+## 12. Reconcile after a restart
 
 A resumed or compacted session loses pending notifications. `holyclaude reconcile` lists Running rows. Confirm each worker's state by its agent id, then run `holyclaude reconcile resolve <id> --fail "<reason>"` when there is evidence the worker stopped, or `holyclaude reconcile resolve <id> --keep` to leave it reserved. Choose exactly one of the two flags.
