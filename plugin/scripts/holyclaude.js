@@ -8074,6 +8074,46 @@ ${text}
 });
 var rosterFingerprint = pluginRoot.pipe(flatMap2(rosterFingerprintAt));
 
+// src/hook/input.ts
+var Envelope = fromJsonString2(Record(String4, Unknown2));
+var Effort2 = Union2([
+  Struct({ level: optionalKey2(String4) }),
+  String4
+]);
+var lenient = (schema, value) => getOrUndefined(decodeUnknownOption2(schema)(value));
+var toolInput = (value) => {
+  const fields = lenient(Record(String4, Unknown2), value);
+  return fields === undefined ? undefined : {
+    command: lenient(String4, fields["command"]),
+    file_path: lenient(String4, fields["file_path"]),
+    notebook_path: lenient(String4, fields["notebook_path"])
+  };
+};
+var isAgentId = (value) => value !== undefined && value !== null && value !== "";
+var decode2 = decodeUnknownEffect2(Envelope);
+var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
+  agent: isAgentId(envelope["agent_id"]) ? { id: lenient(String4, envelope["agent_id"]) } : undefined,
+  tool_name: lenient(String4, envelope["tool_name"]),
+  tool_input: toolInput(envelope["tool_input"]),
+  agent_type: lenient(String4, envelope["agent_type"]),
+  transcript_path: lenient(String4, envelope["transcript_path"]),
+  agent_transcript_path: lenient(String4, envelope["agent_transcript_path"]),
+  effort: lenient(Effort2, envelope["effort"])
+})));
+var effortOf = (input) => {
+  const { effort } = input;
+  return typeof effort === "string" ? effort : effort?.level;
+};
+var subagentTranscript = (input) => {
+  const { transcript_path: path } = input;
+  const agent = input.agent?.id;
+  if (path === undefined || agent === undefined)
+    return;
+  if (path.includes("/subagents/"))
+    return path;
+  return `${path.replace(/\.jsonl$/, "")}/subagents/agent-${agent}.jsonl`;
+};
+
 // src/observations.ts
 import { appendFile, mkdir as mkdir2 } from "fs/promises";
 import { dirname as dirname2 } from "path";
@@ -8127,48 +8167,44 @@ var appendObservation = (record, directory = stateDirPath()) => {
     catch: (cause) => new StateIo({ path, cause })
   })));
 };
-var latestObserved = (records, agentId) => records.findLast((record) => record.kind === "observed" && record.agent_id === agentId);
+var seenOf = (records, agentId) => {
+  const seen = {};
+  for (const record of records) {
+    if (record.kind !== "observed" || record.agent_id !== agentId)
+      continue;
+    if (record.agent_type !== undefined)
+      seen.agent_type = record.agent_type;
+    if (record.effort !== undefined)
+      seen.effort = record.effort;
+    if (record.transcript !== undefined)
+      seen.transcript = record.transcript;
+  }
+  return seen;
+};
 var latestOverride = (records, assignmentId, agentId) => records.findLast((record) => record.kind === "override" && record.assignment_id === assignmentId && record.agent_id === agentId);
 
-// src/hook/input.ts
-var MAX_HOOK_BYTES = 1024 * 1024;
-var Envelope = fromJsonString2(Record(String4, Unknown2));
-var Effort2 = Union2([
-  Struct({ level: optionalKey2(String4) }),
-  String4
-]);
-var lenient = (schema, value) => getOrUndefined(decodeUnknownOption2(schema)(value));
-var toolInput = (value) => {
-  const fields = lenient(Record(String4, Unknown2), value);
-  return fields === undefined ? undefined : {
-    command: lenient(String4, fields["command"]),
-    file_path: lenient(String4, fields["file_path"]),
-    notebook_path: lenient(String4, fields["notebook_path"])
+// src/hook/observe.ts
+var OBSERVATION_BUDGET = "750 millis";
+var observe = (agentId, sighting) => gen2(function* () {
+  const seen = {
+    ...sighting.agent_type ? { agent_type: sighting.agent_type } : {},
+    ...sighting.effort ? { effort: sighting.effort } : {},
+    ...sighting.transcript ? { transcript: sighting.transcript } : {}
   };
-};
-var decode2 = decodeUnknownEffect2(Envelope);
-var decodeHookInput = (text) => withinLimit("Hook input", text, MAX_HOOK_BYTES).pipe(flatMap2(decode2), map4((envelope) => ({
-  agent_id: lenient(String4, envelope["agent_id"]),
-  tool_name: lenient(String4, envelope["tool_name"]),
-  tool_input: toolInput(envelope["tool_input"]),
-  agent_type: lenient(String4, envelope["agent_type"]),
-  transcript_path: lenient(String4, envelope["transcript_path"]),
-  effort: lenient(Effort2, envelope["effort"])
-})));
-var effortOf = (input) => {
-  const { effort } = input;
-  return typeof effort === "string" ? effort : effort?.level;
-};
-var subagentTranscript = (input) => {
-  const { transcript_path: path, agent_id: agent } = input;
-  if (path === undefined || agent === undefined || agent === "")
+  const known = seenOf(yield* readObservations(), agentId);
+  const keys = Object.keys(seen);
+  if (keys.every((key) => seen[key] === known[key]))
     return;
-  if (path.includes("/subagents/"))
-    return path;
-  return `${path.replace(/\.jsonl$/, "")}/subagents/agent-${agent}.jsonl`;
-};
+  yield* appendObservation({
+    kind: "observed",
+    agent_id: agentId,
+    ...seen,
+    at: yield* nowIso
+  });
+}).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
 
 // src/hook/shell.ts
+var MAX_NESTING = 3;
 var WORD_END = /[\s;&|()<>]/;
 var ANSI_ESCAPES = {
   n: `
@@ -8223,7 +8259,9 @@ var bodySubstitutions = (body) => {
   }
   return found;
 };
-var scanScript = (source) => {
+var scanScript = (source, nesting = 0) => {
+  if (nesting > MAX_NESTING)
+    return { ok: false, reason: "substitutions nested too deeply" };
   const commands = [];
   const pending = [];
   let failure;
@@ -8249,7 +8287,7 @@ var scanScript = (source) => {
     failure ??= reason;
   };
   const absorb = (script) => {
-    const nested = scanScript(script);
+    const nested = scanScript(script, nesting + 1);
     if (nested.ok)
       commands.push(...nested.commands);
     else
@@ -8549,13 +8587,17 @@ var scanScript = (source) => {
 
 // src/hook/policy.ts
 var MAX_DEPTH = 6;
+var MAX_JUDGED_BYTES = 1024 * 1024;
 var REASONS = {
   git: (sub) => `git ${sub} writes VCS state, and VCS writes belong to the root. Describe the change in your report (files and intent) and the root commits it. git status, diff, log, show, blame and fetch are open to you.`,
   gh: (sub) => `gh ${sub} is a write or an unlisted gh command, and gh writes belong to the root. Put the finding in your report. Open to you: gh pr view|checks|diff|list|status, run view|list, issue view|list, repo view, and gh api for plain reads.`,
   holyclaude: (sub) => `holyclaude ${sub} changes Intent and Assignment state, which the root owns. Read it with holyclaude intent show, assignment show, assignment list, assignment verify, routes and reconcile.`,
   state: `The .holyclaude state files are written by the root through the holyclaude CLI. Describe the state you need in your report.`,
   config: (key) => `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
-  unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`
+  unsure: (why) => `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`,
+  oversized: (what, bytes) => `This ${what} is ${bytes} bytes and the guard reads at most ${MAX_JUDGED_BYTES}, so it cannot be checked. Shorten it, or send the work in smaller calls, for example one shorter command at a time.`,
+  noTool: `This tool call names no tool that can be read, so it cannot be checked. Retry the call, and report it to the root if it recurs.`,
+  noPath: (tool) => `This ${tool} call names no file path that can be read, so it cannot be checked. Send the path as a plain string.`
 };
 var GIT_READS = new Set([
   "status",
@@ -9116,8 +9158,9 @@ var findAfter = (words, markers) => {
   const end = tail.findIndex((word) => word.text === ";" || word.text === "+");
   return end === -1 ? tail : tail.slice(0, end);
 };
+var isCommandFlag = (text) => /^-[A-Za-z]+$/.test(text) && text.includes("c");
 var classifyShell = (rest, depth) => {
-  const flagged = rest.findIndex((word) => /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text));
+  const flagged = rest.findIndex((word) => isCommandFlag(word.text));
   if (flagged !== -1) {
     const script = rest.slice(flagged + 1).find((word) => !word.text.startsWith("-"));
     if (script === undefined)
@@ -9260,52 +9303,55 @@ var denyReason = (command) => classifyScript(command, 0);
 var UNREADABLE = REASONS.unsure("it is nested too deeply to read");
 var SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"]);
 var FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+var JUDGED_TOOLS = new Set([...SHELL_TOOLS, ...FILE_TOOLS]);
+var oversize = (what, text) => {
+  const bytes = Buffer.byteLength(text);
+  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined;
+};
 var denyToolReason = (toolName, input) => {
   if (toolName === undefined)
-    return;
-  if (SHELL_TOOLS.has(toolName))
-    return input?.command === undefined ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.` : denyReason(input.command);
+    return REASONS.noTool;
+  if (SHELL_TOOLS.has(toolName)) {
+    const command = input?.command;
+    return command === undefined ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.` : oversize("command", command) ?? denyReason(command);
+  }
   if (FILE_TOOLS.has(toolName)) {
-    const target = input?.file_path ?? input?.notebook_path;
-    return target !== undefined && touchesState(target) ? REASONS.state : undefined;
+    const targets = [input?.file_path, input?.notebook_path].filter((path) => path !== undefined);
+    if (targets.length === 0)
+      return REASONS.noPath(toolName);
+    for (const target of targets) {
+      const verdict = oversize("file path", target) ?? (touchesState(target) ? REASONS.state : undefined);
+      if (verdict !== undefined)
+        return verdict;
+    }
+    return;
   }
   return;
 };
 
 // src/hook/pre-tool-use.ts
-var OBSERVATION_BUDGET = "750 millis";
+var MAX_REASON_CHARS = 1000;
 var deny = (reason) => JSON.stringify({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: reason
+    permissionDecisionReason: reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS)}...` : reason
   }
 });
-var observe = (input, agentId) => gen2(function* () {
-  const effort = effortOf(input);
-  const transcript = subagentTranscript(input);
-  if (effort === undefined && input.agent_type === undefined && transcript === undefined)
-    return;
-  const known = latestObserved(yield* readObservations(), agentId);
-  if (known !== undefined && known.effort === effort && known.agent_type === input.agent_type && known.transcript === transcript)
-    return;
-  const record = {
-    kind: "observed",
-    agent_id: agentId,
-    ...input.agent_type ? { agent_type: input.agent_type } : {},
-    ...effort ? { effort } : {},
-    ...transcript ? { transcript } : {},
-    at: yield* nowIso
-  };
-  yield* appendObservation(record);
-});
 var preToolUse = (stdin) => gen2(function* () {
-  const input = yield* decodeHookInput(stdin);
-  const agentId = input.agent_id;
-  if (agentId === undefined || agentId === "")
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const agent = input?.agent;
+  if (input === undefined || agent === undefined)
     return "";
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
-  yield* observe(input, agentId).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
+  if (agent.id !== undefined)
+    yield* observe(agent.id, {
+      agent_type: input.agent_type,
+      effort: effortOf(input),
+      transcript: subagentTranscript(input)
+    });
   return reason === undefined ? "" : deny(reason);
 });
 
@@ -9843,7 +9889,8 @@ var toon = (value) => `${encode2(value)}
 var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
-var POINTER = "Full state: holyclaude intent show; holyclaude assignment list";
+var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
+var pointer = (cli) => `Full state: ${cli} intent show; ${cli} assignment list`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
 var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
@@ -9902,7 +9949,7 @@ var fitSummary = (summary, budget) => {
   }
   return "";
 };
-var composeContext = (rules, summary) => {
+var composeContext = (rules, summary, cli) => {
   const state = block(summary.render(summary.rows, 400));
   const full = [rules, state].filter((part) => part !== undefined).join(`
 
@@ -9911,7 +9958,7 @@ var composeContext = (rules, summary) => {
     return full;
   const tail = `
 
-${POINTER}`;
+${pointer(cli)}`;
   const room = CAP - tail.length - `
 
 ${state}`.length - RULES_CUT.length;
@@ -9924,12 +9971,13 @@ ${state}${tail}`;
 `;
   return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
 };
-var extractRules = (agentFile) => {
+var extractRules = (agentFile, root) => {
   const start = agentFile.indexOf(RULES_START);
   const end = agentFile.indexOf(RULES_END);
   if (start === -1 || end === -1 || end < start)
     return;
-  return agentFile.slice(start + RULES_START.length, end).trim();
+  const rules = agentFile.slice(start + RULES_START.length, end).trim();
+  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root);
 };
 var sessionStart = gen2(function* () {
   const root = yield* pluginRoot;
@@ -9938,13 +9986,29 @@ var sessionStart = gen2(function* () {
   const file = Bun.file(join6(root, "agents", "holyclaude.md"));
   if (!(yield* tryPromise2(() => file.exists())))
     return "";
-  const rules = extractRules(yield* tryPromise2(() => file.text()));
+  const rules = extractRules(yield* tryPromise2(() => file.text()), root);
   const summary = yield* loadState(stateDirPath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
-  const additionalContext = composeContext(rules, summary);
+  const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
   });
 });
+
+// src/hook/subagent.ts
+var record2 = (stdin, sighting) => gen2(function* () {
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const agentId = input?.agent?.id;
+  if (input !== undefined && agentId !== undefined)
+    yield* observe(agentId, sighting(input));
+  return "";
+});
+var subagentStart = (stdin) => record2(stdin, (input) => ({ agent_type: input.agent_type }));
+var subagentStop = (stdin) => record2(stdin, (input) => ({
+  effort: effortOf(input),
+  transcript: input.agent_transcript_path
+}));
 
 // src/state.ts
 var loadStateFile = suspend2(() => loadState(stateDirPath()));
@@ -9984,8 +10048,8 @@ var verifyAssignment = (id) => gen2(function* () {
     effort: override?.effort ?? route.effort,
     agent_type: `${PLUGIN_NAME}:${assignment.role}`
   };
-  const seen = latestObserved(records, agentId);
-  const models = seen?.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
+  const seen = seenOf(records, agentId);
+  const models = seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
   const observedModel = models.length === 0 ? undefined : models.join("|");
   const rows = [
     {
@@ -9997,14 +10061,14 @@ var verifyAssignment = (id) => gen2(function* () {
     {
       field: "effort",
       expected: expected.effort,
-      observed: seen?.effort ?? "unobserved",
-      status: compare(expected.effort, seen?.effort)
+      observed: seen.effort ?? "unobserved",
+      status: compare(expected.effort, seen.effort)
     },
     {
       field: "agent_type",
       expected: expected.agent_type,
-      observed: seen?.agent_type ?? "unobserved",
-      status: compare(expected.agent_type, seen?.agent_type, (want, got) => got === want || got.endsWith(`:${assignment.role}`))
+      observed: seen.agent_type ?? "unobserved",
+      status: compare(expected.agent_type, seen.agent_type, (want, got) => got === want || got.endsWith(`:${assignment.role}`))
     }
   ];
   const verdict = rows.some((r) => r.status === "mismatch") ? "mismatch" : rows.some((r) => r.status === "unobserved") ? "incomplete" : "ok";
@@ -10416,6 +10480,28 @@ var hookPreToolUse = cmd({
   positionals: 0,
   run: (_args, stdin) => stdin.pipe(flatMap2(preToolUse), map4((text) => ({ text })))
 });
+var hookSubagentStart = cmd({
+  path: ["hook", "subagent-start"],
+  usage: "hook subagent-start",
+  summary: "SubagentStart hook: observe the agent type",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) => stdin.pipe(flatMap2(subagentStart), map4((text) => ({ text })))
+});
+var hookSubagentStop = cmd({
+  path: ["hook", "subagent-stop"],
+  usage: "hook subagent-stop",
+  summary: "SubagentStop hook: observe the effort and transcript path, never block",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) => stdin.pipe(flatMap2(subagentStop), map4((text) => ({ text })))
+});
 var COMMANDS = [
   intentShow,
   intentCreate,
@@ -10436,7 +10522,9 @@ var COMMANDS = [
   reconcileResolve,
   reconcileList,
   hookSessionStart,
-  hookPreToolUse
+  hookPreToolUse,
+  hookSubagentStart,
+  hookSubagentStop
 ].toSorted((a, b) => b.path.length - a.path.length);
 
 // src/main.ts

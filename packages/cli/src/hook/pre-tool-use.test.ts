@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { readObservations } from "../observations.ts"
+import { MAX_JUDGED_BYTES } from "./policy.ts"
 import { preToolUse } from "./pre-tool-use.ts"
 
 type Caller = "subagent" | "main"
@@ -29,6 +30,12 @@ const decide = async (stdin: string): Promise<Decision> => {
   expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny")
   expect(parsed.hookSpecificOutput.permissionDecisionReason.length).toBeGreaterThan(0)
   return "deny"
+}
+
+/** The reason the hook gives for a deny, or undefined when it allows. */
+const reasonOf = async (stdin: string): Promise<string | undefined> => {
+  const out = await Effect.runPromise(preToolUse(stdin))
+  return out === "" ? undefined : JSON.parse(out).hookSpecificOutput.permissionDecisionReason
 }
 
 /** One policy row: the tool, its command, who calls it and the decision the hook must give. */
@@ -78,7 +85,7 @@ const TABLE: ReadonlyArray<Row> = [
     "holyclaude intent show",
     "holyclaude assignment list --state Running",
     "holyclaude reconcile",
-    "bun plugin/bin/holyclaude.js intent show",
+    "bun plugin/scripts/holyclaude.js intent show",
     "bun test",
     "bun run lint:readonly",
     "bun test packages/cli/src/commands.test.ts",
@@ -137,12 +144,12 @@ const TABLE: ReadonlyArray<Row> = [
     "holyclaude assignment finish A1 --outcome success",
     "holyclaude reconcile resolve A1 --keep",
     "holyclaude hook pre-tool-use",
-    "bun plugin/bin/holyclaude.js intent create",
+    "bun plugin/scripts/holyclaude.js intent create",
     "bun run packages/cli/src/main.ts intent create",
-    "bun --cwd x run plugin/bin/holyclaude.js intent create",
+    "bun --cwd x run plugin/scripts/holyclaude.js intent create",
     "bunx holyclaude intent create",
     "bun x holyclaude intent create",
-    "sh plugin/bin/holyclaude assignment accept A1",
+    "sh plugin/scripts/holyclaude assignment accept A1",
     "echo '{}' > .holyclaude/state.json",
     "rm -rf .holyclaude",
     "cat x | tee .holyclaude/state.json",
@@ -172,13 +179,13 @@ const TABLE: ReadonlyArray<Row> = [
     '"C:\\Program Files\\Git\\cmd\\git.exe" commit -m x',
     "/c/Program\\ Files/Git/cmd/git.exe commit -m x",
     "'C:/Program Files/Git/cmd/git.exe' push",
-    "bun.exe plugin/bin/holyclaude.js intent create",
-    "node.exe plugin/bin/holyclaude.js intent create",
-    'bun "C:\\Users\\x\\plugin\\bin\\holyclaude.js" intent create',
-    "bun 'plugin\\bin\\holyclaude.js' assignment accept A1",
+    "bun.exe plugin/scripts/holyclaude.js intent create",
+    "node.exe plugin/scripts/holyclaude.js intent create",
+    'bun "C:\\Users\\x\\plugin\\scripts\\holyclaude.js" intent create',
+    "bun 'plugin\\scripts\\holyclaude.js' assignment accept A1",
     'bun "packages\\cli\\src\\main.ts" intent create',
-    '"C:\\Users\\x\\plugin\\bin\\holyclaude" intent create',
-    "sh 'plugin\\bin\\holyclaude' intent create",
+    '"C:\\Users\\x\\plugin\\scripts\\holyclaude" intent create',
+    "sh 'plugin\\scripts\\holyclaude' intent create",
     "holyclaude.cmd intent create",
   ),
   ...allowed(
@@ -187,7 +194,7 @@ const TABLE: ReadonlyArray<Row> = [
     "Git status",
     '"C:\\Program Files\\Git\\cmd\\git.exe" status',
     "bun.exe test",
-    "bun.exe plugin/bin/holyclaude.js intent show",
+    "bun.exe plugin/scripts/holyclaude.js intent show",
   ),
 
   // Every tool that carries a shell command gets the same policy, and the Windows shells are
@@ -340,9 +347,9 @@ const TABLE: ReadonlyArray<Row> = [
     "bunx oxlint packages/cli/src/main.ts packages/cli/src/commands.ts",
     "bunx oxfmt --check packages/cli/src/main.ts packages/cli/src/args.ts",
     "bun build packages/cli/src/main.ts --target bun --outfile /tmp/hc.js",
-    "bun build src/main.ts --target bun --outfile ../../plugin/bin/holyclaude.js",
+    "bun build src/main.ts --target bun --outfile ../../plugin/scripts/holyclaude.js",
     "node --check packages/cli/src/main.js x",
-    "node --check plugin/bin/holyclaude.js",
+    "node --check plugin/scripts/holyclaude.js",
     "git branch -av",
     "git branch -rv",
     "git branch -avv",
@@ -364,10 +371,12 @@ const TABLE: ReadonlyArray<Row> = [
     "gh api --method GET repos/o/r",
     "gh api -X GET search/issues -f q=repo:o/r",
     "gh api -XGET search/issues -f q=x",
-    "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude intent show",
-    "$CLAUDE_PLUGIN_ROOT/bin/holyclaude assignment list",
-    '"$CLAUDE_PLUGIN_ROOT/bin/holyclaude" routes',
-    "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude assignment show A1",
+    "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude intent show",
+    "$CLAUDE_PLUGIN_ROOT/scripts/holyclaude assignment list",
+    '"$CLAUDE_PLUGIN_ROOT/scripts/holyclaude" routes',
+    "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude assignment show A1",
+    '"/home/u/.claude/plugins/cache/holyclaude/holyclaude/0.1.0/scripts/holyclaude" routes',
+    '"C:\\Users\\u\\.claude\\plugins\\cache\\holyclaude\\scripts\\holyclaude" intent show',
     "$HOME/.bun/bin/bun test",
     '"$(git rev-parse --show-toplevel)/scripts/run.sh"',
     "holyclaude help",
@@ -382,13 +391,15 @@ const TABLE: ReadonlyArray<Row> = [
     "gh api -X POST graphql -f query='mutation { x }'",
     "gh api -X DELETE repos/o/r/git/refs/heads/x -f x=y",
     "gh api -XPOST repos/o/r/issues",
-    "${CLAUDE_PLUGIN_ROOT}/bin/holyclaude intent create",
-    "$CLAUDE_PLUGIN_ROOT/bin/holyclaude assignment cancel A1",
-    "$CLAUDE_PLUGIN_ROOT/bin/holyclaude assignment accept A1",
+    "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude intent create",
+    "$CLAUDE_PLUGIN_ROOT/scripts/holyclaude assignment cancel A1",
+    "$CLAUDE_PLUGIN_ROOT/scripts/holyclaude assignment accept A1",
+    '"/home/u/.claude/plugins/cache/holyclaude/holyclaude/0.1.0/scripts/holyclaude" intent create',
+    '"C:/Users/u/.claude/plugins/cache/holyclaude/scripts/holyclaude" assignment accept A1',
     "$HOME/bin/git commit -m x",
-    "$HOME/.bun/bin/bun plugin/bin/holyclaude.js intent create",
-    "node plugin/bin/holyclaude.js intent create -c",
-    "node --require ./x.js plugin/bin/holyclaude.js intent create",
+    "$HOME/.bun/bin/bun plugin/scripts/holyclaude.js intent create",
+    "node plugin/scripts/holyclaude.js intent create -c",
+    "node --require ./x.js plugin/scripts/holyclaude.js intent create",
   ),
 
   // Unrelated: bun x and bunx run the program they name.
@@ -400,7 +411,7 @@ const TABLE: ReadonlyArray<Row> = [
     "git push",
     "gh pr create --title t",
     "holyclaude intent create",
-    "bun plugin/bin/holyclaude.js assignment accept A1",
+    "bun plugin/scripts/holyclaude.js assignment accept A1",
     "echo '{}' > .holyclaude/state.json",
     "echo '{}' > .holyclaude/intents/intent-0001/intent.json",
     "echo x > .holyclaude/.gitignore",
@@ -528,6 +539,12 @@ describe("the decision reads only the fields it needs", () => {
     ])
   })
 
+  test("a subagent call whose agent_id is not a string is judged but cannot be observed", async () => {
+    const extra = { agent_id: 7, agent_type: "holyclaude:Worker.implementation" }
+    expect(await decide(call("Bash", { command: "git commit -m x" }, "main", extra))).toBe("deny")
+    expect(await Effect.runPromise(readObservations(directory))).toEqual([])
+  })
+
   test("a command too deeply nested to read is denied, not waved through", async () => {
     const nested = `echo ${"$(".repeat(20_000)}git push${")".repeat(20_000)}`
     expect(await decide(call("Bash", { command: nested }, "subagent"))).toBe("deny")
@@ -546,5 +563,343 @@ describe("the decision reads only the fields it needs", () => {
     const started = performance.now()
     expect(await decide(call("Bash", { command }, "subagent"))).toBe("deny")
     expect(performance.now() - started).toBeLessThan(2000)
+  })
+})
+
+const LIMIT = MAX_JUDGED_BYTES
+const filler = (bytes: number) => "x".repeat(bytes)
+
+/** A read-only command of exactly `bytes` bytes: `git status` and then spaces. */
+const readOfSize = (bytes: number) => `git status${" ".repeat(bytes - "git status".length)}`
+
+/** A write command of exactly `bytes` bytes: `git commit` and then spaces. */
+const writeOfSize = (bytes: number) => `git commit${" ".repeat(bytes - "git commit".length)}`
+
+describe("only the judged fields are limited: padding elsewhere is neither a bypass nor a deny", () => {
+  test("a large Write into an allowed path passes", async () => {
+    const input = { file_path: "packages/cli/src/big.ts", content: filler(2 * LIMIT) }
+    expect(await decide(call("Write", input, "subagent"))).toBe("allow")
+  })
+
+  test("a large Write into the state directory is denied for its path", async () => {
+    const input = { file_path: ".holyclaude/state.json", content: filler(2 * LIMIT) }
+    expect(await reasonOf(call("Write", input, "subagent"))).toContain("state files are written")
+  })
+
+  test("a read padded outside the command passes", async () => {
+    const input = { command: "git status", description: filler(2 * LIMIT) }
+    expect(await decide(call("Bash", input, "subagent"))).toBe("allow")
+    expect(await decide(call("Bash", { command: "git status" }, "subagent", { x: input }))).toBe(
+      "allow",
+    )
+  })
+
+  test("a write padded outside the command is still judged and denied for what it is", async () => {
+    const input = { command: "git commit -m x", description: filler(2 * LIMIT) }
+    expect(await reasonOf(call("Bash", input, "subagent"))).toContain("git commit writes VCS state")
+    expect(
+      await reasonOf(
+        call("Bash", { command: "git commit -m x" }, "subagent", { padding: filler(2 * LIMIT) }),
+      ),
+    ).toContain("git commit writes VCS state")
+  })
+
+  test("a tool the guard does not judge passes with any input", async () => {
+    const input = { command: filler(2 * LIMIT) }
+    expect(await decide(call("mcp__other__tool", input, "subagent"))).toBe("allow")
+    expect(await decide(call("Write", { file_path: "a.ts", ...input }, "subagent"))).toBe("allow")
+  })
+
+  test("a main-thread payload is allowed at any size", async () => {
+    for (const size of [LIMIT + 1, 4 * LIMIT]) {
+      expect(await decide(call("Bash", { command: writeOfSize(size) }, "main"))).toBe("allow")
+      expect(await decide(call("Write", { content: filler(size) }, "main"))).toBe("allow")
+    }
+  })
+
+  test("an empty agent_id is the main thread's, so it is allowed at any size", async () => {
+    const input = { command: writeOfSize(2 * LIMIT) }
+    expect(await decide(call("Bash", input, "main", { agent_id: "" }))).toBe("allow")
+  })
+})
+
+describe("a command or path over the limit is denied unread", () => {
+  for (const tool of ["Bash", "PowerShell", "Monitor"])
+    test(`${tool}: a command over the limit is denied, a read as well as a write`, async () => {
+      for (const command of [readOfSize(LIMIT + 1), writeOfSize(LIMIT + 1)]) {
+        const reason = await reasonOf(call(tool, { command }, "subagent"))
+        expect(reason).toContain(`command is ${LIMIT + 1} bytes`)
+        expect(reason).toContain(`at most ${LIMIT}`)
+        expect(reason).toContain("cannot be checked")
+        expect(reason).toContain("smaller calls")
+      }
+    })
+
+  test("a command of exactly the limit is judged by the policy", async () => {
+    expect(await decide(call("Bash", { command: readOfSize(LIMIT) }, "subagent"))).toBe("allow")
+    expect(await reasonOf(call("Bash", { command: writeOfSize(LIMIT) }, "subagent"))).toContain(
+      "git commit writes VCS state",
+    )
+  })
+
+  test("the limit counts bytes, not characters", async () => {
+    const atLimit = `echo  ${"é".repeat((LIMIT - 6) / 2)}`
+    expect(atLimit.length).toBeLessThan(LIMIT)
+    expect(await decide(call("Bash", { command: atLimit }, "subagent"))).toBe("allow")
+    expect(await decide(call("Bash", { command: `${atLimit}é` }, "subagent"))).toBe("deny")
+  })
+
+  for (const [tool, key] of [
+    ["Write", "file_path"],
+    ["Edit", "file_path"],
+    ["MultiEdit", "file_path"],
+    ["NotebookEdit", "notebook_path"],
+  ] as const)
+    test(`${tool}: a ${key} over the limit is denied, one at the limit is judged`, async () => {
+      const reason = await reasonOf(call(tool, { [key]: filler(LIMIT + 1) }, "subagent"))
+      expect(reason).toContain(`file path is ${LIMIT + 1} bytes`)
+      expect(await decide(call(tool, { [key]: filler(LIMIT) }, "subagent"))).toBe("allow")
+    })
+
+  test("a main-thread file path over the limit is allowed", async () => {
+    expect(await decide(call("Write", { file_path: filler(LIMIT + 1) }, "main"))).toBe("allow")
+  })
+})
+
+describe("who made the call is read from agent_id of any type", () => {
+  const WRITE = { command: "git commit -m x" }
+  const READ = { command: "git status" }
+
+  for (const [name, agent_id] of [
+    ["a number", 7],
+    ["zero", 0],
+    ["true", true],
+    ["false", false],
+    ["an object", { id: "agent-1" }],
+    ["an array", ["agent-1"]],
+  ] as const)
+    test(`agent_id as ${name} is a subagent: a write is denied and a read allowed`, async () => {
+      expect(await decide(call("Bash", WRITE, "main", { agent_id }))).toBe("deny")
+      expect(await decide(call("Bash", READ, "main", { agent_id }))).toBe("allow")
+    })
+
+  test("a null, missing or empty agent_id is the main thread's", async () => {
+    for (const extra of [{ agent_id: null }, {}, { agent_id: "" }])
+      expect(await decide(call("Bash", WRITE, "main", extra))).toBe("allow")
+  })
+
+  test("a non-string agent_id with no tool name is denied", async () => {
+    const payload = JSON.stringify({ agent_id: 7, tool_input: WRITE })
+    expect(await reasonOf(payload)).toContain("names no tool")
+  })
+})
+
+describe("the payload is read as JSON, not as text", () => {
+  const body = '"tool_name":"Bash","tool_input":{"command":"git commit -m x"}'
+
+  test("a \\u-escaped agent_id key is read", async () => {
+    expect(await decide(`{"\\u0061gent_id":"agent-1",${body}}`)).toBe("deny")
+    expect(await decide(`{"agent\\u005fid":"agent-1",${body}}`)).toBe("deny")
+  })
+
+  test("a \\u-escaped agent_id value is read", async () => {
+    expect(await decide(`{"agent_id":"\\u0061gent-1",${body}}`)).toBe("deny")
+  })
+
+  test("a \\u-escaped empty or null agent_id still reads as the main thread", async () => {
+    expect(await decide(`{"agent_id":"",${body}}`)).toBe("allow")
+    expect(await decide(`{"\\u0061gent_id":null,${body}}`)).toBe("allow")
+  })
+
+  test("a \\u-escaped tool name and command are judged", async () => {
+    const escaped = '"tool_name":"\\u0042ash","tool_input":{"command":"git \\u0063ommit -m x"}'
+    expect(await decide(`{"agent_id":"agent-1",${escaped}}`)).toBe("deny")
+  })
+
+  test("a field that only mentions agent_id inside a string does not make a main-thread call a subagent's", async () => {
+    const input = { command: "git commit -m x", description: '"agent_id":"agent-1"' }
+    expect(await decide(call("Bash", input, "main"))).toBe("allow")
+  })
+
+  const nested = (command: string, depth: number) =>
+    `{"agent_id":"agent-1","tool_name":"Bash","tool_input":{"command":"${command}","x":${"[".repeat(depth)}${"]".repeat(depth)}}}`
+
+  test("deep nesting inside a subagent payload over 1 MB: a write is denied by the policy", async () => {
+    const payload = nested("git commit -m x", 600_000)
+    expect(payload.length).toBeGreaterThan(LIMIT)
+    expect(await reasonOf(payload)).toContain("git commit writes VCS state")
+  })
+
+  test("deep nesting inside a subagent payload over 1 MB: a read is allowed", async () => {
+    const payload = nested("git status", 600_000)
+    expect(payload.length).toBeGreaterThan(LIMIT)
+    expect(await decide(payload)).toBe("allow")
+  })
+
+  test("deep nesting in a main-thread payload passes", async () => {
+    const nest = `${"[".repeat(100_000)}${"]".repeat(100_000)}`
+    const payload = `{"tool_name":"Bash","tool_input":{"command":"git commit -m x","x":${nest}}}`
+    expect(await decide(payload)).toBe("allow")
+  })
+})
+
+describe("a payload with no readable agent_id cannot be attributed and is allowed", () => {
+  const unreadable: ReadonlyArray<readonly [string, string]> = [
+    ["empty stdin", ""],
+    ["blank stdin", " \n"],
+    ["text that is not JSON", "git commit -m x"],
+    ["JSON cut off after the agent_id", '{"agent_id":"agent-1","tool_name":"Bash","tool_in'],
+    ["a JSON array", '[{"agent_id":"agent-1","tool_name":"Bash"}]'],
+    ["a JSON string", '"agent_id"'],
+    ["JSON null", "null"],
+    ["more than the limit of text that is not JSON", "x".repeat(LIMIT + 1)],
+  ]
+
+  for (const [name, stdin] of unreadable)
+    test(`${name}`, async () => {
+      expect(await decide(stdin)).toBe("allow")
+    })
+})
+
+describe("a subagent payload that cannot be judged for another reason", () => {
+  test("no tool name is denied", async () => {
+    const payload = JSON.stringify({ agent_id: "agent-1", tool_input: { command: "git commit" } })
+    expect(await reasonOf(payload)).toContain("names no tool")
+  })
+
+  test("a tool name of another type is denied", async () => {
+    for (const tool_name of [null, 7, ["Bash"], { name: "Bash" }]) {
+      const payload = JSON.stringify({
+        agent_id: "agent-1",
+        tool_name,
+        tool_input: { command: "git commit" },
+      })
+      expect(await decide(payload)).toBe("deny")
+    }
+  })
+
+  test("a main-thread call with no tool name passes through", async () => {
+    expect(await decide(JSON.stringify({ tool_input: { command: "git commit" } }))).toBe("allow")
+  })
+})
+
+describe("a file tool is judged by every path it names", () => {
+  const paths: ReadonlyArray<readonly [string, object, Decision]> = [
+    ["NotebookEdit", { file_path: "ok.ts", notebook_path: ".holyclaude/s.json" }, "deny"],
+    ["NotebookEdit", { file_path: ".holyclaude/s.json", notebook_path: "ok.ipynb" }, "deny"],
+    ["Write", { file_path: "ok.ts", notebook_path: ".holyclaude/s.json" }, "deny"],
+    ["Edit", { file_path: "ok.ts", notebook_path: ".HolyClaude\\s.json" }, "deny"],
+    ["NotebookEdit", { file_path: "ok.ts", notebook_path: "ok.ipynb" }, "allow"],
+    ["Write", { file_path: "ok.ts", notebook_path: "ok.ipynb" }, "allow"],
+  ]
+  for (const [tool, input, expected] of paths)
+    test(`${expected}: ${tool} ${JSON.stringify(input)}`, async () => {
+      expect(await decide(call(tool, input, "subagent"))).toBe(expected)
+    })
+
+  test("a path over the limit is denied wherever it is, behind a harmless one", async () => {
+    for (const input of [
+      { file_path: "ok.ts", notebook_path: filler(LIMIT + 1) },
+      { file_path: filler(LIMIT + 1), notebook_path: "ok.ipynb" },
+    ])
+      expect(await reasonOf(call("NotebookEdit", input, "subagent"))).toContain("file path is")
+  })
+
+  for (const tool of ["Write", "Edit", "MultiEdit", "NotebookEdit"])
+    test(`${tool}: a call with no readable path cannot be judged and is denied`, async () => {
+      for (const input of [
+        { content: "x" },
+        {},
+        null,
+        undefined,
+        { file_path: 5 },
+        { file_path: [".holyclaude/s.json"] },
+        { notebook_path: null },
+      ])
+        expect(await reasonOf(call(tool, input, "subagent"))).toContain("names no file path")
+    })
+
+  test("a main-thread file call with no path passes", async () => {
+    expect(await decide(call("Write", { content: "x" }, "main"))).toBe("allow")
+  })
+})
+
+describe("a flag cluster is read in linear time", () => {
+  test("a long cluster that has no command flag is denied without backtracking", async () => {
+    const started = performance.now()
+    const reason = await reasonOf(
+      call("Bash", { command: `bash -${"c".repeat(100_000)}!; git commit -m x` }, "subagent"),
+    )
+    expect(reason).toContain("a shell reading commands from input")
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  test("a cluster with the command flag anywhere in it still carries the script", async () => {
+    for (const command of [
+      "bash -xc 'git push'",
+      "bash -cx 'git push'",
+      "sh -ec 'git commit -m x'",
+      "bash -lic 'git push'",
+    ])
+      expect(await decide(call("Bash", { command }, "subagent"))).toBe("deny")
+    for (const command of ["bash -c 'git status'", "bash -x script.sh", "sh -e script.sh"])
+      expect(await decide(call("Bash", { command }, "subagent"))).toBe("allow")
+  })
+})
+
+describe("the worst command at the limit is decided in seconds, not minutes", () => {
+  /**
+   * `depth` heredocs that each hold a substitution opening the next, then `inner`, then padding
+   * lines.
+   */
+  const heredocChain = (depth: number, padding: number, inner = "git status") =>
+    `${Array.from({ length: depth }, (_, level) => `cat <<H${level}\n$(`).join("")}${inner}${"\n".repeat(padding)}`
+
+  test("a heredoc chain deeper than the scanner follows is denied unread", async () => {
+    const started = performance.now()
+    const reason = await reasonOf(call("Bash", { command: heredocChain(50, 400_000) }, "subagent"))
+    expect(reason).toContain("nested too deeply")
+    expect(performance.now() - started).toBeLessThan(3000)
+  })
+
+  test("a heredoc chain filling the whole limit is denied in seconds", async () => {
+    const command = heredocChain(50, 0)
+    const padded = heredocChain(50, LIMIT - command.length)
+    expect(Buffer.byteLength(padded)).toBe(LIMIT)
+    const started = performance.now()
+    expect(await reasonOf(call("Bash", { command: padded }, "subagent"))).toContain(
+      "nested too deeply",
+    )
+    expect(performance.now() - started).toBeLessThan(5000)
+  })
+
+  test("a chain within the depth is still judged to its innermost command", async () => {
+    expect(await decide(call("Bash", { command: heredocChain(3, 10) }, "subagent"))).toBe("allow")
+    expect(
+      await decide(call("Bash", { command: heredocChain(3, 10, "git push") }, "subagent")),
+    ).toBe("deny")
+  })
+})
+
+describe("a deny reason does not echo the call's own text at length", () => {
+  const long = "a".repeat(500_000)
+  const echoing: ReadonlyArray<readonly [string, string]> = [
+    ["a git subcommand", `git ${long}`],
+    ["a git flag", `git -${long}`],
+    ["a git -c key", `git -c ${long}=1 status`],
+    ["a gh command group", `gh ${long} view`],
+    ["a holyclaude subcommand", `holyclaude ${long}`],
+  ]
+  for (const [name, command] of echoing)
+    test(`${name} is cut`, async () => {
+      const reason = await reasonOf(call("Bash", { command }, "subagent"))
+      expect(reason?.length).toBeLessThanOrEqual(1003)
+      expect(reason?.endsWith("...")).toBe(true)
+    })
+
+  test("an ordinary reason is sent whole", async () => {
+    const reason = await reasonOf(call("Bash", { command: "gh pr create --title t" }, "subagent"))
+    expect(reason).toContain("Put the finding in your report")
+    expect(reason?.endsWith("...")).toBe(false)
   })
 })

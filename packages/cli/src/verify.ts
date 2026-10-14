@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 
 import { NotBound } from "./errors.ts"
 import { PLUGIN_NAME } from "./fingerprint.ts"
-import { latestObserved, latestOverride, readObservations } from "./observations.ts"
+import { latestOverride, readObservations, seenOf } from "./observations.ts"
 import { loadStateFile } from "./state.ts"
 
 const TranscriptLine = Schema.Struct({
@@ -48,8 +48,10 @@ const compare = (
 
 /**
  * Reports expected against observed model, effort and agent type for an Assignment's bound agent.
- * Expected comes from the route, or the per-call override recorded at bind. Observed effort and
- * agent type come from the PreToolUse hook; observed model comes from the subagent transcript.
+ * Expected comes from the route, or the per-call override recorded at bind. Observed agent type
+ * comes from the SubagentStart hook, effort from PreToolUse or SubagentStop, and the transcript
+ * path from SubagentStop or PreToolUse, combined per field with the newest record winning; the
+ * observed model comes from that subagent transcript.
  */
 export const verifyAssignment = (id: string) =>
   Effect.gen(function* () {
@@ -65,8 +67,8 @@ export const verifyAssignment = (id: string) =>
       effort: override?.effort ?? route.effort,
       agent_type: `${PLUGIN_NAME}:${assignment.role}`,
     }
-    const seen = latestObserved(records, agentId)
-    const models = seen?.transcript === undefined ? [] : yield* transcriptModels(seen.transcript)
+    const seen = seenOf(records, agentId)
+    const models = seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript)
     const observedModel = models.length === 0 ? undefined : models.join("|")
     const rows = [
       {
@@ -80,16 +82,16 @@ export const verifyAssignment = (id: string) =>
       {
         field: "effort",
         expected: expected.effort,
-        observed: seen?.effort ?? "unobserved",
-        status: compare(expected.effort, seen?.effort),
+        observed: seen.effort ?? "unobserved",
+        status: compare(expected.effort, seen.effort),
       },
       {
         field: "agent_type",
         expected: expected.agent_type,
-        observed: seen?.agent_type ?? "unobserved",
+        observed: seen.agent_type ?? "unobserved",
         status: compare(
           expected.agent_type,
-          seen?.agent_type,
+          seen.agent_type,
           (want, got) => got === want || got.endsWith(`:${assignment.role}`),
         ),
       },

@@ -6,6 +6,12 @@ type Verdict = string | undefined
 
 const MAX_DEPTH = 6
 
+/**
+ * Largest command or file path the policy scans, in bytes. A longer one is denied unread, which
+ * bounds the scan; the rest of a payload is never scanned, so it has no limit.
+ */
+export const MAX_JUDGED_BYTES = 1024 * 1024
+
 const REASONS = {
   git: (sub: string) =>
     `git ${sub} writes VCS state, and VCS writes belong to the root. Describe the change in your report (files and intent) and the root commits it. git status, diff, log, show, blame and fetch are open to you.`,
@@ -18,6 +24,11 @@ const REASONS = {
     `git -c ${key} can run programs. A git read accepts display settings with -c (color.*, core.quotepath, diff.renames and similar); drop the setting or use one of those.`,
   unsure: (why: string) =>
     `This command cannot be verified (${why}). Write it as plain commands with literal program names, for example one git read per command, so it can run.`,
+  oversized: (what: string, bytes: number) =>
+    `This ${what} is ${bytes} bytes and the guard reads at most ${MAX_JUDGED_BYTES}, so it cannot be checked. Shorten it, or send the work in smaller calls, for example one shorter command at a time.`,
+  noTool: `This tool call names no tool that can be read, so it cannot be checked. Retry the call, and report it to the root if it recurs.`,
+  noPath: (tool: string) =>
+    `This ${tool} call names no file path that can be read, so it cannot be checked. Send the path as a plain string.`,
 }
 
 const GIT_READS = new Set([
@@ -280,7 +291,7 @@ const isEntry = (path: string) =>
 
 /**
  * The program a word names, or undefined when the shell computes the name. A path that is computed
- * only in its directory (`${CLAUDE_PLUGIN_ROOT}/bin/holyclaude`) still names its program.
+ * only in its directory (`${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude`) still names its program.
  */
 const programOf = (word: Word): string | undefined =>
   word.dynamic && /[$`*?[{]/.test(word.text.slice(partStart(word.text)))
@@ -632,8 +643,12 @@ const findAfter = (words: ReadonlyArray<Word>, markers: ReadonlyArray<string>) =
   return end === -1 ? tail : tail.slice(0, end)
 }
 
+// A single class per regex, so a long flag cluster is read in linear time: `-[A-Za-z]*c[A-Za-z]*`
+// would backtrack quadratically on a cluster that does not match.
+const isCommandFlag = (text: string) => /^-[A-Za-z]+$/.test(text) && text.includes("c")
+
 const classifyShell = (rest: ReadonlyArray<Word>, depth: number): Verdict => {
-  const flagged = rest.findIndex((word) => /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text))
+  const flagged = rest.findIndex((word) => isCommandFlag(word.text))
   if (flagged !== -1) {
     const script = rest.slice(flagged + 1).find((word) => !word.text.startsWith("-"))
     if (script === undefined) return undefined
@@ -782,22 +797,46 @@ const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
 const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
 
 /**
+ * The tools the guard judges. The plugin's hooks.json matcher must list all of them, since a tool
+ * the matcher leaves out never reaches the guard.
+ */
+export const JUDGED_TOOLS: ReadonlySet<string> = new Set([...SHELL_TOOLS, ...FILE_TOOLS])
+
+/** The reason to deny when the text a rule must scan is over the limit, or undefined when it fits. */
+const oversize = (what: string, text: string): Verdict => {
+  const bytes = Buffer.byteLength(text)
+  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined
+}
+
+/**
  * Judges one tool call of a subagent. Tools that carry a shell command (Bash, PowerShell, Monitor)
  * are judged by {@link denyReason}; file tools are refused on the `.holyclaude` state directory,
- * which only the root changes, through the CLI. Returns the reason to deny, or undefined to allow.
+ * which only the root changes, through the CLI, whichever of `file_path` and `notebook_path` it
+ * names. Only the command and the paths are read, and one over {@link MAX_JUDGED_BYTES} is denied
+ * unread; the rest of the input, such as the content of a write, has no limit. A call that names no
+ * tool, or a file tool that names no path, cannot be judged and is denied. Returns the reason to
+ * deny, or undefined to allow.
  */
 export const denyToolReason = (
   toolName: string | undefined,
   input: ToolInput | undefined,
 ): string | undefined => {
-  if (toolName === undefined) return undefined
-  if (SHELL_TOOLS.has(toolName))
-    return input?.command === undefined
+  if (toolName === undefined) return REASONS.noTool
+  if (SHELL_TOOLS.has(toolName)) {
+    const command = input?.command
+    return command === undefined
       ? `This ${toolName} call carries no command text that can be checked. Send the command as a plain string.`
-      : denyReason(input.command)
+      : (oversize("command", command) ?? denyReason(command))
+  }
   if (FILE_TOOLS.has(toolName)) {
-    const target = input?.file_path ?? input?.notebook_path
-    return target !== undefined && touchesState(target) ? REASONS.state : undefined
+    const targets = [input?.file_path, input?.notebook_path].filter((path) => path !== undefined)
+    if (targets.length === 0) return REASONS.noPath(toolName)
+    for (const target of targets) {
+      const verdict =
+        oversize("file path", target) ?? (touchesState(target) ? REASONS.state : undefined)
+      if (verdict !== undefined) return verdict
+    }
+    return undefined
   }
   return undefined
 }

@@ -65,3 +65,28 @@ describe("scanning is linear in the length of the command", () => {
     })
   }
 })
+
+describe("text scanned again on its own is nested a bounded depth", () => {
+  /**
+   * `depth` heredocs whose bodies each open a substitution that holds the next, ending in `git
+   * push`.
+   */
+  const chain = (depth: number) =>
+    `${Array.from({ length: depth }, (_, level) => `cat <<H${level}\n$(`).join("")}git push`
+
+  test("a chain up to the limit is followed to its innermost command", () => {
+    expect(lines(chain(3))).toContainEqual(["git", "push"])
+  })
+
+  test("a deeper chain fails the scan instead of rescanning the script at every level", () => {
+    const scan = scanScript(chain(4))
+    expect(scan.ok).toBe(false)
+    expect(scan.ok ? "" : scan.reason).toContain("nested too deeply")
+  })
+
+  test("a chain of 1000 levels over 300 000 lines is refused in well under a second", () => {
+    const started = performance.now()
+    expect(scanScript(`${chain(1000)}${"\n".repeat(300_000)}`).ok).toBe(false)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+})

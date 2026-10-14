@@ -17,7 +17,9 @@ import { toon } from "../toon.ts"
 const CAP = 10_000
 const RULES_START = "<!-- holyclaude:core-rules:start -->"
 const RULES_END = "<!-- holyclaude:core-rules:end -->"
-const POINTER = "Full state: holyclaude intent show; holyclaude assignment list"
+const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
+/** The one-line pointer to the CLI, which `cli` names as the root should run it. */
+const pointer = (cli: string) => `Full state: ${cli} intent show; ${cli} assignment list`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
 const RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]"
 
@@ -102,11 +104,11 @@ const fitSummary = (summary: Summary, budget: number): string => {
  * Joins the pieces under the cap. The core rules are cut first, then the state summary shrinks, and
  * the one-line pointer to the CLI stays last.
  */
-const composeContext = (rules: string | undefined, summary: Summary): string => {
+const composeContext = (rules: string | undefined, summary: Summary, cli: string): string => {
   const state = block(summary.render(summary.rows, 400))
   const full = [rules, state].filter((part) => part !== undefined).join("\n\n")
   if (full.length <= CAP) return full
-  const tail = `\n\n${POINTER}`
+  const tail = `\n\n${pointer(cli)}`
   const room = CAP - tail.length - `\n\n${state}`.length - RULES_CUT.length
   if (rules !== undefined && room > 0)
     return `${cutRules(rules, room)}${RULES_CUT}\n\n${state}${tail}`
@@ -116,15 +118,23 @@ const composeContext = (rules: string | undefined, summary: Summary): string => 
 }
 
 /** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */
-export const composeForState = (rules: string | undefined, state: State): string =>
-  composeContext(rules, summaryOf(state))
+export const composeForState = (
+  rules: string | undefined,
+  state: State,
+  cli = "holyclaude",
+): string => composeContext(rules, summaryOf(state), cli)
 
-/** Pulls the text between the core-rules markers out of the root agent file. */
-export const extractRules = (agentFile: string): string | undefined => {
+/**
+ * Pulls the text between the core-rules markers out of the root agent file. Claude Code substitutes
+ * `${CLAUDE_PLUGIN_ROOT}` only in the agent prompt it loads, so a given `root` is substituted
+ * here.
+ */
+export const extractRules = (agentFile: string, root?: string): string | undefined => {
   const start = agentFile.indexOf(RULES_START)
   const end = agentFile.indexOf(RULES_END)
   if (start === -1 || end === -1 || end < start) return undefined
-  return agentFile.slice(start + RULES_START.length, end).trim()
+  const rules = agentFile.slice(start + RULES_START.length, end).trim()
+  return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root)
 }
 
 /**
@@ -137,12 +147,12 @@ export const sessionStart = Effect.gen(function* () {
   if (root === undefined) return ""
   const file = Bun.file(join(root, "agents", "holyclaude.md"))
   if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
-  const rules = extractRules(yield* Effect.tryPromise(() => file.text()))
+  const rules = extractRules(yield* Effect.tryPromise(() => file.text()), root)
   const summary = yield* loadState(stateDirPath()).pipe(
     Effect.map(summaryOf),
     Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
   )
-  const additionalContext = composeContext(rules, summary)
+  const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
   })
