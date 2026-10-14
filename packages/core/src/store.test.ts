@@ -3,7 +3,9 @@ import { rmSync, writeFileSync } from "node:fs"
 import * as nodeFs from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
+
 import { Effect } from "effect"
+
 import { emptyState, type Change } from "./model/state.ts"
 import { breakStaleLock, loadState, updateState } from "./store.ts"
 

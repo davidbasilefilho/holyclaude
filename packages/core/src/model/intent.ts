@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+
 import { Id, StoredRevision, Text } from "./primitives.ts"
 
 /** The user's accepted task. The revision bumps only on a material change. */

@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect"
+
+import type { Intent } from "../model/intent.ts"
 import { Id, Text } from "../model/primitives.ts"
 import { findIntent, nextId, type Change, type State } from "../model/state.ts"
-import type { Intent } from "../model/intent.ts"
 
 /** Input of createIntent. */
 export const CreateIntentInput = Schema.Struct({
