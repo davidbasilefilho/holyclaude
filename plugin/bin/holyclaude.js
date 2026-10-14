@@ -7629,6 +7629,9 @@ var updateIntent = (state, input) => gen2(function* () {
     value: next
   };
 });
+// src/clock.ts
+var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
+
 // src/fingerprint.ts
 import { join as join2 } from "path";
 var PLUGIN_NAME = "holyclaude";
@@ -7659,643 +7662,6 @@ ${text}
   return `roster:${hasher.digest("hex").slice(0, 16)}`;
 });
 var rosterFingerprint = pluginRoot.pipe(flatMap2(rosterFingerprintAt));
-
-// src/hook/session-start.ts
-import { join as join3 } from "path";
-
-// ../../node_modules/.bun/@toon-format+toon@4.4.0/node_modules/@toon-format/toon/dist/index.mjs
-var NULL_LITERAL = "null";
-var DELIMITERS = {
-  comma: ",",
-  tab: "\t",
-  pipe: "|"
-};
-var DEFAULT_DELIMITER = DELIMITERS.comma;
-function escapeString(value) {
-  return value.replace(/\\/g, `\\\\`).replace(/"/g, `\\"`).replace(/\n/g, `\\n`).replace(/\r/g, `\\r`).replace(/\t/g, `\\t`).replace(/[\u0000-\u001F]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
-}
-var FETCH_LINE = Symbol("fetch-line");
-function isBooleanOrNullLiteral(token) {
-  return token === "true" || token === "false" || token === "null";
-}
-function setOwnProperty(target, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(target, key, {
-      value,
-      enumerable: true,
-      writable: true,
-      configurable: true
-    });
-    return;
-  }
-  target[key] = value;
-}
-var COMMENT_LINE_PATTERN = new RegExp(`(?:^\uFEFF?|\\n) *#`);
-var RawString = class {
-  constructor(value) {
-    if (COMMENT_LINE_PATTERN.test(value))
-      throw new TypeError(`Raw string must not contain a line starting with "#": ${JSON.stringify(value)}`);
-    this.value = value;
-  }
-};
-function isRawString(value) {
-  return value instanceof RawString;
-}
-var SURROGATE_PATTERN = /[\uD800-\uDFFF]/;
-function normalizeValue(value) {
-  if (value === null)
-    return null;
-  if (isRawString(value))
-    return value;
-  if (typeof value === "object" && value !== null && "toJSON" in value && typeof value.toJSON === "function") {
-    const next = value.toJSON();
-    if (next !== value)
-      return normalizeValue(next);
-  }
-  if (typeof value === "string") {
-    assertNoLoneSurrogate(value, "string value");
-    return value;
-  }
-  if (typeof value === "boolean")
-    return value;
-  if (typeof value === "number") {
-    if (Object.is(value, -0))
-      return 0;
-    if (!Number.isFinite(value))
-      return null;
-    return value;
-  }
-  if (typeof value === "bigint") {
-    if (value >= Number.MIN_SAFE_INTEGER && value <= Number.MAX_SAFE_INTEGER)
-      return Number(value);
-    return value.toString();
-  }
-  if (value instanceof Date)
-    return value.toISOString();
-  if (Array.isArray(value))
-    return Array.from(value, normalizeValue);
-  if (value instanceof Set)
-    return Array.from(value).map(normalizeValue);
-  if (value instanceof Map)
-    return Object.fromEntries(Array.from(value, ([k, v]) => [String(k), normalizeValue(v)]));
-  if (isPlainObject(value)) {
-    const encodedValues = {};
-    for (const key in value)
-      if (Object.hasOwn(value, key)) {
-        assertNoLoneSurrogate(key, "object key");
-        setOwnProperty(encodedValues, key, normalizeValue(value[key]));
-      }
-    return encodedValues;
-  }
-  return null;
-}
-function assertNoLoneSurrogate(value, context) {
-  if (!SURROGATE_PATTERN.test(value))
-    return;
-  for (let index = 0;index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    if (code < 55296 || code > 57343)
-      continue;
-    const isHighSurrogate = code <= 56319;
-    const next = value.charCodeAt(index + 1);
-    if (isHighSurrogate && next >= 56320 && next <= 57343) {
-      index++;
-      continue;
-    }
-    throw new TypeError(`Cannot encode ${context} containing an unpaired surrogate U+${code.toString(16).toUpperCase()} at index ${index}`);
-  }
-}
-function isJsonPrimitive(value) {
-  return value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-}
-function isEncodablePrimitive(value) {
-  return isJsonPrimitive(value) || isRawString(value);
-}
-function isJsonArray(value) {
-  return Array.isArray(value);
-}
-function isJsonObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value) && !isRawString(value);
-}
-function isEmptyObject(value) {
-  return Object.keys(value).length === 0;
-}
-function isPlainObject(value) {
-  if (value === null || typeof value !== "object")
-    return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === null || prototype === Object.prototype;
-}
-function isArrayOfPrimitives(value) {
-  return value.length === 0 || value.every((item) => isEncodablePrimitive(item));
-}
-function isArrayOfArrays(value) {
-  return value.length === 0 || value.every((item) => isJsonArray(item));
-}
-function isArrayOfObjects(value) {
-  return value.length === 0 || value.every((item) => isJsonObject(item));
-}
-var NUMERIC_LIKE_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
-function assertValidDelimiter(delimiter) {
-  if (!Object.values(DELIMITERS).includes(delimiter))
-    throw new TypeError(`Invalid delimiter ${JSON.stringify(delimiter)}. Valid delimiters are: comma (,), tab (\\t), pipe (|)`);
-}
-function isValidUnquotedKey(key) {
-  return /^[A-Z_][\w.]*$/i.test(key);
-}
-function isSafeUnquoted(value, delimiter = DEFAULT_DELIMITER) {
-  if (!value)
-    return false;
-  if (/^[ \t]|[ \t]$/.test(value))
-    return false;
-  if (isBooleanOrNullLiteral(value) || isNumericLike(value))
-    return false;
-  if (value.includes(":"))
-    return false;
-  if (value.includes('"') || value.includes("\\"))
-    return false;
-  if (/[[\]{}]/.test(value))
-    return false;
-  if (/[\u0000-\u001F]/.test(value))
-    return false;
-  if (value.includes(delimiter))
-    return false;
-  if (value.startsWith("-"))
-    return false;
-  if (value.startsWith("#"))
-    return false;
-  return true;
-}
-function isNumericLike(value) {
-  return NUMERIC_LIKE_PATTERN.test(value);
-}
-function encodePrimitive(value, delimiter) {
-  if (isRawString(value))
-    return value.value;
-  if (value === null)
-    return NULL_LITERAL;
-  if (typeof value === "boolean")
-    return String(value);
-  if (typeof value === "number")
-    return String(value);
-  return encodeStringLiteral(value, delimiter);
-}
-function encodeStringLiteral(value, delimiter = DEFAULT_DELIMITER) {
-  if (isSafeUnquoted(value, delimiter))
-    return value;
-  return `"${escapeString(value)}"`;
-}
-function encodeKey(key) {
-  if (isValidUnquotedKey(key))
-    return key;
-  return `"${escapeString(key)}"`;
-}
-function encodeAndJoinPrimitives(values, delimiter = DEFAULT_DELIMITER) {
-  return values.map((v) => encodePrimitive(v, delimiter)).join(delimiter);
-}
-function formatHeader(length, options) {
-  const key = options?.key;
-  const fields = options?.fields;
-  const delimiter = options?.delimiter ?? ",";
-  let header = "";
-  if (key != null)
-    header += encodeKey(key);
-  header += `[${length}${options?.keyed ? ":" : ""}${delimiter !== DEFAULT_DELIMITER ? delimiter : ""}]`;
-  if (fields)
-    header += `{${formatFieldSegment(fields, delimiter)}}`;
-  header += ":";
-  return header;
-}
-function formatFieldSegment(fields, delimiter) {
-  return fields.map((field) => encodeKey(field.name) + (field.children ? `{${formatFieldSegment(field.children, delimiter)}}` : "")).join(delimiter);
-}
-function extractTabularFields(rows) {
-  if (rows.length === 0)
-    return;
-  const firstKeys = Object.keys(rows[0]);
-  if (firstKeys.length === 0)
-    return;
-  for (const row of rows) {
-    if (Object.keys(row).length !== firstKeys.length)
-      return;
-    for (const key of firstKeys)
-      if (!Object.hasOwn(row, key))
-        return;
-  }
-  const fieldNodes = [];
-  for (const key of firstKeys) {
-    const fieldNode = classifyColumn(key, rows.map((row) => row[key]));
-    if (!fieldNode)
-      return;
-    fieldNodes.push(fieldNode);
-  }
-  return fieldNodes;
-}
-function extractKeyedTabularFields(value) {
-  const entryValues = Object.values(value);
-  if (entryValues.length < 2)
-    return;
-  if (!entryValues.every((entryValue) => isJsonObject(entryValue) && !isEmptyObject(entryValue)))
-    return;
-  return extractTabularFields(entryValues);
-}
-function collectRowLeaves(row, fields) {
-  const leaves = [];
-  collectLeafValues(row, fields, leaves);
-  return leaves;
-}
-function classifyColumn(name, values) {
-  if (values.every((value) => isEncodablePrimitive(value)))
-    return { name };
-  if (!values.every((value) => isJsonObject(value) && !isEmptyObject(value)))
-    return;
-  const children = extractTabularFields(values);
-  if (!children)
-    return;
-  return {
-    name,
-    children
-  };
-}
-function collectLeafValues(row, fields, leaves) {
-  for (const field of fields) {
-    const value = row[field.name];
-    if (field.children)
-      collectLeafValues(value, field.children, leaves);
-    else
-      leaves.push(value);
-  }
-}
-function* encodeJsonValue(value, options, depth) {
-  if (isEncodablePrimitive(value)) {
-    const encodedPrimitive = typeof value === "string" && value.startsWith("\uFEFF") ? `"${escapeString(value)}"` : encodePrimitive(value, options.delimiter);
-    if (encodedPrimitive !== "")
-      yield encodedPrimitive;
-    return;
-  }
-  if (isJsonArray(value))
-    yield* encodeArrayLines(undefined, value, depth, options);
-  else if (isJsonObject(value)) {
-    const keyedFields = extractKeyedTabularFields(value);
-    if (keyedFields) {
-      yield* encodeKeyedObjectLines(undefined, value, keyedFields, depth, options);
-      return;
-    }
-    yield* encodeObjectLines(value, depth, options);
-  }
-}
-function* encodeObjectLines(value, depth, options) {
-  for (const [key, val] of Object.entries(value))
-    yield* encodeKeyValuePairLines(key, val, depth, options);
-}
-function* encodeKeyValuePairLines(key, value, depth, options) {
-  const encodedKey = encodeKey(key);
-  if (isEncodablePrimitive(value))
-    yield indentedLine(depth, `${encodedKey}: ${encodePrimitive(value, options.delimiter)}`, options.indentSize);
-  else if (isJsonArray(value))
-    yield* encodeArrayLines(key, value, depth, options);
-  else if (isJsonObject(value)) {
-    const keyedFields = extractKeyedTabularFields(value);
-    if (keyedFields) {
-      yield* encodeKeyedObjectLines(key, value, keyedFields, depth, options);
-      return;
-    }
-    yield indentedLine(depth, `${encodedKey}:`, options.indentSize);
-    if (!isEmptyObject(value))
-      yield* encodeObjectLines(value, depth + 1, options);
-  }
-}
-function* encodeKeyedObjectLines(key, value, fields, depth, options) {
-  const entries = Object.entries(value);
-  yield indentedLine(depth, formatHeader(entries.length, {
-    key,
-    fields,
-    delimiter: options.delimiter,
-    keyed: true
-  }), options.indentSize);
-  yield* encodeKeyedEntryRowsLines(entries, fields, depth + 1, options);
-}
-function* encodeKeyedEntryRowsLines(entries, fields, depth, options) {
-  for (const [entryKey, entryValue] of entries) {
-    const leaves = collectRowLeaves(entryValue, fields);
-    yield indentedLine(depth, `${encodeKey(entryKey)}: ${encodeAndJoinPrimitives(leaves, options.delimiter)}`, options.indentSize);
-  }
-}
-function* encodeArrayLines(key, value, depth, options) {
-  if (value.length === 0) {
-    yield indentedLine(depth, key != null ? `${encodeKey(key)}: []` : "[]", options.indentSize);
-    return;
-  }
-  if (isArrayOfPrimitives(value)) {
-    yield indentedLine(depth, encodeInlineArrayLine(value, options.delimiter, key), options.indentSize);
-    return;
-  }
-  if (isArrayOfArrays(value)) {
-    if (value.every((arr) => isArrayOfPrimitives(arr))) {
-      yield* encodeArrayOfArraysAsListItemsLines(key, value, depth, options);
-      return;
-    }
-  }
-  if (isArrayOfObjects(value)) {
-    const fields = extractTabularFields(value);
-    if (fields)
-      yield* encodeArrayOfObjectsAsTabularLines(key, value, fields, depth, options);
-    else
-      yield* encodeMixedArrayAsListItemsLines(key, value, depth, options);
-    return;
-  }
-  yield* encodeMixedArrayAsListItemsLines(key, value, depth, options);
-}
-function* encodeArrayOfArraysAsListItemsLines(prefix, values, depth, options) {
-  yield indentedLine(depth, formatHeader(values.length, {
-    key: prefix,
-    delimiter: options.delimiter
-  }), options.indentSize);
-  for (const arr of values)
-    if (isArrayOfPrimitives(arr)) {
-      const arrayLine = encodeInlineArrayLine(arr, options.delimiter);
-      yield indentedListItem(depth + 1, arrayLine, options.indentSize);
-    }
-}
-function encodeInlineArrayLine(values, delimiter, prefix) {
-  const header = formatHeader(values.length, {
-    key: prefix,
-    delimiter
-  });
-  const joinedValue = encodeAndJoinPrimitives(values, delimiter);
-  if (values.length === 0)
-    return header;
-  return `${header} ${joinedValue}`;
-}
-function* encodeArrayOfObjectsAsTabularLines(prefix, rows, fields, depth, options) {
-  yield indentedLine(depth, formatHeader(rows.length, {
-    key: prefix,
-    fields,
-    delimiter: options.delimiter
-  }), options.indentSize);
-  yield* writeTabularRowsLines(rows, fields, depth + 1, options);
-}
-function* writeTabularRowsLines(rows, fields, depth, options) {
-  for (const row of rows)
-    yield indentedLine(depth, encodeAndJoinPrimitives(collectRowLeaves(row, fields), options.delimiter), options.indentSize);
-}
-function* encodeMixedArrayAsListItemsLines(prefix, items, depth, options) {
-  yield indentedLine(depth, formatHeader(items.length, {
-    key: prefix,
-    delimiter: options.delimiter
-  }), options.indentSize);
-  for (const item of items)
-    yield* encodeListItemValueLines(item, depth + 1, options);
-}
-function* encodeObjectAsListItemLines(obj, depth, options) {
-  if (isEmptyObject(obj)) {
-    yield indentedLine(depth, "-", options.indentSize);
-    return;
-  }
-  const entries = Object.entries(obj);
-  const [firstKey, firstValue] = entries[0];
-  const restEntries = entries.slice(1);
-  if (isJsonArray(firstValue) && isArrayOfObjects(firstValue)) {
-    const fields = extractTabularFields(firstValue);
-    if (fields) {
-      yield indentedListItem(depth, formatHeader(firstValue.length, {
-        key: firstKey,
-        fields,
-        delimiter: options.delimiter
-      }), options.indentSize);
-      yield* writeTabularRowsLines(firstValue, fields, depth + 2, options);
-      if (restEntries.length > 0)
-        yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
-      return;
-    }
-  }
-  if (isJsonObject(firstValue)) {
-    const keyedFields = extractKeyedTabularFields(firstValue);
-    if (keyedFields) {
-      const keyedEntries = Object.entries(firstValue);
-      yield indentedListItem(depth, formatHeader(keyedEntries.length, {
-        key: firstKey,
-        fields: keyedFields,
-        delimiter: options.delimiter,
-        keyed: true
-      }), options.indentSize);
-      yield* encodeKeyedEntryRowsLines(keyedEntries, keyedFields, depth + 2, options);
-      if (restEntries.length > 0)
-        yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
-      return;
-    }
-  }
-  const encodedKey = encodeKey(firstKey);
-  if (isEncodablePrimitive(firstValue))
-    yield indentedListItem(depth, `${encodedKey}: ${encodePrimitive(firstValue, options.delimiter)}`, options.indentSize);
-  else if (isJsonArray(firstValue)) {
-    if (firstValue.length === 0)
-      yield indentedListItem(depth, `${encodedKey}: []`, options.indentSize);
-    else if (isArrayOfPrimitives(firstValue))
-      yield indentedListItem(depth, `${encodedKey}${encodeInlineArrayLine(firstValue, options.delimiter)}`, options.indentSize);
-    else {
-      yield indentedListItem(depth, `${encodedKey}${formatHeader(firstValue.length, { delimiter: options.delimiter })}`, options.indentSize);
-      for (const item of firstValue)
-        yield* encodeListItemValueLines(item, depth + 2, options);
-    }
-  } else if (isJsonObject(firstValue)) {
-    yield indentedListItem(depth, `${encodedKey}:`, options.indentSize);
-    if (!isEmptyObject(firstValue))
-      yield* encodeObjectLines(firstValue, depth + 2, options);
-  }
-  if (restEntries.length > 0)
-    yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
-}
-function* encodeListItemValueLines(value, depth, options) {
-  if (isEncodablePrimitive(value))
-    yield indentedListItem(depth, encodePrimitive(value, options.delimiter), options.indentSize);
-  else if (isJsonArray(value)) {
-    if (isArrayOfPrimitives(value))
-      yield indentedListItem(depth, encodeInlineArrayLine(value, options.delimiter), options.indentSize);
-    else {
-      yield indentedListItem(depth, formatHeader(value.length, { delimiter: options.delimiter }), options.indentSize);
-      for (const item of value)
-        yield* encodeListItemValueLines(item, depth + 1, options);
-    }
-  } else if (isJsonObject(value))
-    yield* encodeObjectAsListItemLines(value, depth, options);
-}
-function indentedLine(depth, content, indentSize) {
-  return " ".repeat(indentSize * depth) + content;
-}
-function indentedListItem(depth, content, indentSize) {
-  return indentedLine(depth, "- " + content, indentSize);
-}
-function applyReplacer(root, replacer) {
-  const replacedRoot = replacer("", root, []);
-  if (replacedRoot === undefined)
-    return transformChildren(root, replacer, []);
-  return transformReplaced(root, replacedRoot, replacer, []);
-}
-function transformReplaced(original, replaced, replacer, path) {
-  if (isRawString(replaced) && !isEncodablePrimitive(original))
-    return transformChildren(original, replacer, path);
-  return transformChildren(normalizeValue(replaced), replacer, path);
-}
-function transformChildren(value, replacer, path) {
-  if (isJsonObject(value))
-    return transformObject(value, replacer, path);
-  if (isJsonArray(value))
-    return transformArray(value, replacer, path);
-  return value;
-}
-function transformObject(obj, replacer, path) {
-  const result = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const childPath = [...path, key];
-    const replacedValue = replacer(key, value, childPath);
-    if (replacedValue === undefined)
-      continue;
-    setOwnProperty(result, key, transformReplaced(value, replacedValue, replacer, childPath));
-  }
-  return result;
-}
-function transformArray(arr, replacer, path) {
-  const result = [];
-  for (let i = 0;i < arr.length; i++) {
-    const value = arr[i];
-    const childPath = [...path, i];
-    const replacedValue = replacer(String(i), value, childPath);
-    if (replacedValue === undefined)
-      continue;
-    result.push(transformReplaced(value, replacedValue, replacer, childPath));
-  }
-  return result;
-}
-function encode2(input, options) {
-  return Array.from(encodeLines(input, options)).join(`
-`);
-}
-function encodeLines(input, options) {
-  const normalizedValue = normalizeValue(input);
-  const resolvedOptions = resolveOptions(options);
-  return encodeJsonValue(resolvedOptions.replacer ? applyReplacer(normalizedValue, resolvedOptions.replacer) : normalizedValue, resolvedOptions, 0);
-}
-function resolveOptions(options) {
-  const delimiter = options?.delimiter ?? DEFAULT_DELIMITER;
-  assertValidDelimiter(delimiter);
-  return {
-    indentSize: options?.indentSize ?? options?.indent ?? 2,
-    delimiter,
-    replacer: options?.replacer
-  };
-}
-
-// src/toon.ts
-var toon = (value) => `${encode2(value)}
-`;
-
-// src/hook/session-start.ts
-var CAP = 1e4;
-var RULES_START = "<!-- holyclaude:core-rules:start -->";
-var RULES_END = "<!-- holyclaude:core-rules:end -->";
-var POINTER = "Full state: holyclaude intent show; holyclaude assignment list";
-var RULES_CUT = `
-[core rules cut to fit; full text in agents/holyclaude.md]`;
-var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
-var clip = (text, max) => max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
-var cutRules = (rules, room) => {
-  const cut = rules.slice(0, room);
-  const newline = cut.lastIndexOf(`
-`);
-  return newline > 0 ? cut.slice(0, newline) : cut;
-};
-var row = (assignment) => ({
-  id: assignment.id,
-  role: assignment.role,
-  state: assignment.state,
-  agent_id: assignment.agent_id,
-  rev: assignment.intent_revision,
-  objective: clip(assignment.objective.replace(/\s+/g, " "), 60)
-});
-var open2 = (state) => state.assignments.filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
-var summaryOf = (state) => {
-  const rows = open2(state);
-  return {
-    rows: rows.length,
-    render: (limit, textLimit) => {
-      const intent = state.intents.at(-1);
-      return toon({
-        intent: intent === undefined ? null : {
-          id: intent.id,
-          revision: intent.revision,
-          objective: clip(intent.objective, textLimit),
-          requirements: clip(intent.requirements, textLimit)
-        },
-        assignments: rows.slice(0, limit).map(row),
-        ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
-      }).trimEnd();
-    }
-  };
-};
-var brokenSummary = (message) => ({
-  rows: 0,
-  render: () => toon({ state_error: clip(message, 300) }).trimEnd()
-});
-var block = (text) => `State:
-${text}`;
-var fitSummary = (summary, budget) => {
-  for (const textLimit of [400, 120, 0]) {
-    let rows = summary.rows;
-    for (;; ) {
-      const text = summary.render(rows, textLimit);
-      if (block(text).length <= budget)
-        return block(text);
-      if (rows === 0)
-        break;
-      rows = Math.min(rows - 1, Math.floor(rows * 0.8));
-    }
-  }
-  return "";
-};
-var composeContext = (rules, summary) => {
-  const state = block(summary.render(summary.rows, 400));
-  const full = [rules, state].filter((part) => part !== undefined).join(`
-
-`);
-  if (full.length <= CAP)
-    return full;
-  const tail = `
-
-${POINTER}`;
-  const room = CAP - tail.length - `
-
-${state}`.length - RULES_CUT.length;
-  if (rules !== undefined && room > 0)
-    return `${cutRules(rules, room)}${RULES_CUT}
-
-${state}${tail}`;
-  const marker = rules === undefined ? "" : `${RULES_DROPPED}
-
-`;
-  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
-};
-var extractRules = (agentFile) => {
-  const start = agentFile.indexOf(RULES_START);
-  const end = agentFile.indexOf(RULES_END);
-  if (start === -1 || end === -1 || end < start)
-    return;
-  return agentFile.slice(start + RULES_START.length, end).trim();
-};
-var sessionStart = gen2(function* () {
-  const root = yield* pluginRoot;
-  if (root === undefined)
-    return "";
-  const file = Bun.file(join3(root, "agents", "holyclaude.md"));
-  if (!(yield* tryPromise2(() => file.exists())))
-    return "";
-  const rules = extractRules(yield* tryPromise2(() => file.text()));
-  const summary = yield* loadState(stateFilePath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
-  const additionalContext = composeContext(rules, summary);
-  return JSON.stringify({
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
-  });
-});
 
 // src/observations.ts
 import { appendFile, mkdir as mkdir2 } from "fs/promises";
@@ -8337,9 +7703,6 @@ var appendObservation = (record, path = observationsPath()) => tryPromise2(() =>
 `))));
 var latestObserved = (records, agentId) => records.findLast((record) => record.kind === "observed" && record.agent_id === agentId);
 var latestOverride = (records, assignmentId, agentId) => records.findLast((record) => record.kind === "override" && record.assignment_id === assignmentId && record.agent_id === agentId);
-
-// src/clock.ts
-var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
 
 // src/hook/input.ts
 var MAX_HOOK_BYTES = 1024 * 1024;
@@ -9518,6 +8881,643 @@ var preToolUse = (stdin) => gen2(function* () {
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
   yield* observe(input, agentId).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
   return reason === undefined ? "" : deny(reason);
+});
+
+// src/hook/session-start.ts
+import { join as join3 } from "path";
+
+// ../../node_modules/.bun/@toon-format+toon@4.4.0/node_modules/@toon-format/toon/dist/index.mjs
+var NULL_LITERAL = "null";
+var DELIMITERS = {
+  comma: ",",
+  tab: "\t",
+  pipe: "|"
+};
+var DEFAULT_DELIMITER = DELIMITERS.comma;
+function escapeString(value) {
+  return value.replace(/\\/g, `\\\\`).replace(/"/g, `\\"`).replace(/\n/g, `\\n`).replace(/\r/g, `\\r`).replace(/\t/g, `\\t`).replace(/[\u0000-\u001F]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
+var FETCH_LINE = Symbol("fetch-line");
+function isBooleanOrNullLiteral(token) {
+  return token === "true" || token === "false" || token === "null";
+}
+function setOwnProperty(target, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(target, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true
+    });
+    return;
+  }
+  target[key] = value;
+}
+var COMMENT_LINE_PATTERN = new RegExp(`(?:^\uFEFF?|\\n) *#`);
+var RawString = class {
+  constructor(value) {
+    if (COMMENT_LINE_PATTERN.test(value))
+      throw new TypeError(`Raw string must not contain a line starting with "#": ${JSON.stringify(value)}`);
+    this.value = value;
+  }
+};
+function isRawString(value) {
+  return value instanceof RawString;
+}
+var SURROGATE_PATTERN = /[\uD800-\uDFFF]/;
+function normalizeValue(value) {
+  if (value === null)
+    return null;
+  if (isRawString(value))
+    return value;
+  if (typeof value === "object" && value !== null && "toJSON" in value && typeof value.toJSON === "function") {
+    const next = value.toJSON();
+    if (next !== value)
+      return normalizeValue(next);
+  }
+  if (typeof value === "string") {
+    assertNoLoneSurrogate(value, "string value");
+    return value;
+  }
+  if (typeof value === "boolean")
+    return value;
+  if (typeof value === "number") {
+    if (Object.is(value, -0))
+      return 0;
+    if (!Number.isFinite(value))
+      return null;
+    return value;
+  }
+  if (typeof value === "bigint") {
+    if (value >= Number.MIN_SAFE_INTEGER && value <= Number.MAX_SAFE_INTEGER)
+      return Number(value);
+    return value.toString();
+  }
+  if (value instanceof Date)
+    return value.toISOString();
+  if (Array.isArray(value))
+    return Array.from(value, normalizeValue);
+  if (value instanceof Set)
+    return Array.from(value).map(normalizeValue);
+  if (value instanceof Map)
+    return Object.fromEntries(Array.from(value, ([k, v]) => [String(k), normalizeValue(v)]));
+  if (isPlainObject(value)) {
+    const encodedValues = {};
+    for (const key in value)
+      if (Object.hasOwn(value, key)) {
+        assertNoLoneSurrogate(key, "object key");
+        setOwnProperty(encodedValues, key, normalizeValue(value[key]));
+      }
+    return encodedValues;
+  }
+  return null;
+}
+function assertNoLoneSurrogate(value, context) {
+  if (!SURROGATE_PATTERN.test(value))
+    return;
+  for (let index = 0;index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code < 55296 || code > 57343)
+      continue;
+    const isHighSurrogate = code <= 56319;
+    const next = value.charCodeAt(index + 1);
+    if (isHighSurrogate && next >= 56320 && next <= 57343) {
+      index++;
+      continue;
+    }
+    throw new TypeError(`Cannot encode ${context} containing an unpaired surrogate U+${code.toString(16).toUpperCase()} at index ${index}`);
+  }
+}
+function isJsonPrimitive(value) {
+  return value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+function isEncodablePrimitive(value) {
+  return isJsonPrimitive(value) || isRawString(value);
+}
+function isJsonArray(value) {
+  return Array.isArray(value);
+}
+function isJsonObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && !isRawString(value);
+}
+function isEmptyObject(value) {
+  return Object.keys(value).length === 0;
+}
+function isPlainObject(value) {
+  if (value === null || typeof value !== "object")
+    return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === null || prototype === Object.prototype;
+}
+function isArrayOfPrimitives(value) {
+  return value.length === 0 || value.every((item) => isEncodablePrimitive(item));
+}
+function isArrayOfArrays(value) {
+  return value.length === 0 || value.every((item) => isJsonArray(item));
+}
+function isArrayOfObjects(value) {
+  return value.length === 0 || value.every((item) => isJsonObject(item));
+}
+var NUMERIC_LIKE_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
+function assertValidDelimiter(delimiter) {
+  if (!Object.values(DELIMITERS).includes(delimiter))
+    throw new TypeError(`Invalid delimiter ${JSON.stringify(delimiter)}. Valid delimiters are: comma (,), tab (\\t), pipe (|)`);
+}
+function isValidUnquotedKey(key) {
+  return /^[A-Z_][\w.]*$/i.test(key);
+}
+function isSafeUnquoted(value, delimiter = DEFAULT_DELIMITER) {
+  if (!value)
+    return false;
+  if (/^[ \t]|[ \t]$/.test(value))
+    return false;
+  if (isBooleanOrNullLiteral(value) || isNumericLike(value))
+    return false;
+  if (value.includes(":"))
+    return false;
+  if (value.includes('"') || value.includes("\\"))
+    return false;
+  if (/[[\]{}]/.test(value))
+    return false;
+  if (/[\u0000-\u001F]/.test(value))
+    return false;
+  if (value.includes(delimiter))
+    return false;
+  if (value.startsWith("-"))
+    return false;
+  if (value.startsWith("#"))
+    return false;
+  return true;
+}
+function isNumericLike(value) {
+  return NUMERIC_LIKE_PATTERN.test(value);
+}
+function encodePrimitive(value, delimiter) {
+  if (isRawString(value))
+    return value.value;
+  if (value === null)
+    return NULL_LITERAL;
+  if (typeof value === "boolean")
+    return String(value);
+  if (typeof value === "number")
+    return String(value);
+  return encodeStringLiteral(value, delimiter);
+}
+function encodeStringLiteral(value, delimiter = DEFAULT_DELIMITER) {
+  if (isSafeUnquoted(value, delimiter))
+    return value;
+  return `"${escapeString(value)}"`;
+}
+function encodeKey(key) {
+  if (isValidUnquotedKey(key))
+    return key;
+  return `"${escapeString(key)}"`;
+}
+function encodeAndJoinPrimitives(values, delimiter = DEFAULT_DELIMITER) {
+  return values.map((v) => encodePrimitive(v, delimiter)).join(delimiter);
+}
+function formatHeader(length, options) {
+  const key = options?.key;
+  const fields = options?.fields;
+  const delimiter = options?.delimiter ?? ",";
+  let header = "";
+  if (key != null)
+    header += encodeKey(key);
+  header += `[${length}${options?.keyed ? ":" : ""}${delimiter !== DEFAULT_DELIMITER ? delimiter : ""}]`;
+  if (fields)
+    header += `{${formatFieldSegment(fields, delimiter)}}`;
+  header += ":";
+  return header;
+}
+function formatFieldSegment(fields, delimiter) {
+  return fields.map((field) => encodeKey(field.name) + (field.children ? `{${formatFieldSegment(field.children, delimiter)}}` : "")).join(delimiter);
+}
+function extractTabularFields(rows) {
+  if (rows.length === 0)
+    return;
+  const firstKeys = Object.keys(rows[0]);
+  if (firstKeys.length === 0)
+    return;
+  for (const row of rows) {
+    if (Object.keys(row).length !== firstKeys.length)
+      return;
+    for (const key of firstKeys)
+      if (!Object.hasOwn(row, key))
+        return;
+  }
+  const fieldNodes = [];
+  for (const key of firstKeys) {
+    const fieldNode = classifyColumn(key, rows.map((row) => row[key]));
+    if (!fieldNode)
+      return;
+    fieldNodes.push(fieldNode);
+  }
+  return fieldNodes;
+}
+function extractKeyedTabularFields(value) {
+  const entryValues = Object.values(value);
+  if (entryValues.length < 2)
+    return;
+  if (!entryValues.every((entryValue) => isJsonObject(entryValue) && !isEmptyObject(entryValue)))
+    return;
+  return extractTabularFields(entryValues);
+}
+function collectRowLeaves(row, fields) {
+  const leaves = [];
+  collectLeafValues(row, fields, leaves);
+  return leaves;
+}
+function classifyColumn(name, values) {
+  if (values.every((value) => isEncodablePrimitive(value)))
+    return { name };
+  if (!values.every((value) => isJsonObject(value) && !isEmptyObject(value)))
+    return;
+  const children = extractTabularFields(values);
+  if (!children)
+    return;
+  return {
+    name,
+    children
+  };
+}
+function collectLeafValues(row, fields, leaves) {
+  for (const field of fields) {
+    const value = row[field.name];
+    if (field.children)
+      collectLeafValues(value, field.children, leaves);
+    else
+      leaves.push(value);
+  }
+}
+function* encodeJsonValue(value, options, depth) {
+  if (isEncodablePrimitive(value)) {
+    const encodedPrimitive = typeof value === "string" && value.startsWith("\uFEFF") ? `"${escapeString(value)}"` : encodePrimitive(value, options.delimiter);
+    if (encodedPrimitive !== "")
+      yield encodedPrimitive;
+    return;
+  }
+  if (isJsonArray(value))
+    yield* encodeArrayLines(undefined, value, depth, options);
+  else if (isJsonObject(value)) {
+    const keyedFields = extractKeyedTabularFields(value);
+    if (keyedFields) {
+      yield* encodeKeyedObjectLines(undefined, value, keyedFields, depth, options);
+      return;
+    }
+    yield* encodeObjectLines(value, depth, options);
+  }
+}
+function* encodeObjectLines(value, depth, options) {
+  for (const [key, val] of Object.entries(value))
+    yield* encodeKeyValuePairLines(key, val, depth, options);
+}
+function* encodeKeyValuePairLines(key, value, depth, options) {
+  const encodedKey = encodeKey(key);
+  if (isEncodablePrimitive(value))
+    yield indentedLine(depth, `${encodedKey}: ${encodePrimitive(value, options.delimiter)}`, options.indentSize);
+  else if (isJsonArray(value))
+    yield* encodeArrayLines(key, value, depth, options);
+  else if (isJsonObject(value)) {
+    const keyedFields = extractKeyedTabularFields(value);
+    if (keyedFields) {
+      yield* encodeKeyedObjectLines(key, value, keyedFields, depth, options);
+      return;
+    }
+    yield indentedLine(depth, `${encodedKey}:`, options.indentSize);
+    if (!isEmptyObject(value))
+      yield* encodeObjectLines(value, depth + 1, options);
+  }
+}
+function* encodeKeyedObjectLines(key, value, fields, depth, options) {
+  const entries = Object.entries(value);
+  yield indentedLine(depth, formatHeader(entries.length, {
+    key,
+    fields,
+    delimiter: options.delimiter,
+    keyed: true
+  }), options.indentSize);
+  yield* encodeKeyedEntryRowsLines(entries, fields, depth + 1, options);
+}
+function* encodeKeyedEntryRowsLines(entries, fields, depth, options) {
+  for (const [entryKey, entryValue] of entries) {
+    const leaves = collectRowLeaves(entryValue, fields);
+    yield indentedLine(depth, `${encodeKey(entryKey)}: ${encodeAndJoinPrimitives(leaves, options.delimiter)}`, options.indentSize);
+  }
+}
+function* encodeArrayLines(key, value, depth, options) {
+  if (value.length === 0) {
+    yield indentedLine(depth, key != null ? `${encodeKey(key)}: []` : "[]", options.indentSize);
+    return;
+  }
+  if (isArrayOfPrimitives(value)) {
+    yield indentedLine(depth, encodeInlineArrayLine(value, options.delimiter, key), options.indentSize);
+    return;
+  }
+  if (isArrayOfArrays(value)) {
+    if (value.every((arr) => isArrayOfPrimitives(arr))) {
+      yield* encodeArrayOfArraysAsListItemsLines(key, value, depth, options);
+      return;
+    }
+  }
+  if (isArrayOfObjects(value)) {
+    const fields = extractTabularFields(value);
+    if (fields)
+      yield* encodeArrayOfObjectsAsTabularLines(key, value, fields, depth, options);
+    else
+      yield* encodeMixedArrayAsListItemsLines(key, value, depth, options);
+    return;
+  }
+  yield* encodeMixedArrayAsListItemsLines(key, value, depth, options);
+}
+function* encodeArrayOfArraysAsListItemsLines(prefix, values, depth, options) {
+  yield indentedLine(depth, formatHeader(values.length, {
+    key: prefix,
+    delimiter: options.delimiter
+  }), options.indentSize);
+  for (const arr of values)
+    if (isArrayOfPrimitives(arr)) {
+      const arrayLine = encodeInlineArrayLine(arr, options.delimiter);
+      yield indentedListItem(depth + 1, arrayLine, options.indentSize);
+    }
+}
+function encodeInlineArrayLine(values, delimiter, prefix) {
+  const header = formatHeader(values.length, {
+    key: prefix,
+    delimiter
+  });
+  const joinedValue = encodeAndJoinPrimitives(values, delimiter);
+  if (values.length === 0)
+    return header;
+  return `${header} ${joinedValue}`;
+}
+function* encodeArrayOfObjectsAsTabularLines(prefix, rows, fields, depth, options) {
+  yield indentedLine(depth, formatHeader(rows.length, {
+    key: prefix,
+    fields,
+    delimiter: options.delimiter
+  }), options.indentSize);
+  yield* writeTabularRowsLines(rows, fields, depth + 1, options);
+}
+function* writeTabularRowsLines(rows, fields, depth, options) {
+  for (const row of rows)
+    yield indentedLine(depth, encodeAndJoinPrimitives(collectRowLeaves(row, fields), options.delimiter), options.indentSize);
+}
+function* encodeMixedArrayAsListItemsLines(prefix, items, depth, options) {
+  yield indentedLine(depth, formatHeader(items.length, {
+    key: prefix,
+    delimiter: options.delimiter
+  }), options.indentSize);
+  for (const item of items)
+    yield* encodeListItemValueLines(item, depth + 1, options);
+}
+function* encodeObjectAsListItemLines(obj, depth, options) {
+  if (isEmptyObject(obj)) {
+    yield indentedLine(depth, "-", options.indentSize);
+    return;
+  }
+  const entries = Object.entries(obj);
+  const [firstKey, firstValue] = entries[0];
+  const restEntries = entries.slice(1);
+  if (isJsonArray(firstValue) && isArrayOfObjects(firstValue)) {
+    const fields = extractTabularFields(firstValue);
+    if (fields) {
+      yield indentedListItem(depth, formatHeader(firstValue.length, {
+        key: firstKey,
+        fields,
+        delimiter: options.delimiter
+      }), options.indentSize);
+      yield* writeTabularRowsLines(firstValue, fields, depth + 2, options);
+      if (restEntries.length > 0)
+        yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
+      return;
+    }
+  }
+  if (isJsonObject(firstValue)) {
+    const keyedFields = extractKeyedTabularFields(firstValue);
+    if (keyedFields) {
+      const keyedEntries = Object.entries(firstValue);
+      yield indentedListItem(depth, formatHeader(keyedEntries.length, {
+        key: firstKey,
+        fields: keyedFields,
+        delimiter: options.delimiter,
+        keyed: true
+      }), options.indentSize);
+      yield* encodeKeyedEntryRowsLines(keyedEntries, keyedFields, depth + 2, options);
+      if (restEntries.length > 0)
+        yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
+      return;
+    }
+  }
+  const encodedKey = encodeKey(firstKey);
+  if (isEncodablePrimitive(firstValue))
+    yield indentedListItem(depth, `${encodedKey}: ${encodePrimitive(firstValue, options.delimiter)}`, options.indentSize);
+  else if (isJsonArray(firstValue)) {
+    if (firstValue.length === 0)
+      yield indentedListItem(depth, `${encodedKey}: []`, options.indentSize);
+    else if (isArrayOfPrimitives(firstValue))
+      yield indentedListItem(depth, `${encodedKey}${encodeInlineArrayLine(firstValue, options.delimiter)}`, options.indentSize);
+    else {
+      yield indentedListItem(depth, `${encodedKey}${formatHeader(firstValue.length, { delimiter: options.delimiter })}`, options.indentSize);
+      for (const item of firstValue)
+        yield* encodeListItemValueLines(item, depth + 2, options);
+    }
+  } else if (isJsonObject(firstValue)) {
+    yield indentedListItem(depth, `${encodedKey}:`, options.indentSize);
+    if (!isEmptyObject(firstValue))
+      yield* encodeObjectLines(firstValue, depth + 2, options);
+  }
+  if (restEntries.length > 0)
+    yield* encodeObjectLines(Object.fromEntries(restEntries), depth + 1, options);
+}
+function* encodeListItemValueLines(value, depth, options) {
+  if (isEncodablePrimitive(value))
+    yield indentedListItem(depth, encodePrimitive(value, options.delimiter), options.indentSize);
+  else if (isJsonArray(value)) {
+    if (isArrayOfPrimitives(value))
+      yield indentedListItem(depth, encodeInlineArrayLine(value, options.delimiter), options.indentSize);
+    else {
+      yield indentedListItem(depth, formatHeader(value.length, { delimiter: options.delimiter }), options.indentSize);
+      for (const item of value)
+        yield* encodeListItemValueLines(item, depth + 1, options);
+    }
+  } else if (isJsonObject(value))
+    yield* encodeObjectAsListItemLines(value, depth, options);
+}
+function indentedLine(depth, content, indentSize) {
+  return " ".repeat(indentSize * depth) + content;
+}
+function indentedListItem(depth, content, indentSize) {
+  return indentedLine(depth, "- " + content, indentSize);
+}
+function applyReplacer(root, replacer) {
+  const replacedRoot = replacer("", root, []);
+  if (replacedRoot === undefined)
+    return transformChildren(root, replacer, []);
+  return transformReplaced(root, replacedRoot, replacer, []);
+}
+function transformReplaced(original, replaced, replacer, path) {
+  if (isRawString(replaced) && !isEncodablePrimitive(original))
+    return transformChildren(original, replacer, path);
+  return transformChildren(normalizeValue(replaced), replacer, path);
+}
+function transformChildren(value, replacer, path) {
+  if (isJsonObject(value))
+    return transformObject(value, replacer, path);
+  if (isJsonArray(value))
+    return transformArray(value, replacer, path);
+  return value;
+}
+function transformObject(obj, replacer, path) {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const childPath = [...path, key];
+    const replacedValue = replacer(key, value, childPath);
+    if (replacedValue === undefined)
+      continue;
+    setOwnProperty(result, key, transformReplaced(value, replacedValue, replacer, childPath));
+  }
+  return result;
+}
+function transformArray(arr, replacer, path) {
+  const result = [];
+  for (let i = 0;i < arr.length; i++) {
+    const value = arr[i];
+    const childPath = [...path, i];
+    const replacedValue = replacer(String(i), value, childPath);
+    if (replacedValue === undefined)
+      continue;
+    result.push(transformReplaced(value, replacedValue, replacer, childPath));
+  }
+  return result;
+}
+function encode2(input, options) {
+  return Array.from(encodeLines(input, options)).join(`
+`);
+}
+function encodeLines(input, options) {
+  const normalizedValue = normalizeValue(input);
+  const resolvedOptions = resolveOptions(options);
+  return encodeJsonValue(resolvedOptions.replacer ? applyReplacer(normalizedValue, resolvedOptions.replacer) : normalizedValue, resolvedOptions, 0);
+}
+function resolveOptions(options) {
+  const delimiter = options?.delimiter ?? DEFAULT_DELIMITER;
+  assertValidDelimiter(delimiter);
+  return {
+    indentSize: options?.indentSize ?? options?.indent ?? 2,
+    delimiter,
+    replacer: options?.replacer
+  };
+}
+
+// src/toon.ts
+var toon = (value) => `${encode2(value)}
+`;
+
+// src/hook/session-start.ts
+var CAP = 1e4;
+var RULES_START = "<!-- holyclaude:core-rules:start -->";
+var RULES_END = "<!-- holyclaude:core-rules:end -->";
+var POINTER = "Full state: holyclaude intent show; holyclaude assignment list";
+var RULES_CUT = `
+[core rules cut to fit; full text in agents/holyclaude.md]`;
+var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
+var clip = (text, max) => max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
+var cutRules = (rules, room) => {
+  const cut = rules.slice(0, room);
+  const newline = cut.lastIndexOf(`
+`);
+  return newline > 0 ? cut.slice(0, newline) : cut;
+};
+var row = (assignment) => ({
+  id: assignment.id,
+  role: assignment.role,
+  state: assignment.state,
+  agent_id: assignment.agent_id,
+  rev: assignment.intent_revision,
+  objective: clip(assignment.objective.replace(/\s+/g, " "), 60)
+});
+var open2 = (state) => state.assignments.filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
+var summaryOf = (state) => {
+  const rows = open2(state);
+  return {
+    rows: rows.length,
+    render: (limit, textLimit) => {
+      const intent = state.intents.at(-1);
+      return toon({
+        intent: intent === undefined ? null : {
+          id: intent.id,
+          revision: intent.revision,
+          objective: clip(intent.objective, textLimit),
+          requirements: clip(intent.requirements, textLimit)
+        },
+        assignments: rows.slice(0, limit).map(row),
+        ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
+      }).trimEnd();
+    }
+  };
+};
+var brokenSummary = (message) => ({
+  rows: 0,
+  render: () => toon({ state_error: clip(message, 300) }).trimEnd()
+});
+var block = (text) => `State:
+${text}`;
+var fitSummary = (summary, budget) => {
+  for (const textLimit of [400, 120, 0]) {
+    let rows = summary.rows;
+    for (;; ) {
+      const text = summary.render(rows, textLimit);
+      if (block(text).length <= budget)
+        return block(text);
+      if (rows === 0)
+        break;
+      rows = Math.min(rows - 1, Math.floor(rows * 0.8));
+    }
+  }
+  return "";
+};
+var composeContext = (rules, summary) => {
+  const state = block(summary.render(summary.rows, 400));
+  const full = [rules, state].filter((part) => part !== undefined).join(`
+
+`);
+  if (full.length <= CAP)
+    return full;
+  const tail = `
+
+${POINTER}`;
+  const room = CAP - tail.length - `
+
+${state}`.length - RULES_CUT.length;
+  if (rules !== undefined && room > 0)
+    return `${cutRules(rules, room)}${RULES_CUT}
+
+${state}${tail}`;
+  const marker = rules === undefined ? "" : `${RULES_DROPPED}
+
+`;
+  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
+};
+var extractRules = (agentFile) => {
+  const start = agentFile.indexOf(RULES_START);
+  const end = agentFile.indexOf(RULES_END);
+  if (start === -1 || end === -1 || end < start)
+    return;
+  return agentFile.slice(start + RULES_START.length, end).trim();
+};
+var sessionStart = gen2(function* () {
+  const root = yield* pluginRoot;
+  if (root === undefined)
+    return "";
+  const file = Bun.file(join3(root, "agents", "holyclaude.md"));
+  if (!(yield* tryPromise2(() => file.exists())))
+    return "";
+  const rules = extractRules(yield* tryPromise2(() => file.text()));
+  const summary = yield* loadState(stateFilePath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
+  const additionalContext = composeContext(rules, summary);
+  return JSON.stringify({
+    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
+  });
 });
 
 // src/state.ts
