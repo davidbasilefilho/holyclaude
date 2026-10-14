@@ -55,7 +55,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 3. Select
 
-`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same specialist whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id. Take a reuse only for a Sonnet specialist's follow-up: a repair, a re-review and every Haiku specialist get a new worker even when `select` offers one, so answer `spawn` there.
+`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same Sonnet specialist (a Haiku specialist always spawns) whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id. Take a reuse only for a follow-up: a repair and a re-review get a new worker even when `select` offers one, so spawn there.
 
 ## 4. Reserve
 

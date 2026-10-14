@@ -7921,6 +7921,8 @@ var smallestId = (workers) => workers.toSorted((a, b) => a.agent_id < b.agent_id
 var reuseProblem = (state, worker, next, fingerprint) => {
   if (worker.preset !== next.role)
     return `${worker.agent_id} is a ${worker.preset}, not a ${next.role}`;
+  if (routeFor(next.role).model === "haiku")
+    return `${next.role} runs on Haiku, so every Assignment gets a new worker`;
   if (worker.fingerprint !== fingerprint)
     return `${worker.agent_id} was launched with a different roster or tools`;
   if (!isIdle(state, worker))
