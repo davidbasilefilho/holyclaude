@@ -1,10 +1,11 @@
 import { Effect, Schema } from "effect"
-import { anyOverlap } from "../paths.ts"
+
 import { isTerminal, type Assignment } from "../model/assignment.ts"
 import { Id, Text } from "../model/primitives.ts"
 import { routeFor } from "../model/routes.ts"
 import { findAssignment, invalidTransition, type State } from "../model/state.ts"
 import type { Worker } from "../model/worker.ts"
+import { anyOverlap } from "../paths.ts"
 
 /** Input of selectWorker. The fingerprint describes the current roster and tools. */
 export const SelectWorkerInput = Schema.Struct({ assignment_id: Id, fingerprint: Text })

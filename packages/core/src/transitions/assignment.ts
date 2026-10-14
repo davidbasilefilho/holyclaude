@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
+
 import { InvalidRecord } from "../errors.ts"
-import { normalizePaths } from "../paths.ts"
 import { AssignmentDraft, isTerminal, type Assignment } from "../model/assignment.ts"
 import { Id } from "../model/primitives.ts"
 import {
@@ -11,6 +11,7 @@ import {
   type Change,
   type State,
 } from "../model/state.ts"
+import { normalizePaths } from "../paths.ts"
 
 /** Input of followUp: a draft linked to the terminal Assignment it continues. */
 export const FollowUpInput = Schema.Struct({ predecessor_id: Id, assignment: AssignmentDraft })

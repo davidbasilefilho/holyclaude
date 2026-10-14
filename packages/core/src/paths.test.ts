@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { resolve } from "node:path"
+
 import { Effect } from "effect"
+
 import { isInsideRoots, normalizePath, normalizePaths, pathsOverlap } from "./paths.ts"
 
 const reason = (raw: string) =>

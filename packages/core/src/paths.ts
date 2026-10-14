@@ -1,5 +1,7 @@
 import { isAbsolute, relative, resolve, sep } from "node:path"
+
 import { Effect } from "effect"
+
 import { InvalidPath } from "./errors.ts"
 
 const FORBIDDEN_CHARACTERS = /[:*?"<>|]/
