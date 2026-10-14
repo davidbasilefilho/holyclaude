@@ -453,14 +453,36 @@ describe("a judgement has a bound on its work", () => {
   }
 
   test("a command that needs more work than the bound is denied as unreadable", () => {
-    const reason = denyReason(`Start-Process x ${fill("a ").repeat(3)}`)
+    const reason = denyReason("cmd /c start t ".repeat(6) + fill("a ").slice(128))
     expect(reason).toContain("too large to read")
   })
 
   test("a large command that needs little work is still judged", () => {
-    expect(denyReason(`git status ${fill("a ")}`)).toBeUndefined()
-    expect(denyReason(`git status ${fill("a ")}; git push`)).toBeDefined()
-    expect(denyReason(`cmd /c git status ${fill("a ")}`)).toBeUndefined()
+    const large = fill("a ").slice(64)
+    expect(denyReason(`git status ${large}`)).toBeUndefined()
+    expect(denyReason(`git status ${large}; git push`)).toBeDefined()
+    expect(denyReason(`cmd /c git status ${large}`)).toBeUndefined()
+  })
+})
+
+describe("every text a launcher has read is held to the size limit of a command", () => {
+  const MIB = 1024 * 1024
+
+  test("a command over the limit is denied unread, a read as well as a write", () => {
+    for (const command of [`git status ${"a".repeat(MIB)}`, `git push ${"a".repeat(MIB)}`])
+      expect(denyReason(command)).toContain(`and the guard reads at most ${MIB}`)
+  })
+
+  test("a script block written back longer than the limit is denied unread", () => {
+    const command = `Invoke-Command { echo "${"'".repeat(MIB - 40)}" }`
+    expect(Buffer.byteLength(command)).toBeLessThanOrEqual(MIB)
+    expect(denyReason(command)).toContain(`and the guard reads at most ${MIB}`)
+  })
+
+  test("a script block written back within the limit is judged", () => {
+    const quotes = "'".repeat(1000)
+    expect(denyReason(`Invoke-Command { echo "${quotes}" }`)).toBeUndefined()
+    expect(denyReason(`Invoke-Command { echo "${quotes}"; git push }`)).toContain("git push")
   })
 })
 
@@ -638,7 +660,7 @@ describe("start /?", () => {
 
 describe("the work budget belongs to one judgement", () => {
   const MIB = 1024 * 1024
-  const heavy = `Start-Process x ${"a ".repeat(MIB / 2).repeat(3)}`
+  const heavy = "cmd /c start t ".repeat(6) + "a ".repeat(MIB / 2 - 64)
 
   test("a command over the bound is denied, and the next command starts afresh", () => {
     expect(denyReason(heavy)).toContain("too large to read")

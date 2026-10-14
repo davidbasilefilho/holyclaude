@@ -44,6 +44,17 @@ const REASONS = {
 }
 const TOO_LARGE = REASONS.unsure(TOO_LARGE_WHY)
 
+/**
+ * The reason to deny when the text a rule must scan is over {@link MAX_JUDGED_BYTES}, or undefined
+ * when it fits. A text of a third of the limit in UTF-16 units or less fits whatever it holds, so
+ * only a longer one is measured.
+ */
+const oversize = (what: string, text: string): Verdict => {
+  if (text.length * 3 <= MAX_JUDGED_BYTES) return undefined
+  const bytes = Buffer.byteLength(text)
+  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined
+}
+
 const GIT_READS = new Set([
   "status",
   "diff",
@@ -866,8 +877,15 @@ const classifySimple = (simple: Simple, depth: number, budget: Budget): Verdict 
   return written ?? classifyWords(simple.words, depth, budget)
 }
 
+/**
+ * Judges every command of a script. Every text scanned, at any depth, is held to
+ * {@link MAX_JUDGED_BYTES}: the script of a nested shell, a line rebuilt from a launcher's
+ * arguments or a script block written back can be longer than the command it came from.
+ */
 const classifyScript = (source: string, depth: number, budget: Budget): Verdict => {
   if (depth > MAX_DEPTH) return REASONS.unsure("commands nested too deeply")
+  const large = oversize("command", source)
+  if (large !== undefined) return large
   if (overBudget(budget, source.length >> 1)) return TOO_LARGE
   const scan = scanScript(source)
   if (!scan.ok) return REASONS.unsure(scan.reason)
@@ -882,6 +900,7 @@ const classifyScript = (source: string, depth: number, budget: Budget): Verdict 
 const judge: Judge = {
   maxDepth: MAX_DEPTH,
   unsure: REASONS.unsure,
+  oversize: (text) => oversize("command", text),
   words: classifyWords,
   script: classifyScript,
   simple: classifySimple,
@@ -890,7 +909,8 @@ const judge: Judge = {
 
 /**
  * Judges a shell command a subagent wants to run. Returns the reason to deny it, framed as the good
- * direction to take, or undefined when every simple command in it may run. When unsure it denies.
+ * direction to take, or undefined when every simple command in it may run. When unsure it denies,
+ * and a command over {@link MAX_JUDGED_BYTES}, or a text read out of it that is, is denied unread.
  */
 export const denyReason = (command: string): string | undefined =>
   classifyScript(command, 0, newBudget())
@@ -900,12 +920,6 @@ export const UNREADABLE = REASONS.unsure("it is nested too deeply to read")
 
 const SHELL_TOOLS = new Set(["Bash", "PowerShell", "Monitor"])
 const FILE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"])
-
-/** The reason to deny when the text a rule must scan is over the limit, or undefined when it fits. */
-const oversize = (what: string, text: string): Verdict => {
-  const bytes = Buffer.byteLength(text)
-  return bytes > MAX_JUDGED_BYTES ? REASONS.oversized(what, bytes) : undefined
-}
 
 /**
  * Judges one tool call of a subagent. Tools that carry a shell command (Bash, PowerShell, Monitor)

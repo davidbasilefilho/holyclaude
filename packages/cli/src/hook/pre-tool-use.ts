@@ -72,14 +72,15 @@ const observe = (input: HookInput, agentId: string) =>
  * effort observation within a short bound, never letting a failure block the call, and denies shell
  * commands (Bash, PowerShell, Monitor) that write VCS state or holyclaude state, and file writes
  * into the `.holyclaude` and `.git` directories. A subagent call that cannot be judged is denied: a
- * command or file path over `MAX_JUDGED_BYTES`, a file tool that names no path, a call that names
- * no tool, or one the policy cannot read. Only the command and the paths are judged, so padding
- * elsewhere in the payload neither hides a call nor changes its verdict, as long as the payload
- * stays within the limit. The guard fails open only when the hook cannot run (stdin cannot be read,
- * it crashes or passes the hook timeout). A subagent's call is not expected to cause that: the
- * payload and the judged fields are capped and the scan's nesting and work are bounded, so the
- * slowest input found takes seconds against the 30 second timeout. Returns the hook JSON, or "" to
- * allow.
+ * command or file path over `MAX_JUDGED_BYTES`, or a text read out of a command that is (a nested
+ * shell's script, a launcher's argument line, a script block written back), a file tool that names
+ * no path, a call that names no tool, or one the policy cannot read. Only the command and the paths
+ * are judged, so padding elsewhere in the payload neither hides a call nor changes its verdict, as
+ * long as the payload stays within the limit. The guard fails open only when the hook cannot run
+ * (stdin cannot be read, it crashes or passes the hook timeout). A subagent's call is not expected
+ * to cause that: the payload and the judged fields are capped and the scan's nesting and work are
+ * bounded, so the slowest input found takes seconds against the 30 second timeout. Returns the hook
+ * JSON, or "" to allow.
  */
 export const preToolUse = (stdin: string) =>
   Effect.gen(function* () {

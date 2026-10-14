@@ -35,6 +35,8 @@ export interface Judge {
   readonly maxDepth: number
   /** The reason given for a command that cannot be verified. */
   readonly unsure: (why: string) => string
+  /** The reason to deny a text over the size the policy scans, or undefined when it fits. */
+  readonly oversize: (text: string) => Verdict
   /** Judges the words of one command. */
   readonly words: (words: ReadonlyArray<Word>, depth: number, budget: Budget) => Verdict
   /** Judges the text of a script, every command in it. */
@@ -297,6 +299,8 @@ const classifyStartProcess = (
   }
   if (file === undefined) return undefined
   const text = argumentText(elements)
+  const large = judge.oversize(text)
+  if (large !== undefined) return large
   if (overBudget(budget, text.length >> 1)) return judge.unsure(TOO_LARGE_WHY)
   const [first = NO_ARGUMENTS, ...others] = argumentCommands(text)
   const launched: Simple = {
