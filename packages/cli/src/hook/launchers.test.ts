@@ -442,6 +442,10 @@ describe("a judgement has a bound on its work", () => {
     ["wt nested six deep, with a quoted word", nested("wt nt ")],
     ["a title at every start", "cmd /c start t ".repeat(6) + fill("a ")],
     ["unknown parameters before the program", "Start-Process " + fill("-x y ", "git status")],
+    [
+      "a hashtable value of many }",
+      fill("a} ", "").replace(/^/, "Start-Process notepad -WorkingDirectory @{").slice(0, MIB),
+    ],
   ]
   for (const [name, command] of SHAPES) {
     test(`${name}, at 1 MiB, is decided in under three seconds`, () => {

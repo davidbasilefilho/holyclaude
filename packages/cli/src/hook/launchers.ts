@@ -202,22 +202,21 @@ const afterHashtable = (
   budget: Budget,
 ): Verdict => {
   const before = words.slice(0, flagAt)
-  const readings: ReadonlyArray<Word>[] = []
-  for (let end = valueAt; end < words.length; end += 1)
-    if (words[end]?.text.includes("}") === true) readings.push(words.slice(end + 1))
-  // With no `}` at all, a `;` of the hashtable ended the command.
-  if (readings.length === 0) readings.push([])
-  for (const after of readings) {
+  // Each reading is built only when it is judged: built up front, a value of many `}` would hold a
+  // copy of the rest of the command for each of them before the budget could stop the work.
+  const judgeAfter = (after: ReadonlyArray<Word>) =>
     // A `;` in the hashtable ends the command, and the rest is in the next one: when nothing follows
     // the `}` the command may go on, so it is cut short.
-    const verdict = judge.words(
-      [...before, ...(after.length === 0 ? [CUT_OPEN] : after)],
-      depth + 1,
-      budget,
-    )
+    judge.words([...before, ...(after.length === 0 ? [CUT_OPEN] : after)], depth + 1, budget)
+  let closed = false
+  for (let end = valueAt; end < words.length; end += 1) {
+    if (words[end]?.text.includes("}") !== true) continue
+    closed = true
+    const verdict = judgeAfter(words.slice(end + 1))
     if (verdict !== undefined) return verdict
   }
-  return undefined
+  // With no `}` at all, a `;` of the hashtable ended the command.
+  return closed ? undefined : judgeAfter([])
 }
 
 /**
