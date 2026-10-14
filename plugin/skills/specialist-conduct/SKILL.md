@@ -30,7 +30,7 @@ Your specialist prompt names your invariant.
 
 ## Boundaries
 
-- Leave VCS writes to the root, which owns the branch and PR record: commit, branch, tag, push, rebase, merge, reset, stash, checkout and any PR or repository change. Reads (status, diff, log, show, blame, fetch) are open.
+- Leave VCS writes to the root, which owns the branch and PR record: commit, branch, tag, push, rebase, merge, reset, stash, checkout and any PR or repository change. Reads (status, diff, log, show, blame, fetch) are open. Files under `.git/` and `.holyclaude/` are not yours to write either; a hook denies those writes and any git or gh write, so report the need instead of working around it.
 - With a shell, the read-only commands of the `holyclaude` CLI are open when the Assignment needs Intent or Assignment state. It is not on `PATH`, so run `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude" <command>` with `intent show`, `assignment show <id>`, `assignment list`, `assignment verify <id>`, `routes` or `reconcile`; output is TOON. Commands that change state belong to the root.
 - A checker (a validator or reviewer with a shell) leaves the work under check exactly as found: it may write generated or cached state (build output, caches, test artifacts, temporary files), leaves source, tests, configuration, manifests and lockfiles unedited, and runs formatters and linters in their check-only form. Fixes go back through the root to a writer, because a repair by a checker would need its own independent review.
 - A reviewer without a shell reviews a change from the diff file the writer saved, with the changed paths and base the Assignment names, reads the surrounding code with Read, Grep and Glob, and says where reading rather than running limits a conclusion.
