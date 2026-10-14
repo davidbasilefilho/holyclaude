@@ -11115,7 +11115,7 @@ var select = cmd({
 var routes2 = cmd({
   path: ["routes"],
   usage: "routes",
-  summary: "list the 18 presets with their pinned model and effort",
+  summary: "list the 18 specialists with their pinned model and effort",
   root: false,
   flags: {},
   positionals: 0,

@@ -11,7 +11,7 @@ Read-only commands are open to every agent: `holyclaude intent show`, `holyclaud
 
 ## 1. Intent
 
-- `holyclaude routes` lists the 18 presets with mutability, capabilities, independence rule, model and effort.
+- `holyclaude routes` lists the 18 specialists with mutability, capabilities, independence rule, model and effort.
 - `holyclaude intent show` prints the active Intent and its revision. Read it before the first dispatch and before follow-up work.
 - `holyclaude intent create` takes `{"objective": "...", "requirements": "..."}` on stdin and starts at revision 1. `requirements` is optional text.
 - `holyclaude intent update` takes any of `{"id", "objective", "requirements"}`. Add `--material` when the change alters requirements, user-visible behavior, architecture, trust boundaries, security, persistent contracts, dependencies, toolchain, deployment or ownership, or invalidates accepted work; `--material` bumps the revision. A routine clarification leaves the revision where it is, so omit the flag.
@@ -43,7 +43,7 @@ Read-only commands are open to every agent: `holyclaude intent show`, `holyclaud
 JSON
 ```
 
-The reply prints the new `id` in state Ready with the `subagent_type`, `model`, `effort` and `rev`. `metadata` and each of its lists are optional. Mutability is `ReadOnly` or `ScopedWrite`, and it stays within the preset's own (a reviewer is dispatched as ReadOnly). The CLI checks that:
+The reply prints the new `id` in state Ready with the `subagent_type`, `model`, `effort` and `rev`. `metadata` and each of its lists are optional. Mutability is `ReadOnly` or `ScopedWrite`, and it stays within the specialist's own (a reviewer is dispatched as ReadOnly). The CLI checks that:
 
 - acceptance criteria and required-evidence labels are non-empty with no blank label. `intent_revision` records the revision your plan rests on, and reserve checks it against the live one;
 - a ScopedWrite Assignment names at least one ownership path. Paths are relative and portable: each segment is non-empty, and the path avoids absolute forms, `..`, `.`, a trailing dot or space, control characters and any of `:*?"<>|`. `\` becomes `/` and comparison ignores case. Two paths overlap when equal or when one is a directory prefix of the other. Worker.operations names its specific paths, and a dependency install owns the root package.json, the lockfile and node_modules;
@@ -55,11 +55,11 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 3. Select
 
-`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same preset whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id.
+`holyclaude select <id> [--fingerprint <text>]` prints `action: spawn` or `action: reuse` (with `agent_id` and `reason`), plus `subagent_type`, `model` and `effort`. `--fingerprint` overrides the roster fingerprint that reuse compares, and it defaults to the live roster, so omit it. Reuse candidates are idle workers of the same specialist whose last Assignment is terminal, with an unchanged roster fingerprint and, for review work, a history independent of the work under review. It prefers retained context (a related Assignment, overlapping paths, shared symbols or domains), then the smallest id.
 
 ## 4. Reserve
 
-`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the preset's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`.
+`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the specialist's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`.
 
 ## 5. Spawn or resume
 

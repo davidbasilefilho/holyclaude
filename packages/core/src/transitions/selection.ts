@@ -52,8 +52,8 @@ const smallestId = (workers: ReadonlyArray<Worker>): Worker | undefined =>
 
 /**
  * Why a registered worker may not take the Assignment, or undefined when it may: it must be the
- * same preset with an unchanged fingerprint and idle, and for review work its whole history must be
- * independent from the work under review. Selection and binding share this rule.
+ * same specialist with an unchanged fingerprint and idle, and for review work its whole history
+ * must be independent from the work under review. Selection and binding share this rule.
  */
 export const reuseProblem = (
   state: State,

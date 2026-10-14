@@ -67,8 +67,8 @@ claude --plugin-dir <path-to-clone>/plugin
 ```
 
 The plugin's `settings.json` sets `agent` to `holyclaude`, so the session starts with the root
-agent. Check `/agents` for the `holyclaude:` presets, and run `<path-to-clone>/plugin/scripts/holyclaude routes` in a
-shell to see each preset's model and effort.
+agent. Check `/agents` for the `holyclaude:` specialists, and run
+`<path-to-clone>/plugin/scripts/holyclaude routes` in a shell to see each specialist's model and effort.
 
 To install it through the marketplace route, add the marketplace and then install the plugin. In a
 session:
@@ -89,7 +89,7 @@ T3 Code drives Claude through the Agent SDK and loads the user, project and loca
 include `enabledPlugins` and `agent`. It does not pass a plugin directory, so `--plugin-dir` does
 not apply there. Install through the marketplace route above, from a plain `claude` session on the
 same machine, so the plugin is enabled in the settings T3 reads. Then start a thread in T3 Code and
-confirm that the thread runs the `holyclaude` root and that `holyclaude:` presets can be dispatched.
+confirm that the thread runs the `holyclaude` root and that `holyclaude:` specialists can be dispatched.
 
 T3 Code's `$` skills picker lists only skills in the Claude config directory and the project's
 `.claude/skills`, so the plugin's skills do not appear there. The root and the workers still load
@@ -105,7 +105,7 @@ fallback must not rely on the plugin's own SessionStart hook:
 
 - the holyclaude root agent file in `~/.claude/agents/` or `.claude/agents/`;
 - the user-level `settings.json` setting `agent` to it;
-- the presets and skills in `.claude/agents` and `.claude/skills`;
+- the specialists and skills in `.claude/agents` and `.claude/skills`;
 - the CLI on `PATH` through `bun link` in `packages/cli`, with
   `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"` in the copied agents and skills replaced by
   `holyclaude`, because Claude Code substitutes that variable only in a plugin's own files;
@@ -124,14 +124,14 @@ settings of sessions that use other agents.
 
 | Setting                                                                                                                    | Why                                                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }`                                                                              | Turns off fork mode. A fork inherits the root's Opus model, which would bypass the pinned Haiku and Sonnet presets.                                                                                      |
-| `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`                    | Forks inherit the Opus model, and the built-in agent types ignore the pinned presets, so denying them keeps every dispatch on a holyclaude preset.                                                       |
+| `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }`                                                                              | Turns off fork mode. A fork inherits the root's Opus model, which would bypass the pinned Haiku and Sonnet specialists.                                                                                  |
+| `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`                    | Forks inherit the Opus model, and the built-in agent types ignore the pinned specialists, so denying them keeps every dispatch on a holyclaude specialist.                                               |
 | `"subagentPromptCacheTtl": "1h"`                                                                                           | Keeps resumed workers cached past the five-minute default, at a higher cache-write cost.                                                                                                                 |
 | `"promptCacheTtl": "1h"`                                                                                                   | Keeps the root cached on API-key setups, where the default is five minutes. It carries the same higher write cost.                                                                                       |
 | `"autoCompactWindow": 450000` or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`                                                  | Compacts the root and every subagent at 450,000 tokens. See below.                                                                                                                                       |
 | `"permissions": { "allow": ["Bash(gh pr checks *)", "Bash(gh pr view *)", "Bash(gh run list *)", "Bash(gh run view *)"] }` | The root watches CI through Monitor with read-only `gh` commands, and Monitor commands pass through Bash permission rules. Allow the read commands you want it to run without a prompt.                  |
 | `"deniedModels": ["fable"]` in managed settings                                                                            | Blocks Fable-class models so no session or per-call override reaches them. The key is managed-scope only and needs Claude Code 2.1.283 or later. Adjust the entry to the model family you want to block. |
-| `CLAUDE_CODE_EFFORT_LEVEL` left unset                                                                                      | The variable overrides every preset's pinned effort, so leaving it unset lets each preset run at its own level.                                                                                          |
+| `CLAUDE_CODE_EFFORT_LEVEL` left unset                                                                                      | The variable overrides every specialist's pinned effort, so leaving it unset lets each specialist run at its own level.                                                                                  |
 | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" }` (optional)                                                              | A fallback default for definitions that lack a model. Leave `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset: it forces one model on every subagent and would block Sonnet.                                      |
 | T3 Code Queue mode (Settings, General, Follow-up behavior)                                                                 | Messages sent mid-run wait for the turn to finish. Steer interrupts in-flight tools.                                                                                                                     |
 
@@ -242,7 +242,7 @@ error line and exits 127.
 ## Skills
 
 The plugin ships five skills. `assignments`, `continue-work`, `grill-me` and `handoff` serve the root.
-`frontend-design` is preloaded by the visual presets. `/code-review` is Claude Code's built-in skill,
+`frontend-design` is preloaded by the visual specialists. `/code-review` is Claude Code's built-in skill,
 which review Assignments call; it is neither vendored nor wrapped.
 
 ## Limits
