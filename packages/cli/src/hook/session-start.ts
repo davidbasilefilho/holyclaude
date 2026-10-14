@@ -1,6 +1,13 @@
 import { join } from "node:path"
 
-import { loadState, stateFilePath, type Assignment, type State } from "@holyclaude/core"
+import {
+  latestIntent,
+  loadState,
+  sortedById,
+  stateDirPath,
+  type Assignment,
+  type State,
+} from "@holyclaude/core"
 import { Effect } from "effect"
 
 import { pluginRoot } from "../fingerprint.ts"
@@ -37,7 +44,7 @@ const row = (assignment: Assignment) => ({
 
 /** Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
 const open = (state: State) =>
-  state.assignments.filter(
+  sortedById(state.assignments).filter(
     (assignment) =>
       assignment.state === "Running" ||
       (assignment.state === "Succeeded" && assignment.acceptance === null),
@@ -54,7 +61,7 @@ const summaryOf = (state: State): Summary => {
   return {
     rows: rows.length,
     render: (limit, textLimit) => {
-      const intent = state.intents.at(-1)
+      const intent = latestIntent(state)
       return toon({
         intent:
           intent === undefined
@@ -141,7 +148,7 @@ export const sessionStart = Effect.gen(function* () {
   const file = Bun.file(join(root, "agents", "holyclaude.md"))
   if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
   const rules = extractRules(yield* Effect.tryPromise(() => file.text()), root)
-  const summary = yield* loadState(stateFilePath()).pipe(
+  const summary = yield* loadState(stateDirPath()).pipe(
     Effect.map(summaryOf),
     Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
   )

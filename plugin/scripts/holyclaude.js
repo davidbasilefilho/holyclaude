@@ -1152,6 +1152,15 @@ var TaggedError = (tag) => {
   Base.prototype.name = tag;
   return Base;
 };
+var NoSuchElementErrorTypeId = "~effect/Cause/NoSuchElementError";
+class NoSuchElementError extends (/* @__PURE__ */ TaggedError("NoSuchElementError")) {
+  [NoSuchElementErrorTypeId] = NoSuchElementErrorTypeId;
+  constructor(message) {
+    super({
+      message
+    });
+  }
+}
 var DoneTypeId = "~effect/Cause/Done";
 var isDone = (u) => hasProperty(u, DoneTypeId);
 var DoneVoid = {
@@ -2927,6 +2936,7 @@ var provideService = function() {
   return dual(3, (self, service, impl) => provideServiceImpl(self, service, impl)).apply(this, arguments);
 };
 var provideServiceImpl = (self, service, implementation) => updateContext(self, add(service, implementation));
+var filterOrFail = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate, orFailWith) => filterOrElse(self, predicate, orFailWith ? (a) => fail3(orFailWith(a)) : () => fail3(new NoSuchElementError)));
 var catchCause = /* @__PURE__ */ dual(2, (self, f) => new OnFailureImpl(self, f.length !== 1 ? (cause) => f(cause) : f));
 var OnFailureProto = /* @__PURE__ */ makePrimitiveProto({
   op: "OnFailure",
@@ -3339,6 +3349,7 @@ var forEachConcurrent = /* @__PURE__ */ iterateConcurrentImpl({
     }
   }
 });
+var filterOrElse = /* @__PURE__ */ dual(3, (self, predicate, orElse) => flatMap(self, (a) => predicate(a) ? succeed3(a) : orElse(a)));
 var forkUnsafe = (parent, effect, immediate = false, daemon = false, uninterruptible = false) => {
   const parentRuntime = parent;
   const interruptible = uninterruptible === "inherit" ? parentRuntime.interruptible : !uninterruptible;
@@ -3690,6 +3701,18 @@ var isSuccess3 = exitIsSuccess;
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Clock.js
 var currentTimeMillis2 = currentTimeMillis;
 
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/internal/random.js
+var Random = /* @__PURE__ */ Reference("effect/Random", {
+  defaultValue: () => ({
+    nextIntUnsafe() {
+      return Math.floor(Math.random() * (Number.MAX_SAFE_INTEGER - Number.MIN_SAFE_INTEGER + 1)) + Number.MIN_SAFE_INTEGER;
+    },
+    nextDoubleUnsafe() {
+      return Math.random();
+    }
+  })
+});
+
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Pull.js
 var catchDone = /* @__PURE__ */ dual(2, (effect, f) => catchCauseFilter(effect, filterDoneLeftover, (l) => f(l)));
 var isDoneFailure = (failure) => failure._tag === "Fail" && isDone2(failure.error);
@@ -3872,6 +3895,7 @@ var fail5 = fail3;
 var failCauseSync2 = failCauseSync;
 var die3 = die;
 var try_2 = try_;
+var withFiber2 = withFiber;
 var fromResult2 = fromResult;
 var flatMap2 = flatMap;
 var andThen2 = andThen;
@@ -3879,6 +3903,7 @@ var option2 = option;
 var exit2 = exit;
 var map4 = map2;
 var as2 = as;
+var asVoid2 = asVoid;
 var catch_2 = catch_;
 var catchTag2 = catchTag;
 var catchCause2 = catchCause;
@@ -3889,6 +3914,7 @@ var retry2 = retry;
 var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeout2 = timeout;
+var filterOrFail2 = filterOrFail;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var runPromise2 = runPromise;
@@ -3897,6 +3923,18 @@ var mapEager2 = mapEager;
 var mapErrorEager2 = mapErrorEager;
 var flatMapEager2 = flatMapEager;
 var fnUntracedEager2 = fnUntracedEager;
+
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Random.js
+var Random2 = Random;
+var randomWith = (f) => withFiber2((fiber) => succeed5(f(fiber.getRef(Random2))));
+var nextIntBetween = (min, max, options) => {
+  const extra = options?.halfOpen === true ? 0 : 1;
+  return randomWith((r) => {
+    const minInt = Math.ceil(min);
+    const maxInt = Math.floor(max);
+    return Math.floor(r.nextDoubleUnsafe() * (maxInt - minInt + extra)) + minInt;
+  });
+};
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/encoding/Base64.js
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input);
@@ -6424,7 +6462,26 @@ function make5(ast, options) {
 }
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Struct.js
+var omit2 = /* @__PURE__ */ dual(2, (self, keys) => {
+  return buildStruct(self, (k, v) => !hasPropertyKey(keys, k) ? [k, v] : undefined);
+});
 var lambda = (f) => f;
+function hasPropertyKey(keys, key) {
+  return keys.some((candidate) => candidate === key || typeof candidate === "number" && String(candidate) === key);
+}
+function buildStruct(source, f) {
+  const out = {};
+  for (const k of Reflect.ownKeys(source)) {
+    if (!Object.prototype.propertyIsEnumerable.call(source, k))
+      continue;
+    const res = f(k, source[k]);
+    if (res) {
+      const [nk, nv] = res;
+      assignProperty(out, nk, nv);
+    }
+  }
+  return out;
+}
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/internal/schemaError.js
 var SchemaErrorTypeId = "~effect/Schema/SchemaError";
@@ -6926,12 +6983,6 @@ class StdinMissing extends TaggedError2("StdinMissing") {
   }
 }
 
-class StateCorrupt extends TaggedError2("StateCorrupt") {
-  get message() {
-    return `State file ${this.path} does not match the state schema: ${this.detail}`;
-  }
-}
-
 // src/args.ts
 var stringFlag = (parsed, name) => {
   const value = parsed.flags[name];
@@ -7049,6 +7100,30 @@ class LockLost extends TaggedError2("LockLost") {
   }
 }
 
+class CorruptRecord extends TaggedError2("CorruptRecord") {
+  get message() {
+    return `${this.path} is not a valid state file: ${this.reason}`;
+  }
+}
+
+class SymlinkRefused extends TaggedError2("SymlinkRefused") {
+  get message() {
+    return `${this.path} is a symbolic link; nothing under the state directory may be one`;
+  }
+}
+
+class MigratedFileInTheWay extends TaggedError2("MigratedFileInTheWay") {
+  get message() {
+    return `${this.path} already exists and differs from the state file waiting to be migrated; nothing was migrated. Move ${this.path} away, then rerun`;
+  }
+}
+
+class OwnedElsewhere extends TaggedError2("OwnedElsewhere") {
+  get message() {
+    return `${this.id} is running for clone ${this.clone_id}, not this one; its own root settles it. Use \`holyclaude reconcile resolve ${this.id}\` to settle it from here`;
+  }
+}
+
 class StateIo extends TaggedError2("StateIo") {
   get message() {
     return `State I/O failed for ${this.path}: ${String(this.cause)}`;
@@ -7057,7 +7132,10 @@ class StateIo extends TaggedError2("StateIo") {
 
 // ../core/src/codec.ts
 var MAX_INPUT_BYTES = 64 * 1024;
-var MAX_STATE_BYTES = 1024 * 1024;
+var MAX_RECORD_BYTES = 256 * 1024;
+var MAX_LOCAL_BYTES = 4 * 1024 * 1024;
+var OBSERVATIONS_ROTATE_BYTES = 1024 * 1024;
+var MAX_LEGACY_STATE_BYTES = 1024 * 1024;
 var strict = { onExcessProperty: "error" };
 var decodeStrict = (schema) => decodeUnknownEffect2(schema, strict);
 var decodeJsonStrict = (schema) => decodeUnknownEffect2(fromJsonString2(schema), strict);
@@ -7070,49 +7148,86 @@ var decodeInput = (schema) => {
   const decode = decodeJsonStrict(schema);
   return (text) => withinLimit("Input", text, MAX_INPUT_BYTES).pipe(flatMap2((ok) => decode(ok)));
 };
-// ../core/src/paths.ts
-import { isAbsolute, relative, resolve as resolve3, sep } from "path";
-var FORBIDDEN_CHARACTERS = /[:*?"<>|]/;
-var CONTROL_CHARACTERS = /\p{Cc}/u;
-var RESERVED_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9\u00B9\u00B2\u00B3]|lpt[1-9\u00B9\u00B2\u00B3]|conin\$|conout\$) *(?:\..*)?$/i;
-var segmentProblem = (segment) => {
-  if (segment === "")
-    return "empty segment";
-  if (segment === "." || segment === "..")
-    return `"${segment}" segment`;
-  if (segment.endsWith(".") || segment.endsWith(" "))
-    return "trailing dot or space";
-  if (CONTROL_CHARACTERS.test(segment))
-    return "control character";
-  if (FORBIDDEN_CHARACTERS.test(segment))
-    return 'one of : * ? " < > |';
-  if (RESERVED_DEVICE_NAME.test(segment))
-    return "Windows reserved device name";
-  return;
+// ../core/src/io.ts
+var attempt = (run) => tryPromise2({ try: run, catch: (cause) => cause });
+var io = (path, run) => attempt(run).pipe(mapError2((cause) => new StateIo({ path, cause })));
+var hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === code;
+var attemptTransient = (run) => attempt(run).pipe(retry2({
+  schedule: exponential("5 millis", 2),
+  times: 4,
+  while: (cause) => hasCode(cause, "EPERM") || hasCode(cause, "EBUSY")
+}));
+var readText = (path, limit) => gen2(function* () {
+  const file = Bun.file(path);
+  if (!(yield* io(path, () => file.exists())))
+    return;
+  if (file.size > limit)
+    return yield* new TooLarge({ subject: path, bytes: file.size, limit });
+  const bytes = yield* io(path, () => file.slice(0, limit + 1).bytes());
+  if (bytes.byteLength > limit)
+    return yield* new TooLarge({ subject: path, bytes: bytes.byteLength, limit });
+  return new TextDecoder().decode(bytes);
+});
+// ../core/src/layout.ts
+import { join as join2 } from "path";
+
+// ../core/src/safety.ts
+import { lstat } from "fs/promises";
+import { join, relative, sep } from "path";
+var lstatIfPresent = (path) => attempt(() => lstat(path)).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5(undefined) : fail5(new StateIo({ path, cause }))));
+var refuseSymlinks = (directory, path) => gen2(function* () {
+  const parts = relative(directory, path).split(sep).filter((part) => part !== "" && part !== ".");
+  let current = directory;
+  for (const part of [undefined, ...parts]) {
+    if (part !== undefined)
+      current = join(current, part);
+    const info = yield* lstatIfPresent(current);
+    if (info === undefined)
+      return;
+    if (info.isSymbolicLink())
+      return yield* new SymlinkRefused({ path: current });
+  }
+});
+
+// ../core/src/layout.ts
+var STORE_DIRECTORY = ".holyclaude";
+var LOCAL_DIRECTORY = "local";
+var LEGACY_FILE = "state.json";
+var MIGRATED_FILE = "state.json.migrated";
+var projectRoot = (env = process.env) => env["CLAUDE_PROJECT_DIR"] || process.cwd();
+var stateDirPath = (env = process.env) => env["HOLYCLAUDE_STATE_DIR"] || join2(projectRoot(env), STORE_DIRECTORY);
+var intentFile = (directory, intentId) => join2(directory, "intents", intentId, "intent.json");
+var assignmentFile = (directory, intentId, id) => join2(directory, "intents", intentId, "assignments", `${id}.json`);
+var localFile = (directory, name) => join2(directory, LOCAL_DIRECTORY, name);
+var observationsFile = (directory) => localFile(directory, "observations.jsonl");
+var previousObservationsFile = (directory) => localFile(directory, "observations.1.jsonl");
+var lockFile = (directory) => localFile(directory, "lock");
+var legacyFile = (directory) => join2(directory, LEGACY_FILE);
+var migratedFile = (directory) => join2(directory, MIGRATED_FILE);
+var legacyLockFiles = (directory) => [
+  join2(directory, `${LEGACY_FILE}.lock`),
+  join2(directory, `${LEGACY_FILE}.lock.breaking`)
+];
+var IGNORE_RULES = [
+  `/${LOCAL_DIRECTORY}/`,
+  "*.tmp",
+  `/${MIGRATED_FILE}`,
+  `/${LEGACY_FILE}`,
+  `/${LEGACY_FILE}.lock*`,
+  "/state.observations.jsonl"
+].join(`
+`) + `
+`;
+var LEGACY_IGNORE_RULES = `*
+`;
+var keepLocalFilesOutOfVersionControl = (directory) => {
+  const path = join2(directory, ".gitignore");
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, MAX_RECORD_BYTES)), map4((current) => current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(path, rules))), asVoid2);
 };
-var normalizePath = (raw) => {
-  const path = raw.replaceAll("\\", "/");
-  const problem = path.startsWith("/") ? "absolute path" : path.split("/").map(segmentProblem).find((found) => found !== undefined);
-  return problem === undefined ? succeed5(path) : fail5(new InvalidPath({ path: raw, reason: problem }));
-};
-var normalizePaths = (raw) => forEach2(raw, normalizePath).pipe(map4((paths) => paths.filter((path, index) => paths.findIndex((other) => other.toLowerCase() === path.toLowerCase()) === index)));
-var pathsOverlap = (a, b) => {
-  const left = a.toLowerCase();
-  const right = b.toLowerCase();
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
-};
-var anyOverlap = (a, b) => a.some((left) => b.some((right) => pathsOverlap(left, right)));
-var isInsideRoots = (path, roots, base) => {
-  const target = resolve3(base, path);
-  return roots.some((root) => {
-    const inside = relative(resolve3(base, root), target);
-    return inside.split(sep)[0] !== ".." && !isAbsolute(inside);
-  });
-};
-// ../core/src/store.ts
-import { mkdir, open, rename, rm, stat } from "fs/promises";
+// ../core/src/lock.ts
+import { mkdir, open, rm, stat } from "fs/promises";
 import { hostname } from "os";
-import { basename, dirname, join } from "path";
+import { dirname } from "path";
 
 // ../core/src/model/primitives.ts
 var Text = String4.check(isPattern2(/\S/));
@@ -7122,13 +7237,131 @@ var Revision = Int.check(isGreaterThanOrEqualTo2(1));
 var StoredRevision = Int.check(isGreaterThanOrEqualTo2(0)).pipe(withDecodingDefaultKey(succeed5(0)));
 var TextList = ArraySchema(Text).pipe(withDecodingDefaultKey(succeed5([])));
 
-// ../core/src/model/acceptance.ts
-var AcceptanceRecord = Struct({
-  intent_revision: Revision,
-  rationale: Text,
-  criteria_evidence: Record(Text, Text),
-  required_evidence: Record(Text, Text)
+// ../core/src/lock.ts
+var LOCK_STALE_MS = 30000;
+var MAX_OWNER_BYTES = 4 * 1024;
+var LockOwner = Struct({
+  pid: Int.check(isGreaterThanOrEqualTo2(1)),
+  host: Text,
+  token: Text,
+  acquired_at: Int
 });
+var readOwner = (file) => readText(file, MAX_OWNER_BYTES).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(LockOwner)(text)), orElseSucceed2(() => {
+  return;
+}));
+var ownsFile = (file, token) => readOwner(file).pipe(map4((owner) => owner?.token === token));
+var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed5(!hasCode(cause, "ESRCH"))));
+var isStale = (file, owner) => gen2(function* () {
+  if (owner !== undefined && owner.host === hostname())
+    return !(yield* processAlive(owner.pid));
+  const { mtimeMs } = yield* attempt(() => stat(file));
+  return (yield* currentTimeMillis2) - mtimeMs > LOCK_STALE_MS;
+});
+var createExclusively = (file, content) => attemptTransient(() => open(file, "wx")).pipe(flatMap2((handle) => attempt(() => handle.writeFile(content)).pipe(tapError2(() => attempt(() => rm(file, { force: true })).pipe(ignore2)), ensuring2(attempt(() => handle.close()).pipe(ignore2)))));
+var claim = (file) => gen2(function* () {
+  const owner = {
+    pid: process.pid,
+    host: hostname(),
+    token: crypto.randomUUID(),
+    acquired_at: yield* currentTimeMillis2
+  };
+  const content = yield* encodeEffect(fromJsonString2(LockOwner))(owner).pipe(orDie2);
+  yield* createExclusively(file, content);
+  return owner.token;
+});
+var releaseIfOwned = (file, token) => ownsFile(file, token).pipe(flatMap2((owns) => owns ? attempt(() => rm(file, { force: true })) : void_3), ignore2);
+var removeIfStale = (file) => gen2(function* () {
+  const judged = yield* readOwner(file);
+  if (!(yield* isStale(file, judged)))
+    return false;
+  if ((yield* readOwner(file))?.token !== judged?.token)
+    return false;
+  yield* attempt(() => rm(file));
+  return true;
+}).pipe(orElseSucceed2(() => false));
+var breakStaleLock = (lockFile) => {
+  const guard = `${lockFile}.breaking`;
+  return acquireUseRelease2(claim(guard), () => removeIfStale(lockFile), (token) => releaseIfOwned(guard, token)).pipe(catch_2(() => removeIfStale(guard).pipe(as2(false))));
+};
+var acquireLock = (directory, lockFile) => {
+  const create = claim(lockFile).pipe(mapError2((cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile }) : new StateIo({ path: lockFile, cause })), map4((token) => ({ directory, file: lockFile, token })));
+  return create.pipe(catchTag2("StateLocked", (locked) => breakStaleLock(lockFile).pipe(andThen2(fail5(locked)))), retry2({
+    schedule: exponential("10 millis", 1.5),
+    times: 15,
+    while: (error) => error._tag === "StateLocked"
+  }));
+};
+var withStateLock = (directory, use) => {
+  const file = lockFile(directory);
+  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(io(directory, () => mkdir(dirname(file), { recursive: true }))), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
+};
+// ../core/src/files.ts
+import { rename } from "fs/promises";
+var fromNextLine = (text) => {
+  const at = text.indexOf(`
+`);
+  return at === -1 ? "" : text.slice(at + 1);
+};
+var keepNewestLines = (text, limit) => {
+  const bytes = new TextEncoder().encode(text);
+  return bytes.byteLength <= limit ? text : fromNextLine(new TextDecoder().decode(bytes.subarray(bytes.byteLength - limit - 1)));
+};
+var readNewestLines = (path, limit) => gen2(function* () {
+  const file = Bun.file(path);
+  if (!(yield* io(path, () => file.exists())))
+    return;
+  const size = file.size;
+  if (size <= limit)
+    return yield* readText(path, limit);
+  const bytes = yield* io(path, () => file.slice(size - limit - 1, size).bytes());
+  return fromNextLine(new TextDecoder().decode(bytes));
+});
+var readJson = (schema, path, limit = MAX_RECORD_BYTES) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
+var encodeJson = (schema, value, path, limit = MAX_RECORD_BYTES) => encodeEffect(schema)(value).pipe(map4((encoded) => `${JSON.stringify(encoded, null, 2)}
+`), flatMap2((json) => withinLimit(path, json, limit)));
+var moveFile = (from, to, lock) => gen2(function* () {
+  if (!(yield* ownsFile(lock.file, lock.token)))
+    return yield* new LockLost({ lockFile: lock.file });
+  yield* refuseSymlinks(lock.directory, from);
+  yield* refuseSymlinks(lock.directory, to);
+  yield* attemptTransient(() => rename(from, to)).pipe(mapError2((cause) => new StateIo({ path: to, cause })));
+});
+var deleteIfPresent = (path) => attempt(() => Bun.file(path).delete()).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? void_3 : fail5(new StateIo({ path, cause }))));
+var commitFile = (path, content, lock) => {
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  return refuseSymlinks(lock.directory, path).pipe(andThen2(io(path, () => Bun.write(temporary, content))), andThen2(moveFile(temporary, path, lock)), tapError2(() => deleteIfPresent(temporary).pipe(ignore2)));
+};
+var removeFile = (path, lock) => refuseSymlinks(lock.directory, path).pipe(andThen2(deleteIfPresent(path)));
+
+// ../core/src/model/ids.ts
+var TIME_DIGITS = 9;
+var RANDOM_DIGITS = 4;
+var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var IntentId = identifier2("intent");
+var AssignmentId = identifier2("assignment");
+var CloneId = identifier2("clone");
+var randomDigits = forEach2(Array.from({ length: RANDOM_DIGITS }, (_, index) => index), () => nextIntBetween(0, 35).pipe(map4((digit) => digit.toString(36)))).pipe(map4((digits) => digits.join("")));
+var newId = (kind) => gen2(function* () {
+  const time = (yield* currentTimeMillis2).toString(36).padStart(TIME_DIGITS, "0");
+  return `${kind}-${time}-${yield* randomDigits}`;
+});
+var compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var legacyCounter = (id) => {
+  const digits = /^[a-z]+-(\d+)$/.exec(id)?.[1];
+  return digits === undefined ? undefined : BigInt(digits);
+};
+var compareIds = (a, b) => {
+  const first = legacyCounter(a);
+  const second = legacyCounter(b);
+  if (first !== undefined && second !== undefined)
+    return first < second ? -1 : first > second ? 1 : compareText(a, b);
+  if (first !== undefined)
+    return -1;
+  if (second !== undefined)
+    return 1;
+  return compareText(a, b);
+};
+var sortedById = (records) => records.toSorted((a, b) => compareIds(a.id, b.id));
 
 // ../core/src/model/routes.ts
 var Role = Literals([
@@ -7188,6 +7421,115 @@ var routeFor = (role) => ({
 });
 var ROUTES = Role.literals.map(routeFor);
 
+// ../core/src/model/worker.ts
+var Worker = Struct({
+  agent_id: Id,
+  preset: Role,
+  fingerprint: Text,
+  history: ArraySchema(Id)
+});
+
+// ../core/src/local.ts
+var WorkersFile = Struct({ workers: ArraySchema(Worker) });
+var AgentsFile = Record(AssignmentId, Id);
+var CloneFile = Struct({ clone_id: CloneId });
+var workersPath = (directory) => localFile(directory, "workers.json");
+var agentsPath = (directory) => localFile(directory, "agents.json");
+var clonePath = (directory) => localFile(directory, "clone.json");
+var readLocal = (schema, directory, path) => refuseSymlinks(directory, path).pipe(andThen2(readJson(schema, path, MAX_LOCAL_BYTES)));
+var readWorkers = (directory) => readLocal(WorkersFile, directory, workersPath(directory)).pipe(map4((file) => file?.workers ?? []));
+var readAgents = (directory) => readLocal(AgentsFile, directory, agentsPath(directory)).pipe(map4((file) => file ?? {}));
+var readCloneId = (directory) => readLocal(CloneFile, directory, clonePath(directory)).pipe(map4((file) => file?.clone_id));
+var ensureCloneId = (directory, lock) => gen2(function* () {
+  const existing = yield* readCloneId(directory);
+  if (existing !== undefined)
+    return existing;
+  const created = yield* newId("clone");
+  const content = yield* encodeJson(CloneFile, { clone_id: created }, clonePath(directory));
+  yield* commitFile(clonePath(directory), content, lock);
+  return created;
+});
+var stampClone = (cloneId, before, after) => {
+  const wasRunning = new Set(before.assignments.filter((row) => row.state === "Running").map((row) => row.id));
+  const entering = new Set(after.assignments.filter((row) => row.state === "Running" && !wasRunning.has(row.id)).map((row) => row.id));
+  return entering.size === 0 ? succeed5(after) : cloneId.pipe(map4((own) => ({
+    ...after,
+    assignments: after.assignments.map((row) => entering.has(row.id) ? { ...row, clone_id: own } : row)
+  })));
+};
+var sortedKeys = (agents) => Object.fromEntries(Object.entries(agents).toSorted(([a], [b]) => compareIds(a, b)));
+var writeLocal = (directory, before, after, lock) => gen2(function* () {
+  const workersFile = workersPath(directory);
+  const workers = yield* encodeJson(WorkersFile, after, workersFile, MAX_LOCAL_BYTES);
+  const workersBefore = yield* encodeJson(WorkersFile, before, workersFile, MAX_LOCAL_BYTES);
+  if (workers !== workersBefore)
+    yield* commitFile(workersFile, workers, lock);
+  const agentsFile = agentsPath(directory);
+  const stored = yield* readAgents(directory);
+  const bound = after.assignments.flatMap((row) => row.agent_id === null ? [] : [[row.id, row.agent_id]]);
+  const merged = sortedKeys({ ...stored, ...Object.fromEntries(bound) });
+  const agents = yield* encodeJson(AgentsFile, merged, agentsFile, MAX_LOCAL_BYTES);
+  const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored), agentsFile, MAX_LOCAL_BYTES);
+  if (agents !== agentsBefore)
+    yield* commitFile(agentsFile, agents, lock);
+});
+// ../core/src/observations.ts
+var rotateObservations = (directory) => {
+  const current = observationsFile(directory);
+  const previous = previousObservationsFile(directory);
+  const full = io(current, async () => Bun.file(current).size > OBSERVATIONS_ROTATE_BYTES);
+  return refuseSymlinks(directory, current).pipe(andThen2(refuseSymlinks(directory, previous)), andThen2(full), flatMap2((outgrown) => outgrown ? withStateLock(directory, (lock) => full.pipe(flatMap2((still) => still ? moveFile(current, previous, lock) : void_3))) : void_3));
+};
+// ../core/src/paths.ts
+import { isAbsolute, relative as relative2, resolve as resolve3, sep as sep2 } from "path";
+var FORBIDDEN_CHARACTERS = /[:*?"<>|]/;
+var CONTROL_CHARACTERS = /\p{Cc}/u;
+var RESERVED_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9\u00B9\u00B2\u00B3]|lpt[1-9\u00B9\u00B2\u00B3]|conin\$|conout\$) *(?:\..*)?$/i;
+var segmentProblem = (segment) => {
+  if (segment === "")
+    return "empty segment";
+  if (segment === "." || segment === "..")
+    return `"${segment}" segment`;
+  if (segment.endsWith(".") || segment.endsWith(" "))
+    return "trailing dot or space";
+  if (CONTROL_CHARACTERS.test(segment))
+    return "control character";
+  if (FORBIDDEN_CHARACTERS.test(segment))
+    return 'one of : * ? " < > |';
+  if (RESERVED_DEVICE_NAME.test(segment))
+    return "Windows reserved device name";
+  return;
+};
+var normalizePath = (raw) => {
+  const path = raw.replaceAll("\\", "/");
+  const problem = path.startsWith("/") ? "absolute path" : path.split("/").map(segmentProblem).find((found) => found !== undefined);
+  return problem === undefined ? succeed5(path) : fail5(new InvalidPath({ path: raw, reason: problem }));
+};
+var normalizePaths = (raw) => forEach2(raw, normalizePath).pipe(map4((paths) => paths.filter((path, index) => paths.findIndex((other) => other.toLowerCase() === path.toLowerCase()) === index)));
+var pathsOverlap = (a, b) => {
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
+};
+var anyOverlap = (a, b) => a.some((left) => b.some((right) => pathsOverlap(left, right)));
+var isInsideRoots = (path, roots, base) => {
+  const target = resolve3(base, path);
+  return roots.some((root) => {
+    const inside = relative2(resolve3(base, root), target);
+    return inside.split(sep2)[0] !== ".." && !isAbsolute(inside);
+  });
+};
+// ../core/src/legacy.ts
+import { join as join4 } from "path";
+
+// ../core/src/model/acceptance.ts
+var AcceptanceRecord = Struct({
+  intent_revision: Revision,
+  rationale: Text,
+  criteria_evidence: Record(Text, Text),
+  required_evidence: Record(Text, Text)
+});
+
 // ../core/src/model/assignment.ts
 var AssignmentState = Literals([
   "Ready",
@@ -7218,29 +7560,22 @@ var AssignmentDraft = Struct({
 });
 var Assignment = Struct({
   ...AssignmentDraft.fields,
-  id: Id,
+  id: AssignmentId,
   intent_revision: StoredRevision,
   state: AssignmentState,
   agent_id: NullOr(Id),
   result: NullOr(Text),
-  acceptance: NullOr(AcceptanceRecord)
+  acceptance: NullOr(AcceptanceRecord),
+  clone_id: optionalKey2(CloneId)
 });
 var isTerminal = (assignment) => assignment.state === "Succeeded" || assignment.state === "Failed" || assignment.state === "Cancelled";
 
 // ../core/src/model/intent.ts
 var Intent = Struct({
-  id: Id,
+  id: IntentId,
   objective: Text,
   requirements: String4,
   revision: StoredRevision
-});
-
-// ../core/src/model/worker.ts
-var Worker = Struct({
-  agent_id: Id,
-  preset: Role,
-  fingerprint: Text,
-  history: ArraySchema(Id)
 });
 
 // ../core/src/model/state.ts
@@ -7250,7 +7585,6 @@ var State = Struct({
   assignments: ArraySchema(Assignment),
   workers: ArraySchema(Worker)
 });
-var emptyState = { version: 1, intents: [], assignments: [], workers: [] };
 var findIntent = (state, id) => {
   const found = state.intents.find((intent) => intent.id === id);
   return found === undefined ? fail5(new UnknownRecord({ kind: "intent", id })) : succeed5(found);
@@ -7259,9 +7593,13 @@ var findAssignment = (state, id) => {
   const found = state.assignments.find((assignment) => assignment.id === id);
   return found === undefined ? fail5(new UnknownRecord({ kind: "assignment", id })) : succeed5(found);
 };
+var refuseOtherClone = (state, id, cloneId) => {
+  const row = state.assignments.find((assignment) => assignment.id === id);
+  return row?.state === "Running" && row.clone_id !== undefined && row.clone_id !== cloneId ? fail5(new OwnedElsewhere({ id, clone_id: row.clone_id })) : void_3;
+};
 var invalidTransition = (assignment, action) => fail5(new InvalidTransition({ id: assignment.id, state: assignment.state, action }));
 var requireLiveRevision = (intent, given) => intent.revision < 1 ? fail5(new NoRevision({ intent_id: intent.id })) : given === intent.revision ? void_3 : fail5(new StaleRevision({ given, live: intent.revision }));
-var nextId = (prefix, existing) => `${prefix}-${String(existing.length + 1).padStart(4, "0")}`;
+var latestIntent = (state) => sortedById(state.intents).at(-1);
 var withAssignment = (state, next) => ({
   ...state,
   assignments: state.assignments.map((assignment) => assignment.id === next.id ? next : assignment)
@@ -7297,115 +7635,158 @@ var validateState = (state) => gen2(function* () {
     if (unknown !== undefined)
       return yield* fail(`Assignment ${assignment.id} references unknown assignment ${unknown}`);
   }
-  const unknownHistory = state.workers.flatMap((worker) => worker.history).find((id) => !assignmentIds.includes(id));
-  if (unknownHistory !== undefined)
-    return yield* fail(`Worker history names unknown assignment ${unknownHistory}`);
   return state;
 });
 
-// ../core/src/store.ts
-var LOCK_STALE_MS = 30000;
-var STORE_DIRECTORY = ".holyclaude";
-var projectRoot = (env = process.env) => env["CLAUDE_PROJECT_DIR"] || process.cwd();
-var stateFilePath = (env = process.env) => env["HOLYCLAUDE_STATE_FILE"] || join(projectRoot(env), STORE_DIRECTORY, "state.json");
-var attempt = (run) => tryPromise2({ try: run, catch: (cause) => cause });
-var io = (path, run) => attempt(run).pipe(mapError2((cause) => new StateIo({ path, cause })));
-var hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === code;
-var attemptTransient = (run) => attempt(run).pipe(retry2({
-  schedule: exponential("5 millis", 2),
-  times: 4,
-  while: (cause) => hasCode(cause, "EPERM") || hasCode(cause, "EBUSY")
-}));
-var parseState = (text) => decodeJsonStrict(State)(text).pipe(flatMap2(validateState));
-var loadState = (path) => gen2(function* () {
-  const file = Bun.file(path);
-  if (!(yield* io(path, () => file.exists())))
-    return emptyState;
-  if (file.size > MAX_STATE_BYTES)
-    return yield* new TooLarge({ subject: path, bytes: file.size, limit: MAX_STATE_BYTES });
-  const text = yield* io(path, () => file.text());
-  return yield* parseState(text);
-});
-var keepOutOfVersionControl = (directory) => {
-  const ignore = Bun.file(join(directory, ".gitignore"));
-  return basename(directory) === STORE_DIRECTORY ? io(directory, () => ignore.exists()).pipe(flatMap2((exists) => exists ? void_3 : io(directory, () => Bun.write(ignore, `*
-`)))) : void_3;
-};
-var LockOwner = Struct({
-  pid: Int.check(isGreaterThanOrEqualTo2(1)),
-  host: Text,
-  token: Text,
-  acquired_at: Int
-});
-var lockPath = (path) => `${path}.lock`;
-var readOwner = (file) => attempt(() => Bun.file(file).text()).pipe(flatMap2(decodeJsonStrict(LockOwner)), orElseSucceed2(() => {
-  return;
-}));
-var ownsFile = (file, token) => readOwner(file).pipe(map4((owner) => owner?.token === token));
-var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed5(!hasCode(cause, "ESRCH"))));
-var isStale = (file, owner) => gen2(function* () {
-  if (owner !== undefined && owner.host === hostname())
-    return !(yield* processAlive(owner.pid));
-  const { mtimeMs } = yield* attempt(() => stat(file));
-  return (yield* currentTimeMillis2) - mtimeMs > LOCK_STALE_MS;
-});
-var createExclusively = (file, content) => attemptTransient(() => open(file, "wx")).pipe(flatMap2((handle) => attempt(() => handle.writeFile(content)).pipe(tapError2(() => attempt(() => rm(file, { force: true })).pipe(ignore2)), ensuring2(attempt(() => handle.close()).pipe(ignore2)))));
-var claim = (file) => gen2(function* () {
-  const owner = {
-    pid: process.pid,
-    host: hostname(),
-    token: crypto.randomUUID(),
-    acquired_at: yield* currentTimeMillis2
-  };
-  const content = yield* encodeEffect(fromJsonString2(LockOwner))(owner).pipe(orDie2);
-  yield* createExclusively(file, content);
-  return owner.token;
-});
-var releaseIfOwned = (file, token) => ownsFile(file, token).pipe(flatMap2((owns) => owns ? attempt(() => rm(file, { force: true })) : void_3), ignore2);
-var removeIfStale = (file) => gen2(function* () {
-  const judged = yield* readOwner(file);
-  if (!(yield* isStale(file, judged)))
-    return false;
-  if ((yield* readOwner(file))?.token !== judged?.token)
-    return false;
-  yield* attempt(() => rm(file));
-  return true;
-}).pipe(orElseSucceed2(() => false));
-var breakStaleLock = (lockFile) => {
-  const guard = `${lockFile}.breaking`;
-  return acquireUseRelease2(claim(guard), () => removeIfStale(lockFile), (token) => releaseIfOwned(guard, token)).pipe(catch_2(() => removeIfStale(guard).pipe(as2(false))));
-};
-var acquireLock = (path) => {
-  const lockFile = lockPath(path);
-  const create = claim(lockFile).pipe(mapError2((cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile }) : new StateIo({ path, cause })));
-  return create.pipe(catchTag2("StateLocked", (locked) => breakStaleLock(lockFile).pipe(andThen2(fail5(locked)))), retry2({
-    schedule: exponential("10 millis", 1.5),
-    times: 15,
-    while: (error) => error._tag === "StateLocked"
+// ../core/src/records.ts
+import { readdir } from "fs/promises";
+import { join as join3 } from "path";
+var AssignmentRecord = Assignment.mapFields(omit2(["agent_id"]));
+var segments = (relative) => relative.split(/[\\/]/);
+var scan = (directory, pattern) => attempt(() => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: directory, onlyFiles: true }))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed5([]) : fail5(new StateIo({ path: directory, cause }))));
+var intentFolders = (directory) => attempt(() => readdir(join3(directory, "intents"))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5([]) : fail5(new StateIo({ path: join3(directory, "intents"), cause }))));
+var present = (path) => flatMap2((value) => value === undefined ? fail5(new CorruptRecord({ path, reason: "the file disappeared while reading" })) : succeed5(value));
+var readIntents = (directory) => scan(directory, "intents/*/intent.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
+  const path = join3(directory, relative);
+  const folder = segments(relative)[1] ?? "";
+  return refuseSymlinks(directory, path).pipe(andThen2(readJson(Intent, path)), present(path), filterOrFail2((intent) => intent.id === folder, (intent) => new CorruptRecord({
+    path,
+    reason: `its id ${intent.id} does not match the directory ${folder}`
+  })));
+})));
+var readAssignments = (directory) => scan(directory, "intents/*/assignments/*.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
+  const path = join3(directory, relative);
+  const parts = segments(relative);
+  const folder = parts[1] ?? "";
+  const name = (parts[3] ?? "").replace(/\.json$/, "");
+  return refuseSymlinks(directory, path).pipe(andThen2(readJson(AssignmentRecord, path)), present(path), filterOrFail2((record) => record.id === name, (record) => new CorruptRecord({
+    path,
+    reason: `its id ${record.id} does not match the file name ${name}`
+  })), filterOrFail2((record) => record.intent_id === folder, (record) => new CorruptRecord({
+    path,
+    reason: `its intent ${record.intent_id} does not match the directory ${folder}`
+  })));
+})));
+var loadRecordState = (directory) => gen2(function* () {
+  for (const path of [directory, join3(directory, "intents"), join3(directory, "local")])
+    yield* refuseSymlinks(directory, path);
+  for (const folder of yield* intentFolders(directory)) {
+    yield* refuseSymlinks(directory, join3(directory, "intents", folder));
+    yield* refuseSymlinks(directory, join3(directory, "intents", folder, "assignments"));
+  }
+  const intents = sortedById(yield* readIntents(directory));
+  const agents = yield* readAgents(directory);
+  const assignments = sortedById(yield* readAssignments(directory)).map((record) => ({
+    ...record,
+    agent_id: agents[record.id] ?? null
   }));
-};
-var writeState = (path, state, token) => gen2(function* () {
-  const lockFile = lockPath(path);
-  const encoded = yield* encodeEffect(State)(state);
-  const json = yield* withinLimit(path, `${JSON.stringify(encoded, null, 2)}
-`, MAX_STATE_BYTES);
-  yield* parseState(json);
-  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  yield* keepOutOfVersionControl(dirname(path));
-  const commit = gen2(function* () {
-    if (!(yield* ownsFile(lockFile, token)))
-      return yield* new LockLost({ lockFile });
-    yield* attemptTransient(() => rename(temporary, path)).pipe(mapError2((cause) => new StateIo({ path, cause })));
-  });
-  yield* io(path, () => Bun.write(temporary, json)).pipe(andThen2(commit), tapError2(() => attempt(() => rm(temporary, { force: true })).pipe(ignore2)));
+  const workers = yield* readWorkers(directory);
+  return yield* validateState({ version: 1, intents, assignments, workers });
 });
-var updateState = (path, transition) => acquireUseRelease2(io(path, () => mkdir(dirname(path), { recursive: true })).pipe(andThen2(acquireLock(path))), (token) => gen2(function* () {
-  const before = yield* loadState(path);
-  const { state, value } = yield* transition(before);
+var recordTexts = (directory, state) => gen2(function* () {
+  const texts = new Map;
+  for (const intent of state.intents) {
+    const path = intentFile(directory, intent.id);
+    texts.set(path, yield* encodeJson(Intent, intent, path));
+  }
+  for (const assignment of state.assignments) {
+    const path = assignmentFile(directory, assignment.intent_id, assignment.id);
+    texts.set(path, yield* encodeJson(AssignmentRecord, assignment, path));
+  }
+  return texts;
+});
+var persist = (directory, before, after, lock) => gen2(function* () {
+  yield* validateState(after);
+  const was = yield* recordTexts(directory, before);
+  const now = yield* recordTexts(directory, after);
+  for (const [path, text] of now)
+    if (was.get(path) !== text)
+      yield* commitFile(path, text, lock);
+  yield* writeLocal(directory, before, after, lock);
+});
+
+// ../core/src/legacy.ts
+var readLegacy = (directory) => refuseSymlinks(directory, legacyFile(directory)).pipe(andThen2(readJson(State, legacyFile(directory), MAX_LEGACY_STATE_BYTES)), flatMap2((state) => state === undefined ? succeed5(undefined) : validateState(state)));
+var mergeLegacy = (legacy, existing) => {
+  const known = (own) => new Set(own.map((record) => record.id));
+  const intents = known(legacy.intents);
+  const assignments = known(legacy.assignments);
+  const workers = new Set(legacy.workers.map((worker) => worker.agent_id));
+  return {
+    version: 1,
+    intents: [...legacy.intents, ...existing.intents.filter(({ id }) => !intents.has(id))],
+    assignments: [
+      ...legacy.assignments,
+      ...existing.assignments.filter(({ id }) => !assignments.has(id))
+    ],
+    workers: [
+      ...legacy.workers,
+      ...existing.workers.filter(({ agent_id }) => !workers.has(agent_id))
+    ]
+  };
+};
+var moveObservations = (directory, lock) => {
+  const from = join4(directory, "state.observations.jsonl");
+  const to = previousObservationsFile(directory);
+  return gen2(function* () {
+    yield* refuseSymlinks(directory, from);
+    yield* refuseSymlinks(directory, to);
+    const older = yield* readNewestLines(from, MAX_LOCAL_BYTES);
+    if (older === undefined)
+      return;
+    const newer = (yield* readNewestLines(to, MAX_LOCAL_BYTES)) ?? "";
+    const separator = older === "" || older.endsWith(`
+`) ? "" : `
+`;
+    yield* commitFile(to, keepNewestLines(`${older}${separator}${newer}`, MAX_LOCAL_BYTES), lock);
+    yield* removeFile(from, lock);
+  });
+};
+var migrateLegacy = (directory, lock) => gen2(function* () {
+  const legacy = yield* readLegacy(directory);
+  if (legacy === undefined)
+    return;
+  const migrated = migratedFile(directory);
+  yield* refuseSymlinks(directory, migrated);
+  const kept = yield* readText(migrated, MAX_LEGACY_STATE_BYTES);
+  if (kept !== undefined && kept !== (yield* readText(legacyFile(directory), MAX_LEGACY_STATE_BYTES)))
+    return yield* new MigratedFileInTheWay({ path: migrated });
+  const existing = yield* loadRecordState(directory);
+  const incoming = yield* recordTexts(directory, legacy);
+  for (const [path, text] of yield* recordTexts(directory, existing)) {
+    const old = incoming.get(path);
+    if (old !== undefined && old !== text)
+      return yield* new CorruptRecord({
+        path,
+        reason: `it disagrees with ${legacyFile(directory)}; move one of them away`
+      });
+  }
+  yield* persist(directory, existing, mergeLegacy(legacy, existing), lock);
+  yield* moveObservations(directory, lock);
+  if (kept === undefined)
+    yield* moveFile(legacyFile(directory), migrated, lock);
+  else
+    yield* removeFile(legacyFile(directory), lock);
+  for (const file of legacyLockFiles(directory))
+    yield* removeFile(file, lock);
+});
+
+// ../core/src/store.ts
+var loadState = (directory) => gen2(function* () {
+  const legacy = yield* readLegacy(directory);
+  const existing = yield* loadRecordState(directory);
+  return legacy === undefined ? existing : mergeLegacy(legacy, existing);
+});
+var updateState = (directory, transition) => withStateLock(directory, (lock) => gen2(function* () {
+  yield* keepLocalFilesOutOfVersionControl(directory);
+  yield* migrateLegacy(directory, lock);
+  const before = yield* loadRecordState(directory);
+  const cloneId = ensureCloneId(directory, lock);
+  const { state, value } = yield* transition(before, { cloneId });
   if (state !== before)
-    yield* writeState(path, state, token);
+    yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock);
   return value;
-}), (token) => releaseIfOwned(lockPath(path), token));
+}));
 // ../core/src/model/ci.ts
 var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
@@ -7422,7 +7803,7 @@ var createAssignment = (state, draft) => gen2(function* () {
   const assignment = {
     ...draft,
     metadata: { ...draft.metadata, ownership_paths },
-    id: nextId("assignment", state.assignments),
+    id: yield* newId("assignment"),
     state: "Ready",
     agent_id: null,
     result: null,
@@ -7506,7 +7887,14 @@ var accept = (state, input) => gen2(function* () {
     return yield* new InsufficientEvidence({ id: assignment.id, detail: problems.join("; ") });
   return replaceAssignment(state, { ...assignment, acceptance });
 });
-var reconcile = (state) => state.assignments.filter((assignment) => assignment.state === "Running");
+var reconcile = (state, cloneId) => {
+  const running = sortedById(state.assignments.filter((assignment) => assignment.state === "Running"));
+  const isElsewhere = (assignment) => assignment.clone_id !== undefined && assignment.clone_id !== cloneId;
+  return {
+    local: running.filter((assignment) => !isElsewhere(assignment)),
+    elsewhere: running.filter(isElsewhere)
+  };
+};
 var resolveReconcile = (state, input) => gen2(function* () {
   const assignment = yield* findAssignment(state, input.assignment_id);
   if (assignment.state !== "Running")
@@ -7516,8 +7904,11 @@ var resolveReconcile = (state, input) => gen2(function* () {
 // ../core/src/transitions/selection.ts
 var SelectWorkerInput = Struct({ assignment_id: Id, fingerprint: Text });
 var isIdle = (state, worker) => {
-  const last = state.assignments.find((assignment) => assignment.id === worker.history.at(-1));
-  return last === undefined || isTerminal(last);
+  const lastId = worker.history.at(-1);
+  if (lastId === undefined)
+    return true;
+  const last = state.assignments.find((assignment) => assignment.id === lastId);
+  return last !== undefined && isTerminal(last);
 };
 var intersects = (a, b) => a.some((item) => b.includes(item));
 var hasRelevantContext = (state, worker, next) => {
@@ -7592,7 +7983,7 @@ var reserve = (state, input, context) => gen2(function* () {
     if (!accepted)
       return yield* refuse("DependencyNotAccepted", `${id} is not accepted at revision ${assignment.intent_revision}`);
   }
-  const holder = state.assignments.find((other) => writes && other.state === "Running" && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
+  const holder = state.assignments.find((other) => writes && other.state === "Running" && (other.clone_id === undefined || other.clone_id === context.cloneId) && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
   if (holder !== undefined)
     return yield* refuse("OwnershipConflict", `paths overlap ${holder.id}`);
   return replaceAssignment(state, { ...assignment, state: "Running" });
@@ -7632,10 +8023,10 @@ var UpdateIntentInput = Struct({
   requirements: optionalKey2(String4),
   material: Boolean3
 });
-var createIntent = (state, input) => {
-  const intent = { id: nextId("intent", state.intents), ...input, revision: 1 };
-  return succeed5({ state: { ...state, intents: [...state.intents, intent] }, value: intent });
-};
+var createIntent = (state, input) => gen2(function* () {
+  const intent = { id: yield* newId("intent"), ...input, revision: 1 };
+  return { state: { ...state, intents: [...state.intents, intent] }, value: intent };
+});
 var updateIntent = (state, input) => gen2(function* () {
   const current = yield* findIntent(state, input.id);
   const next = {
@@ -7653,16 +8044,16 @@ var updateIntent = (state, input) => gen2(function* () {
 var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
 
 // src/fingerprint.ts
-import { join as join2 } from "path";
+import { join as join5 } from "path";
 var PLUGIN_NAME = "holyclaude";
 var rootCandidates = () => [
   ...process.env["CLAUDE_PLUGIN_ROOT"] ? [process.env["CLAUDE_PLUGIN_ROOT"]] : [],
-  join2(import.meta.dir, ".."),
-  join2(import.meta.dir, "..", "..", "..", "plugin")
+  join5(import.meta.dir, ".."),
+  join5(import.meta.dir, "..", "..", "..", "plugin")
 ];
 var pluginRoot = gen2(function* () {
   for (const root of rootCandidates()) {
-    const found = yield* tryPromise2(() => Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join2(root, "agents") }))).pipe(orElseSucceed2(() => []));
+    const found = yield* tryPromise2(() => Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join5(root, "agents") }))).pipe(orElseSucceed2(() => []));
     if (found.length > 0)
       return root;
   }
@@ -7671,10 +8062,10 @@ var pluginRoot = gen2(function* () {
 var rosterFingerprintAt = (root) => gen2(function* () {
   if (root === undefined)
     return `roster:unknown:${crypto.randomUUID()}`;
-  const names = yield* tryPromise2(() => Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join2(root, "agents") }))).pipe(orElseSucceed2(() => []));
+  const names = yield* tryPromise2(() => Array.fromAsync(new Bun.Glob("*.md").scan({ cwd: join5(root, "agents") }))).pipe(orElseSucceed2(() => []));
   const hasher = new Bun.CryptoHasher("sha256");
   for (const name of names.toSorted()) {
-    const text = yield* tryPromise2(() => Bun.file(join2(root, "agents", name)).text()).pipe(orElseSucceed2(() => ""));
+    const text = yield* tryPromise2(() => Bun.file(join5(root, "agents", name)).text()).pipe(orElseSucceed2(() => ""));
     hasher.update(`${name}
 ${text}
 `);
@@ -7744,10 +8135,11 @@ var Override = Struct({
   at: String4
 });
 var ObservationRecord = Union2([Observed, Override]);
-var observationsPath = (statePath = stateFilePath()) => statePath.endsWith(".json") ? `${statePath.slice(0, -".json".length)}.observations.jsonl` : `${statePath}.observations.jsonl`;
+var observationsPath = (directory = stateDirPath()) => observationsFile(directory);
 var decodeLine = decodeJsonStrict(ObservationRecord);
-var readObservations = (path = observationsPath()) => gen2(function* () {
-  const text = yield* tryPromise2(() => Bun.file(path).text()).pipe(orElseSucceed2(() => ""));
+var readGeneration = (directory, path) => gen2(function* () {
+  yield* refuseSymlinks(directory, path);
+  const text = (yield* readText(path, MAX_LOCAL_BYTES)) ?? "";
   const records = [];
   for (const line of text.split(`
 `)) {
@@ -7759,8 +8151,22 @@ var readObservations = (path = observationsPath()) => gen2(function* () {
   }
   return records;
 });
-var appendObservation = (record, path = observationsPath()) => tryPromise2(() => mkdir2(dirname2(path), { recursive: true })).pipe(andThen2(tryPromise2(() => appendFile(path, `${JSON.stringify(record)}
-`))));
+var readObservations = (directory = stateDirPath()) => gen2(function* () {
+  const current = yield* readGeneration(directory, observationsPath(directory));
+  const previous = yield* readGeneration(directory, previousObservationsFile(directory));
+  return [...previous, ...current];
+});
+var appendObservation = (record, directory = stateDirPath()) => {
+  const path = observationsPath(directory);
+  return refuseSymlinks(directory, path).pipe(andThen2(tryPromise2({
+    try: () => mkdir2(dirname2(path), { recursive: true }),
+    catch: (cause) => new StateIo({ path, cause })
+  })), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
+    try: () => appendFile(path, `${JSON.stringify(record)}
+`),
+    catch: (cause) => new StateIo({ path, cause })
+  })));
+};
 var seenOf = (records, agentId) => {
   const seen = {};
   for (const record of records) {
@@ -9662,7 +10068,7 @@ var preToolUse = (stdin) => gen2(function* () {
 });
 
 // src/hook/session-start.ts
-import { join as join3 } from "path";
+import { join as join6 } from "path";
 
 // ../../node_modules/.bun/@toon-format+toon@4.4.0/node_modules/@toon-format/toon/dist/index.mjs
 var NULL_LITERAL = "null";
@@ -10215,13 +10621,13 @@ var row = (assignment) => ({
   rev: assignment.intent_revision,
   objective: clip(assignment.objective.replace(/\s+/g, " "), 60)
 });
-var open2 = (state) => state.assignments.filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
+var open2 = (state) => sortedById(state.assignments).filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
 var summaryOf = (state) => {
   const rows = open2(state);
   return {
     rows: rows.length,
     render: (limit, textLimit) => {
-      const intent = state.intents.at(-1);
+      const intent = latestIntent(state);
       return toon({
         intent: intent === undefined ? null : {
           id: intent.id,
@@ -10289,11 +10695,11 @@ var sessionStart = gen2(function* () {
   const root = yield* pluginRoot;
   if (root === undefined)
     return "";
-  const file = Bun.file(join3(root, "agents", "holyclaude.md"));
+  const file = Bun.file(join6(root, "agents", "holyclaude.md"));
   if (!(yield* tryPromise2(() => file.exists())))
     return "";
   const rules = extractRules(yield* tryPromise2(() => file.text()), root);
-  const summary = yield* loadState(stateFilePath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
+  const summary = yield* loadState(stateDirPath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
   const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
@@ -10317,18 +10723,16 @@ var subagentStop = (stdin) => record2(stdin, (input) => ({
 }));
 
 // src/state.ts
-var loadStateFile = suspend2(() => {
-  const path = stateFilePath();
-  return loadState(path).pipe(catchTag2("SchemaError", (error) => fail5(new StateCorrupt({ path, detail: error.message }))));
-});
+var loadStateFile = suspend2(() => loadState(stateDirPath()));
 
 // src/verify.ts
 var TranscriptLine = Struct({
   message: optionalKey2(Struct({ model: optionalKey2(String4) }))
 });
 var decodeLine2 = decodeUnknownEffect2(fromJsonString2(TranscriptLine));
+var MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
 var transcriptModels = (path) => gen2(function* () {
-  const text = yield* tryPromise2(() => Bun.file(path).text()).pipe(orElseSucceed2(() => ""));
+  const text = yield* readText(path, MAX_TRANSCRIPT_BYTES).pipe(map4((read) => read ?? ""), catchTag2("StateIo", () => succeed5("")));
   const models = new Set;
   for (const line of text.split(`
 `)) {
@@ -10419,11 +10823,12 @@ var dispatchInfo = (assignment) => {
 var activeIntent = (state, id) => gen2(function* () {
   if (id !== undefined)
     return yield* findIntent(state, id);
-  const latest = state.intents.at(-1);
+  const latest = latestIntent(state);
   return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }));
 });
 var read = (use) => loadStateFile.pipe(flatMap2(use));
-var change = (transition) => loadStateFile.pipe(andThen2(updateState(stateFilePath(), transition)));
+var change = (transition) => suspend2(() => updateState(stateDirPath(), transition));
+var changeOwn = (id, transition) => change((state, { cloneId }) => cloneId.pipe(flatMap2((own) => refuseOtherClone(state, id, own)), andThen2(transition(state))));
 var need = (stdin, command) => stdin.pipe(flatMap2((text) => text.trim() === "" ? fail5(new StdinMissing({ command })) : succeed5(text)));
 var fromStdin = (schema, stdin, command) => need(stdin, command).pipe(flatMap2(decodeInput(schema)));
 var IntentUpdateBody = Struct({
@@ -10511,7 +10916,7 @@ var assignmentList = cmd({
   flags: { state: "string" },
   positionals: 0,
   run: (args) => stateFilter(stringFlag(args, "state")).pipe(flatMap2((wanted) => read((state) => {
-    const rows = state.assignments.filter((assignment) => wanted === undefined || assignment.state === wanted).map(summaryRow);
+    const rows = sortedById(state.assignments).filter((assignment) => wanted === undefined || assignment.state === wanted).map(summaryRow);
     return succeed5({ value: { assignments: rows } });
   })))
 });
@@ -10536,11 +10941,12 @@ var assignmentReserve = cmd({
     const id = args.positionals[0];
     const given = stringFlag(args, "capabilities");
     const roots = listFlag(args, "root");
-    const context = {
-      projectRoot: projectRoot(),
-      writableRoots: roots.length > 0 ? roots : [projectRoot()]
-    };
-    const reserved = yield* change((state) => gen2(function* () {
+    const reserved = yield* change((state, { cloneId }) => gen2(function* () {
+      const context = {
+        projectRoot: projectRoot(),
+        writableRoots: roots.length > 0 ? roots : [projectRoot()],
+        cloneId: yield* cloneId
+      };
       const assignment = yield* findAssignment(state, id ?? "");
       const capabilities = given === undefined ? routeFor(assignment.role).capabilities : given.split(",").filter((item) => item !== "");
       const input = yield* decodeStrict(ReserveInput)({
@@ -10572,7 +10978,7 @@ var assignmentBind = cmd({
       agent_id: agent,
       fingerprint
     });
-    const bound = yield* change((state) => bindAgent(state, input));
+    const bound = yield* changeOwn(input.assignment_id, (state) => bindAgent(state, input));
     const missed = model === undefined && effort === undefined ? undefined : yield* appendObservation({
       kind: "override",
       assignment_id: bound.id,
@@ -10580,7 +10986,7 @@ var assignmentBind = cmd({
       ...model === undefined ? {} : { model },
       ...effort === undefined ? {} : { effort },
       at: yield* nowIso
-    }).pipe(as2(undefined), catch_2((error) => succeed5(`override not recorded in ${observationsPath()}: ${String(error.cause)}`)));
+    }).pipe(as2(undefined), catch_2((error) => succeed5(`override not recorded in ${observationsPath()}: ${error.message}`)));
     return {
       value: { ...summaryRow(bound), ...missed === undefined ? {} : { observation: missed } }
     };
@@ -10593,7 +10999,7 @@ var assignmentRollback = cmd({
   root: true,
   flags: {},
   positionals: 1,
-  run: (args) => withRef(args.positionals[0]).pipe(flatMap2((ref) => change((state) => rollbackReservation(state, ref))), map4((assignment) => ({ value: summaryRow(assignment) })))
+  run: (args) => withRef(args.positionals[0]).pipe(flatMap2((ref) => changeOwn(ref.assignment_id, (state) => rollbackReservation(state, ref))), map4((assignment) => ({ value: summaryRow(assignment) })))
 });
 var assignmentFinish = cmd({
   path: ["assignment", "finish"],
@@ -10614,7 +11020,7 @@ var assignmentFinish = cmd({
       outcome,
       result: body.result
     });
-    const done = yield* change((state) => finish(state, input));
+    const done = yield* changeOwn(input.assignment_id, (state) => finish(state, input));
     return { value: summaryRow(done) };
   })
 });
@@ -10632,7 +11038,7 @@ var assignmentCancel = cmd({
       notification: "stopped",
       ...reason === undefined ? {} : { reason }
     });
-    const done = yield* change((state) => cancel(state, input));
+    const done = yield* changeOwn(input.assignment_id, (state) => cancel(state, input));
     return { value: summaryRow(done) };
   })
 });
@@ -10729,11 +11135,24 @@ var routes2 = cmd({
 var reconcileList = cmd({
   path: ["reconcile"],
   usage: "reconcile",
-  summary: "list Running rows to confirm by agent id",
+  summary: "list Running rows to confirm by agent id, and those running elsewhere",
   root: false,
   flags: {},
   positionals: 0,
-  run: () => read((state) => succeed5({ value: { running: reconcile(state).map(summaryRow) } }))
+  run: () => read((state) => suspend2(() => readCloneId(stateDirPath())).pipe(map4((cloneId) => {
+    const { local, elsewhere } = reconcile(state, cloneId);
+    return {
+      value: {
+        running: local.map(summaryRow),
+        ...elsewhere.length === 0 ? {} : {
+          running_elsewhere: elsewhere.map((row) => ({
+            ...summaryRow(row),
+            clone: row.clone_id
+          }))
+        }
+      }
+    };
+  })))
 });
 var reconcileResolve = cmd({
   path: ["reconcile", "resolve"],
@@ -10833,11 +11252,14 @@ var HINTS = {
   DispatchRefused: "Fix the condition named in the message, then reserve again.",
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence: "Cover exactly the declared labels in criteria_evidence and required_evidence.",
-  TooLarge: "Shorten the input to fit the limit.",
+  TooLarge: "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
   StateLocked: "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
-  StateIo: "Check HOLYCLAUDE_STATE_FILE or CLAUDE_PROJECT_DIR and the file permissions.",
-  StateCorrupt: "Fix the field the message names in the state file, or restore the file from a backup; a missing file reads as empty state.",
+  StateIo: "Check HOLYCLAUDE_STATE_DIR or CLAUDE_PROJECT_DIR and the file permissions.",
+  SymlinkRefused: "Replace the symbolic link the message names with a real file or directory, or review why the repository has one; the state directory must hold none.",
+  MigratedFileInTheWay: "Move the state.json.migrated the message names out of the folder (or delete it if you no longer need it), then rerun; the old state.json is still in place.",
+  OwnedElsewhere: "Another clone reserved this Assignment. Settle it from there, or with `holyclaude reconcile resolve <id>` once you have evidence about its worker.",
+  CorruptRecord: "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError: "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
   NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",

@@ -91,7 +91,7 @@ export class InsufficientEvidence extends Data.TaggedError("InsufficientEvidence
   }
 }
 
-/** The state file or an input exceeds its size cap. */
+/** A state file or an input exceeds its size cap. */
 export class TooLarge extends Data.TaggedError("TooLarge")<{
   readonly subject: string
   readonly bytes: number
@@ -120,7 +120,48 @@ export class LockLost extends Data.TaggedError("LockLost")<{
   }
 }
 
-/** Reading or writing the state file failed. */
+/** A file under the state directory is unreadable, malformed or disagrees with where it lives. */
+export class CorruptRecord extends Data.TaggedError("CorruptRecord")<{
+  readonly path: string
+  readonly reason: string
+}> {
+  override get message() {
+    return `${this.path} is not a valid state file: ${this.reason}`
+  }
+}
+
+/** A path under the state directory is a symbolic link, so a write through it could land elsewhere. */
+export class SymlinkRefused extends Data.TaggedError("SymlinkRefused")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `${this.path} is a symbolic link; nothing under the state directory may be one`
+  }
+}
+
+/**
+ * An earlier version's state file waits to be migrated, but a different file already sits where the
+ * migrated copy goes, so renaming would destroy it.
+ */
+export class MigratedFileInTheWay extends Data.TaggedError("MigratedFileInTheWay")<{
+  readonly path: string
+}> {
+  override get message() {
+    return `${this.path} already exists and differs from the state file waiting to be migrated; nothing was migrated. Move ${this.path} away, then rerun`
+  }
+}
+
+/** The Assignment is Running for another clone, whose own root settles it. */
+export class OwnedElsewhere extends Data.TaggedError("OwnedElsewhere")<{
+  readonly id: string
+  readonly clone_id: string
+}> {
+  override get message() {
+    return `${this.id} is running for clone ${this.clone_id}, not this one; its own root settles it. Use \`holyclaude reconcile resolve ${this.id}\` to settle it from here`
+  }
+}
+
+/** Reading or writing a state file failed. */
 export class StateIo extends Data.TaggedError("StateIo")<{
   readonly path: string
   readonly cause: unknown

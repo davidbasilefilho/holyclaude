@@ -37,10 +37,14 @@ export const BindAgentInput = Schema.Struct({
 /** Decoded input of bindAgent. */
 export type BindAgentInput = typeof BindAgentInput.Type
 
-/** Where the CLI runs: the project root, and the roots a ScopedWrite path must stay inside. */
+/**
+ * Where the CLI runs: the project root, the roots a ScopedWrite path must stay inside, and the id
+ * of this clone when it has one. Only Running writers of this clone count toward ownership.
+ */
 export interface DispatchContext {
   readonly projectRoot: string
   readonly writableRoots: ReadonlyArray<string>
+  readonly cloneId?: string | undefined
 }
 
 const MUTABILITY_RANK = { ReadOnly: 0, ScopedWrite: 1 } as const
@@ -88,6 +92,8 @@ export const reserve = (state: State, input: ReserveInput, context: DispatchCont
       (other) =>
         writes &&
         other.state === "Running" &&
+        // A row another clone reserved is not held against this one: git shows an overlap at merge.
+        (other.clone_id === undefined || other.clone_id === context.cloneId) &&
         other.mutability !== "ReadOnly" &&
         anyOverlap(other.metadata.ownership_paths, ownership_paths),
     )

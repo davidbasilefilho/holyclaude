@@ -2,12 +2,12 @@ import { Effect, Schema } from "effect"
 
 import { InvalidRecord } from "../errors.ts"
 import { AssignmentDraft, isTerminal, type Assignment } from "../model/assignment.ts"
+import { newId } from "../model/ids.ts"
 import { Id } from "../model/primitives.ts"
 import {
   findAssignment,
   findIntent,
   invalidTransition,
-  nextId,
   type Change,
   type State,
 } from "../model/state.ts"
@@ -34,7 +34,7 @@ export const createAssignment = (state: State, draft: AssignmentDraft) =>
     const assignment: Assignment = {
       ...draft,
       metadata: { ...draft.metadata, ownership_paths },
-      id: nextId("assignment", state.assignments),
+      id: yield* newId("assignment"),
       state: "Ready",
       agent_id: null,
       result: null,

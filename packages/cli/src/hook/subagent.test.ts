@@ -9,22 +9,20 @@ import { observationsPath, readObservations } from "../observations.ts"
 import { subagentStart, subagentStop } from "./subagent.ts"
 
 let directory = ""
-let stateFile = ""
-const previous = process.env["HOLYCLAUDE_STATE_FILE"]
+const previous = process.env["HOLYCLAUDE_STATE_DIR"]
 
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), "holyclaude-subagent-"))
-  stateFile = join(directory, "state.json")
-  process.env["HOLYCLAUDE_STATE_FILE"] = stateFile
+  process.env["HOLYCLAUDE_STATE_DIR"] = directory
 })
 
 afterEach(() => {
-  if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_FILE"]
-  else process.env["HOLYCLAUDE_STATE_FILE"] = previous
+  if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_DIR"]
+  else process.env["HOLYCLAUDE_STATE_DIR"] = previous
   rmSync(directory, { recursive: true, force: true })
 })
 
-const records = () => Effect.runPromise(readObservations(observationsPath(stateFile)))
+const records = () => Effect.runPromise(readObservations(directory))
 
 const START = JSON.stringify({
   session_id: "s1",
@@ -106,7 +104,7 @@ describe("hook subagent-stop", () => {
   })
 
   test("an unwritable observations file does not make the hook fail", async () => {
-    await Bun.write(observationsPath(stateFile) + "/blocker", "")
+    await Bun.write(join(observationsPath(directory), "blocker"), "")
     expect(await Effect.runPromise(subagentStop(STOP))).toBe("")
   })
 })

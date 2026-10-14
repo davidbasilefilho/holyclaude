@@ -1,10 +1,11 @@
 import { Schema } from "effect"
 
-import { Id, StoredRevision, Text } from "./primitives.ts"
+import { IntentId } from "./ids.ts"
+import { StoredRevision, Text } from "./primitives.ts"
 
 /** The user's accepted task. The revision bumps only on a material change. */
 export const Intent = Schema.Struct({
-  id: Id,
+  id: IntentId,
   objective: Text,
   requirements: Schema.String,
   revision: StoredRevision,

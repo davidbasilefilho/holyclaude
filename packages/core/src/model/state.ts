@@ -2,12 +2,14 @@ import { Effect, Schema } from "effect"
 
 import {
   InvalidRecord,
+  OwnedElsewhere,
   InvalidTransition,
   NoRevision,
   StaleRevision,
   UnknownRecord,
 } from "../errors.ts"
 import { Assignment } from "./assignment.ts"
+import { sortedById } from "./ids.ts"
 import { Intent } from "./intent.ts"
 import { Worker } from "./worker.ts"
 
@@ -46,6 +48,18 @@ export const findAssignment = (state: State, id: string) => {
     : Effect.succeed(found)
 }
 
+/**
+ * Fails with OwnedElsewhere when the Assignment is Running for another clone. Its worker lives in a
+ * session this clone cannot see, so binding, rolling back, cancelling or finishing it here would
+ * act on a row that is not this clone's. An unknown id passes; the transition reports that.
+ */
+export const refuseOtherClone = (state: State, id: string, cloneId: string | undefined) => {
+  const row = state.assignments.find((assignment) => assignment.id === id)
+  return row?.state === "Running" && row.clone_id !== undefined && row.clone_id !== cloneId
+    ? Effect.fail(new OwnedElsewhere({ id, clone_id: row.clone_id }))
+    : Effect.void
+}
+
 /** Fails because the operation does not apply to the Assignment's current state. */
 export const invalidTransition = (assignment: Assignment, action: string) =>
   Effect.fail(new InvalidTransition({ id: assignment.id, state: assignment.state, action }))
@@ -61,9 +75,8 @@ export const requireLiveRevision = (intent: Intent, given: number) =>
       ? Effect.void
       : Effect.fail(new StaleRevision({ given, live: intent.revision }))
 
-/** The next identifier for a kind of record. Records are never deleted, so counts are unique. */
-export const nextId = (prefix: string, existing: ReadonlyArray<unknown>): string =>
-  `${prefix}-${String(existing.length + 1).padStart(4, "0")}`
+/** The latest Intent: the one with the greatest id, which is the one created last. */
+export const latestIntent = (state: State): Intent | undefined => sortedById(state.intents).at(-1)
 
 /** Returns the state with one Assignment replaced. */
 export const withAssignment = (state: State, next: Assignment): State => ({
@@ -87,7 +100,11 @@ export const unchanged = (state: State, assignment: Assignment): Change<Assignme
 
 const duplicate = (ids: ReadonlyArray<string>) => ids.find((id, index) => ids.indexOf(id) !== index)
 
-/** Domain rules for a decoded state: unique ids and known references. */
+/**
+ * Domain rules for a decoded state: unique ids and known references. A worker's history may name an
+ * Assignment that is not here: workers are kept per clone while Assignments are shared through
+ * version control, so a branch switch can leave a worker with history from another branch.
+ */
 export const validateState = (state: State) =>
   Effect.gen(function* () {
     const fail = (message: string) => Effect.fail(new InvalidRecord({ message }))
@@ -114,10 +131,5 @@ export const validateState = (state: State) =>
       if (unknown !== undefined)
         return yield* fail(`Assignment ${assignment.id} references unknown assignment ${unknown}`)
     }
-    const unknownHistory = state.workers
-      .flatMap((worker) => worker.history)
-      .find((id) => !assignmentIds.includes(id))
-    if (unknownHistory !== undefined)
-      return yield* fail(`Worker history names unknown assignment ${unknownHistory}`)
     return state
   })

@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { observationsPath, readObservations } from "../observations.ts"
+import { readObservations } from "../observations.ts"
 import type { ToolInput } from "./input.ts"
 import { denyToolReason, MAX_JUDGED_BYTES } from "./policy.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./pre-tool-use.ts"
@@ -94,6 +94,7 @@ const TABLE: ReadonlyArray<Row> = [
     "time timeout 60 nice -n 5 env FOO=1 git status",
     "sh -c 'git status'",
     "cat .holyclaude/state.json",
+    "cat .holyclaude/intents/intent-0001/intent.json",
   ),
   ...denied(
     "git commit -m x",
@@ -153,6 +154,16 @@ const TABLE: ReadonlyArray<Row> = [
     "echo '{}' > .holyclaude/state.json",
     "rm -rf .holyclaude",
     "cat x | tee .holyclaude/state.json",
+    // The record files, the folder's own .gitignore and the local files are the root's too.
+    "echo '{}' > .holyclaude/intents/intent-0001/intent.json",
+    "echo '{}' > .holyclaude/intents/intent-0001/assignments/assignment-0mg8k2x1a-7f3q.json",
+    "cat x | tee .holyclaude/intents/intent-0001/intent.json",
+    "echo '' > .holyclaude/.gitignore",
+    "echo x > .holyclaude/local/workers.json",
+    "echo x >> .holyclaude/local/observations.jsonl",
+    "echo x > .holyclaude/local/agents.json",
+    "rm .holyclaude/local/lock",
+    "rm -rf .holyclaude/intents",
   ),
 
   // Executable names are normalized: Windows spellings, case and paths.
@@ -203,6 +214,9 @@ const TABLE: ReadonlyArray<Row> = [
     "Set-Content .holyclaude/state.json '{}'",
     "'{}' | Out-File .holyclaude\\state.json",
     "git status > .holyclaude\\state.json",
+    "Set-Content .holyclaude\\intents\\intent-0001\\intent.json '{}'",
+    "'x' | Out-File .holyclaude\\.gitignore",
+    "Remove-Item .holyclaude\\local\\workers.json",
   ]),
   ...rows("PowerShell", "subagent", "allow", [
     "git status",
@@ -562,6 +576,9 @@ const TABLE: ReadonlyArray<Row> = [
     "holyclaude intent create",
     "bun plugin/scripts/holyclaude.js assignment accept A1",
     "echo '{}' > .holyclaude/state.json",
+    "echo '{}' > .holyclaude/intents/intent-0001/intent.json",
+    "echo x > .holyclaude/.gitignore",
+    "echo x > .holyclaude/local/workers.json",
     "git.exe push",
     "function f { git push; }; f",
   ]),
@@ -590,6 +607,19 @@ const FILE_TABLE: ReadonlyArray<FileRow> = [
   ["Write", "packages/cli/src/main.ts", "subagent", "allow"],
   ["Edit", "docs/notes.md", "subagent", "allow"],
   ["Write", ".holyclaude/state.json", "main", "allow"],
+  ["Write", ".holyclaude/intents/intent-0001/intent.json", "subagent", "deny"],
+  ["Edit", ".holyclaude/intents/intent-0001/assignments/assignment-0001.json", "subagent", "deny"],
+  ["Write", "C:\\proj\\.holyclaude\\intents\\intent-0001\\intent.json", "subagent", "deny"],
+  ["Write", ".holyclaude/.gitignore", "subagent", "deny"],
+  ["Edit", "/home/me/proj/.holyclaude/.gitignore", "subagent", "deny"],
+  ["Write", ".holyclaude/local/workers.json", "subagent", "deny"],
+  ["Write", ".holyclaude/local/agents.json", "subagent", "deny"],
+  ["Write", ".holyclaude/local/clone.json", "subagent", "deny"],
+  ["Write", ".holyclaude/local/lock", "subagent", "deny"],
+  ["MultiEdit", ".holyclaude/local/observations.jsonl", "subagent", "deny"],
+  ["Write", ".holyclaude/intents/intent-0001/intent.json", "main", "allow"],
+  ["Write", ".holyclaude/.gitignore", "main", "allow"],
+  ["Write", ".holyclaude/local/workers.json", "main", "allow"],
   // Windows reads either separator, any case and the 8.3 short names.
   ["Write", ".holyclaude\\state.json", "subagent", "deny"],
   ["Write", "C:/proj\\.HOLYCLAUDE/state.json", "subagent", "deny"],
@@ -635,18 +665,16 @@ describe("file tools and the state directory", () => {
 
 describe("the decision reads only the fields it needs", () => {
   let directory = ""
-  let stateFile = ""
-  const previous = process.env["HOLYCLAUDE_STATE_FILE"]
+  const previous = process.env["HOLYCLAUDE_STATE_DIR"]
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), "holyclaude-hook-"))
-    stateFile = join(directory, "state.json")
-    process.env["HOLYCLAUDE_STATE_FILE"] = stateFile
+    process.env["HOLYCLAUDE_STATE_DIR"] = directory
   })
 
   afterEach(() => {
-    if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_FILE"]
-    else process.env["HOLYCLAUDE_STATE_FILE"] = previous
+    if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_DIR"]
+    else process.env["HOLYCLAUDE_STATE_DIR"] = previous
     rmSync(directory, { recursive: true, force: true })
   })
 
@@ -697,7 +725,7 @@ describe("the decision reads only the fields it needs", () => {
         effort: null,
       }),
     )
-    const records = await Effect.runPromise(readObservations(observationsPath(stateFile)))
+    const records = await Effect.runPromise(readObservations(directory))
     expect(records).toMatchObject([
       { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:Worker.implementation" },
     ])
@@ -706,7 +734,7 @@ describe("the decision reads only the fields it needs", () => {
   test("a subagent call whose agent_id is not a string is judged but cannot be observed", async () => {
     const extra = { agent_id: 7, agent_type: "holyclaude:Worker.implementation" }
     expect(await decide(call("Bash", { command: "git commit -m x" }, "main", extra))).toBe("deny")
-    expect(await Effect.runPromise(readObservations(observationsPath(stateFile)))).toEqual([])
+    expect(await Effect.runPromise(readObservations(directory))).toEqual([])
   })
 
   test("a command too deeply nested to read is denied, not waved through", async () => {

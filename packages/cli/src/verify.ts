@@ -1,4 +1,4 @@
-import { findAssignment, routeFor } from "@holyclaude/core"
+import { findAssignment, readText, routeFor } from "@holyclaude/core"
 import { Effect, Schema } from "effect"
 
 import { NotBound } from "./errors.ts"
@@ -11,11 +11,21 @@ const TranscriptLine = Schema.Struct({
 })
 const decodeLine = Schema.decodeUnknownEffect(Schema.fromJsonString(TranscriptLine))
 
-/** Every real model id the subagent transcript shows, in order of first appearance. */
+/**
+ * Largest subagent transcript read, in bytes. The path comes from the unlocked observations log, so
+ * the read is capped like every state read; a real transcript stays far below it.
+ */
+const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024
+
+/**
+ * Every real model id the subagent transcript shows, in order of first appearance. A missing or
+ * unreadable transcript shows none; one over the cap is TooLarge.
+ */
 const transcriptModels = (path: string) =>
   Effect.gen(function* () {
-    const text = yield* Effect.tryPromise(() => Bun.file(path).text()).pipe(
-      Effect.orElseSucceed(() => ""),
+    const text = yield* readText(path, MAX_TRANSCRIPT_BYTES).pipe(
+      Effect.map((read) => read ?? ""),
+      Effect.catchTag("StateIo", () => Effect.succeed("")),
     )
     const models = new Set<string>()
     for (const line of text.split("\n")) {

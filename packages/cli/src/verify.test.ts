@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import type { State } from "@holyclaude/core"
 import { Effect } from "effect"
@@ -43,21 +43,20 @@ const state: State = {
 }
 
 let directory = ""
-let stateFile = ""
 let transcript = ""
-const previous = process.env["HOLYCLAUDE_STATE_FILE"]
+const previous = process.env["HOLYCLAUDE_STATE_DIR"]
 
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), "holyclaude-verify-"))
-  stateFile = join(directory, "state.json")
   transcript = join(directory, "agent-agent-1.jsonl")
-  writeFileSync(stateFile, JSON.stringify(state))
-  process.env["HOLYCLAUDE_STATE_FILE"] = stateFile
+  // An earlier version's state file, which the store reads until a write migrates it.
+  writeFileSync(join(directory, "state.json"), JSON.stringify(state))
+  process.env["HOLYCLAUDE_STATE_DIR"] = directory
 })
 
 afterEach(() => {
-  if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_FILE"]
-  else process.env["HOLYCLAUDE_STATE_FILE"] = previous
+  if (previous === undefined) delete process.env["HOLYCLAUDE_STATE_DIR"]
+  else process.env["HOLYCLAUDE_STATE_DIR"] = previous
   rmSync(directory, { recursive: true, force: true })
 })
 
@@ -71,11 +70,13 @@ const observed = (fields: object): ObservationRecord => ({
 
 const writeTranscript = (model: string) =>
   writeFileSync(transcript, `${JSON.stringify({ message: { model } })}\n`)
-const writeObservations = (...records: ReadonlyArray<ObservationRecord>) =>
+const writeObservations = (...records: ReadonlyArray<ObservationRecord>) => {
+  mkdirSync(dirname(observationsPath(directory)), { recursive: true })
   writeFileSync(
-    observationsPath(stateFile),
+    observationsPath(directory),
     records.map((record) => `${JSON.stringify(record)}\n`).join(""),
   )
+}
 
 const verify = async () => {
   const { value, code } = await Effect.runPromise(verifyAssignment("assignment-0001"))
