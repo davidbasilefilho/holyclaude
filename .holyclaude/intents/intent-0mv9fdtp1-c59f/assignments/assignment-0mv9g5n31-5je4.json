@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review PR5's docs (README Cloud sessions section, Third-party material paragraph, new docs/DECISIONS.md) against their acceptance criteria and the facts given.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9g2wfu-rkz8.diff",
+    "Worktree worktree pr5 (README.md, docs/DECISIONS.md), base origin/main"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Every documented claim matches the facts listed in the prompt; every observed claim is marked observed; inferences presented as facts are findings.",
+    "DECISIONS.md covers each standing decision with its reason, states the size-cap decision as content limits removed and input-safety bounds kept, and records frontend-design provenance accurately (the claude-code hash is the repository HEAD at verification, not necessarily the last commit touching the skill).",
+    "Nothing from any audited third-party repository appears.",
+    "Redundant, obsolete, conflicting or over-long text is reported as findings, blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9g2wfu-rkz8"
+    ]
+  },
+  "id": "assignment-0mv9g5n31-5je4",
+  "state": "Succeeded",
+  "result": "PR5 docs review: not ready; 6 blockers (size-cap statement contradicts write-side caps; claude-code hash wording; observed bullet adds only and an unmarked inference; commit-keys line ignores managed-only keys; unqualified agent-setting claims conflict with cloud observation; stop-hook overstatement) and optional findings (grammar, unmeasured clause, duplication, claude.ai and Cowork). Documented claims otherwise match.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Each blocker cites file and line and checks against code (codec.ts, files.ts, records.ts) and the facts given; I verified the write-side cap claim matches the README and codec constants.",
+    "criteria_evidence": {
+      "Every documented claim matches the facts listed in the prompt; every observed claim is marked observed; inferences presented as facts are findings.": "Documented claims matched; B3, B6 flag observed overreach and inference.",
+      "DECISIONS.md covers each standing decision with its reason, states the size-cap decision as content limits removed and input-safety bounds kept, and records frontend-design provenance accurately (the claude-code hash is the repository HEAD at verification, not necessarily the last commit touching the skill).": "Coverage met; B1 size-cap contradiction; B2 hash wording.",
+      "Nothing from any audited third-party repository appears.": "Reviewer found no audited-repo content; open question answered: anthropics repos and T3 Code are not audited.",
+      "Redundant, obsolete, conflicting or over-long text is reported as findings, blockers separated from optional.": "B4, B5 conflicts; O1-O4 optional."
+    },
+    "required_evidence": {
+      "blockers": "B1-B6.",
+      "optional-findings": "O1-O6."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

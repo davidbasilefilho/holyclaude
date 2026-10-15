@@ -6,5 +6,9 @@
   "bracketSameLine": true,
   "sortImports": true,
   "sortPackageJson": true,
-  "ignorePatterns": ["plugin/scripts/holyclaude.js", "plugin/skills/frontend-design/**"]
+  "ignorePatterns": [
+    ".holyclaude/**",
+    "plugin/scripts/holyclaude.js",
+    "plugin/skills/frontend-design/**"
+  ]
 }

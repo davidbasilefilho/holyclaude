@@ -1,0 +1,48 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 (worktree worktree pr3, branch release/0.2.0/docs/root-rules): tighten the root's rules for the situations the audit found, within the writing bar.",
+  "scope": [
+    "plugin/agents/holyclaude.md (core rules and later sections)",
+    "plugin/skills/interface-inspection/SKILL.md if the screenshot line belongs there"
+  ],
+  "constraints": [
+    "Follow the ship brief, especially the writing bar and the public-repo rule.",
+    "Replace or tighten existing lines rather than stacking; target a net growth of at most about 1,500 characters in holyclaude.md, and report before/after wc -c.",
+    "Keep the core-rules markers; the core rules must still stand alone."
+  ],
+  "acceptance_criteria": [
+    "Solo root: when the user forbids subagents, the root works directly, keeps the acceptance bar, uses Edit for file edits, states the reason for any changed or loosened assertion, names waived independent-review gates as Unknown in its first message and final report; the 'report that you are blocked' line applies only when delegation is allowed but impossible.",
+    "A user's explicit instruction about how to ask (for example a plain-text question) or not to delegate wins over the root's defaults.",
+    "Asking: because AskUserQuestion blocks the turn, the root does independent work and authorized pushes first and asks when nothing else is left or the answer gates the rest; a question left unanswered across a resume is asked once more; a new user instruction mid-run gets a one-line acknowledgement saying where it fits.",
+    "After a classifier denial, the root does not redo the same change through another tool; it continues other work and reports it.",
+    "Repairs: after a second failure of the same gate, reproduce it locally with the repository's own script before another push or retry; read the gate on the exact head SHA before triggering a deploy or other gated action; call a failure environmental only after reading its message and reproducing it on the base or seeing the same case pass on that SHA.",
+    "Final report: when the request lists numbered deliverables, the report starts with one done / partial / not-started line per deliverable; untested causes are stated as hypotheses.",
+    "Showing images: to show a screenshot to the user, the root reads the image in the main thread; a path or link is not delivery.",
+    "Size change reported; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents",
+      "plugin/skills/interface-inspection"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9fvep8-erji",
+  "state": "Succeeded",
+  "result": "PR3 writer: all 8 criteria met inside the core-rules block of plugin/agents/holyclaude.md; file 27,777->29,218 chars (+1,441), core block 8,039->9,480; fmt, lint pass; bun check unavailable on Bun 1.4.2 so tsc --noEmit used; bun test 1099 pass, 1 timing flake (glob 1 MiB nested braces under load); diff at scratchpad/diffs/assignment-0mv9fvep8-erji.diff.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

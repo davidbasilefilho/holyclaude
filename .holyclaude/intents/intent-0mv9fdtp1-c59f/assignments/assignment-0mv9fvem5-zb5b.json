@@ -1,0 +1,66 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR1 (worktree worktree pr1, branch release/0.2.0/fix/hook-scope): the observing hooks record only holyclaude specialists, and the SessionStart hook leaves out the core rules when the main thread already runs as the holyclaude agent.",
+  "scope": [
+    "packages/cli/src hook and observation code and their tests",
+    "plugin/scripts/holyclaude.js bundle",
+    "README.md sections describing these hooks"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md.",
+    "Keep the state summary and CLI pointer in the SessionStart output in both cases.",
+    "No new limits."
+  ],
+  "acceptance_criteria": [
+    "A hook payload for a subagent whose agent_type is not a holyclaude specialist (empty, a built-in type, or another plugin's) writes nothing under .holyclaude/, including no .gitignore and no local/ directory; holyclaude specialists are recorded as before.",
+    "When the SessionStart payload says the main thread runs as the holyclaude agent, additionalContext omits the core-rules block and keeps the state summary; otherwise it is unchanged.",
+    "Regression tests for both behaviors fail on the base and pass after the change.",
+    "README describes both behaviors.",
+    "Format, lint, typecheck, test pass; bundle rebuilt and current."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "changed-paths",
+    "bun-version",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/hooks/hooks.json",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9fvem5-zb5b",
+  "state": "Succeeded",
+  "result": "PR1 writer: observe() records only when sighting or logged agent_type starts with holyclaude:; SubagentStop passes agent_type; non-specialists write nothing (no .holyclaude/, .gitignore, local/). SessionStart reads stdin and omits core rules when agent_type is holyclaude:holyclaude or holyclaude; summary kept; unreadable payload keeps rules. 9 new tests; 6 behavior tests fail on base, session-start tests fail on base by signature only; 3 subagent-stop tests adapted to the new contract. Gates on Bun 1.4.3: oxfmt, oxlint, bun check (76 files), bun test 1109 pass; bundle rebuilt with 1.4.3. README updated. Diff at scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Independent code review (no blockers, bundle byte-identical, e2e and mutation evidence) and security review (no finding at medium or above) confirm the change; tests fail on base for behavior; gates green on Bun 1.4.3.",
+    "criteria_evidence": {
+      "A hook payload for a subagent whose agent_type is not a holyclaude specialist (empty, a built-in type, or another plugin's) writes nothing under .holyclaude/, including no .gitignore and no local/ directory; holyclaude specialists are recorded as before.": "subagent.test.ts non-specialist cases assert no local/ or .gitignore; reviewer CLI runs; specialist paths verified.",
+      "When the SessionStart payload says the main thread runs as the holyclaude agent, additionalContext omits the core-rules block and keeps the state summary; otherwise it is unchanged.": "Reviewer e2e table: 35 chars state only vs 8005 chars with rules.",
+      "Regression tests for both behaviors fail on the base and pass after the change.": "6 behavior tests fail on base; session-start tests behavior-sensitive per mutations.",
+      "README describes both behaviors.": "Reviewer confirmed README matches.",
+      "Format, lint, typecheck, test pass; bundle rebuilt and current.": "oxfmt, oxlint, bun check, 1109 tests; bundle cmp identical to 1.4.3 build."
+    },
+    "required_evidence": {
+      "checks-run": "Writer and reviewer gate runs on Bun 1.4.3.",
+      "regression-tests": "subagent.test.ts, pre-tool-use.test.ts, session-start.test.ts new cases.",
+      "changed-paths": "README.md, commands.ts, hook/observe.ts, subagent.ts, session-start.ts, three tests, bundle.",
+      "bun-version": "Bundle built with bunx bun@1.4.3.",
+      "diff-file": "scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
