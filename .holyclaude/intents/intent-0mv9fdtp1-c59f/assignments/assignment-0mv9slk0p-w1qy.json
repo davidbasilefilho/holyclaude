@@ -4,7 +4,7 @@
   "role": "Worker.implementation",
   "objective": "Restructure the README into the owner's section layout.",
   "scope": [
-    "/home/user/holyclaude (branch ccr-dd890d7d-vpxecw = main plus the LICENSE line): README.md, and docs/DECISIONS.md only to fix links into renamed README sections."
+    "the main checkout (branch ccr-dd890d7d-vpxecw = main plus the LICENSE line): README.md, and docs/DECISIONS.md only to fix links into renamed README sections."
   ],
   "constraints": [
     "Writing bar; keep every technical fact that still applies; T3 Code appears only in Special thanks; no word or byte caps; no git writes; leave .holyclaude and LICENSE alone."

@@ -4,7 +4,7 @@
   "role": "Reviewer.artifact",
   "objective": "Independently review the restructured README and the LICENSE line.",
   "scope": [
-    "Diff scratchpad/diffs/assignment-0mv9slk0p-w1qy.diff (README.md) and scratchpad/diffs/assignment-0mv9s8b8u-z7x0.diff (LICENSE); full files in /home/user/holyclaude; base main c3d2131."
+    "Diff scratchpad/diffs/assignment-0mv9slk0p-w1qy.diff (README.md) and scratchpad/diffs/assignment-0mv9s8b8u-z7x0.diff (LICENSE); full files in the main checkout; base main c3d2131."
   ],
   "constraints": [
     "Read-only; first review, read the whole README."

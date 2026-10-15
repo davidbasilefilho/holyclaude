@@ -4,7 +4,7 @@
   "role": "Worker.mechanical",
   "objective": "Fill the LICENSE copyright line with 2026 and David Basile Filho.",
   "scope": [
-    "Main checkout /home/user/holyclaude on branch ccr-dd890d7d-vpxecw (= main), LICENSE only."
+    "Main checkout the main checkout on branch ccr-dd890d7d-vpxecw (= main), LICENSE only."
   ],
   "constraints": [
     "Change only the appendix copyright line; keep the rest of the Apache-2.0 text verbatim; no git writes."
