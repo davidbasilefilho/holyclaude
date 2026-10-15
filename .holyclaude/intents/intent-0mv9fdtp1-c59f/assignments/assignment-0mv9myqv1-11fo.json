@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Worker.mechanical",
+  "objective": "Stack-rules correction (worktree pr9): replace two sentences in the Branches paragraph and the CI watching bullet with the user-approved corrected text.",
+  "scope": [
+    "plugin/agents/holyclaude.md"
+  ],
+  "constraints": [
+    "Apply the given text verbatim; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "Replacements applied verbatim.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9myqv1-11fo",
+  "state": "Succeeded",
+  "result": "Corrected stack-rules text applied verbatim; plain holyclaude assignment list; gates pass (1136).",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "User-approved text applied verbatim and checked by grep; artifact review blockers resolved by the corrected text the user approved.",
+    "criteria_evidence": {
+      "Replacements applied verbatim.": "Gates pass 1136; text verified.",
+      "Format, lint, typecheck and test pass.": "Gates pass 1136; text verified."
+    },
+    "required_evidence": {
+      "checks-run": "Gates pass 1136; text verified.",
+      "diff-file": "Gates pass 1136; text verified."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

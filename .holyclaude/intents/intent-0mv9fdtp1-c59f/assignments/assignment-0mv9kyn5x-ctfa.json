@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Reviewer.artifact",
+  "objective": "Review PR8's prose: the shared writing bar in three agent files, the root's Intent line and instruction-text Assignment line, the assignments, continue-work and handoff skills, and README's Intent sections.",
+  "scope": [
+    "Saved diff scratchpad/diffs/pr8-full.diff (prose files only)",
+    "Worktree pr8 at 258ab95"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge the PR8 changes, not text PR8 did not touch."
+  ],
+  "acceptance_criteria": [
+    "Docs match the implemented behavior (commands, flags, resolution order, close/reopen rules, absent state reads as open, collaborators need the same version, local/.gitignore).",
+    "The writing bar reads well for writer and reviewer alike; the root line names the expected size and no longer asks to quote the bar.",
+    "No contradiction with other sections; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9kcrjn-7ui8",
+      "assignment-0mv9kcroa-ru9o",
+      "assignment-0mv9ktq2k-obv3"
+    ]
+  },
+  "id": "assignment-0mv9kyn5x-ctfa",
+  "state": "Succeeded",
+  "result": "PR8 prose review: B1 handoff suggests intent use while claiming it writes nothing; optional O1 continue-work trigger vs core rule, O2 intent list in handoff, O3 active-intent.json not append-only, O4 NoActiveIntent zero-open wording (+ main.ts hint), O5 positional id and JSON id precedence, O6 closed Intent keeps Ready rows, O7 intent use bullet, O8-O10 bar wording.",
+  "acceptance": {
+    "intent_revision": 3,
+    "rationale": "Docs checked line by line against the implementing sources.",
+    "criteria_evidence": {
+      "Docs match the implemented behavior (commands, flags, resolution order, close/reopen rules, absent state reads as open, collaborators need the same version, local/.gitignore).": "B1 and O1-O10.",
+      "The writing bar reads well for writer and reviewer alike; the root line names the expected size and no longer asks to quote the bar.": "B1 and O1-O10.",
+      "No contradiction with other sections; blockers separated from optional.": "B1 and O1-O10."
+    },
+    "required_evidence": {
+      "blockers": "B1 and O1-O10.",
+      "optional-findings": "B1 and O1-O10."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

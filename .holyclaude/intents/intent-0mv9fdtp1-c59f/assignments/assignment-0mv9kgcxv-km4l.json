@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Worker.validation",
+  "objective": "Run the gates on PR7's merged head (worktree pr7 at ae166ff) and report exact outcomes.",
+  "scope": [
+    "Worktree pr7 at ae166ff"
+  ],
+  "constraints": [
+    "Read-only on source."
+  ],
+  "acceptance_criteria": [
+    "oxfmt --check, oxlint, bun check, bun test (Bun 1.4.3) with exit codes and counts, including scripts/architecture.test.ts against PR7's new imports.",
+    "Bundle build matches the committed bundle (cmp)."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "bundle-check"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9kgcxv-km4l",
+  "state": "Succeeded",
+  "result": "PR7 head ae166ff: fmt, lint, check pass; bun test 1154 pass 1 fail: architecture flags statSync from node:fs in packages/core/src/legacy.test.ts (PR7 inode test); baseline clean; bundle identical.",
+  "acceptance": {
+    "intent_revision": 3,
+    "rationale": "Exact SHA, failure reproduced alone and baselined.",
+    "criteria_evidence": {
+      "oxfmt --check, oxlint, bun check, bun test (Bun 1.4.3) with exit codes and counts, including scripts/architecture.test.ts against PR7's new imports.": "One deterministic failure, rest green.",
+      "Bundle build matches the committed bundle (cmp).": "One deterministic failure, rest green."
+    },
+    "required_evidence": {
+      "checks-run": "One deterministic failure, rest green.",
+      "bundle-check": "One deterministic failure, rest green."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

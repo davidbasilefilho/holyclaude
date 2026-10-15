@@ -31,13 +31,19 @@ describe("the local folder's own .gitignore", () => {
     expect(await readFile(localIgnore(), "utf8")).toBe("*\n")
   })
 
-  test("a local/ folder that has none gets one, and one already there stays", async () => {
+  test("a local/ folder that has none gets one", async () => {
     await mkdir(join(directory, "local"), { recursive: true })
     await touch()
     expect(await readFile(localIgnore(), "utf8")).toBe("*\n")
-    await writeFile(localIgnore(), "mine\n")
-    await touch()
-    expect(await readFile(localIgnore(), "utf8")).toBe("mine\n")
+  })
+
+  test("a different one, which a repository can commit, is put back to *, however large", async () => {
+    await mkdir(join(directory, "local"), { recursive: true })
+    for (const content of ["!active-intent.json\n", "", `*\n${"#".repeat(1024 * 1024)}\n`]) {
+      await writeFile(localIgnore(), content)
+      await touch()
+      expect(await readFile(localIgnore(), "utf8")).toBe("*\n")
+    }
   })
 })
 

@@ -27,6 +27,7 @@ import {
   findAssignment,
   findIntent,
   followUp,
+  intentInUse,
   isOpenAssignment,
   projectRoot,
   reconcile,
@@ -130,13 +131,40 @@ const dispatchInfo = (assignment: Assignment) => {
 }
 
 /**
+ * The Intent this clone stored with `intent use`. An unreadable or undecodable choice counts as
+ * none, as in the SessionStart hook: it must never stop a command that names its Intent.
+ */
+const storedIntent = Effect.suspend(() => readActiveIntent(stateDirPath())).pipe(
+  Effect.orElseSucceed(() => undefined),
+)
+
+/**
  * The Intent a command acts on: the one named by `id`, else this clone's stored choice while it is
- * open, else the only open Intent.
+ * open, else the only open Intent. The stored choice is read only when `id` does not settle it.
  */
 const activeIntent = (state: State, id: string | undefined) =>
-  Effect.suspend(() => readActiveIntent(stateDirPath())).pipe(
+  (id === undefined ? storedIntent : Effect.succeed(undefined)).pipe(
     Effect.flatMap((stored) => resolveIntent(state, id, stored)),
   )
+
+/**
+ * The one Intent id two sources name, or a usage error when they name different ones. `source` says
+ * where `named` came from, for the message.
+ */
+const agreedIntent = (
+  usage: string,
+  source: string,
+  named: string | undefined,
+  flag: string | undefined,
+) =>
+  Effect.gen(function* () {
+    if (named !== undefined && flag !== undefined && named !== flag)
+      return yield* usageError(
+        usage,
+        `${source} ${named} and --intent ${flag} name different Intents`,
+      )
+    return named ?? flag
+  })
 
 const INTENT_FLAG = { intent: "string" } as const
 
@@ -215,16 +243,19 @@ const withRef = (id: string | undefined) => decodeStrict(AssignmentRef)({ assign
 
 const cmd = (command: Command): Command => command
 
+const SHOW_USAGE = "intent show [id | --intent <id>]"
+
 const intentShow = cmd({
   path: ["intent", "show"],
-  usage: "intent show [id | --intent <id>]",
+  usage: SHOW_USAGE,
   summary: "show the Intent in use, or the one named",
   root: false,
   flags: INTENT_FLAG,
   positionals: 1,
   optional: true,
   run: (args) =>
-    read((state) => activeIntent(state, stringFlag(args, "intent") ?? args.positionals[0])).pipe(
+    agreedIntent(SHOW_USAGE, "Argument", args.positionals[0], stringFlag(args, "intent")).pipe(
+      Effect.flatMap((id) => read((state) => activeIntent(state, id))),
       Effect.map((intent) => ({ value: intent })),
     ),
 })
@@ -302,16 +333,36 @@ const intentClose = cmd({
     }),
 })
 
+const REOPEN_USAGE = "intent reopen [--intent <id>]"
+
+/**
+ * The Intent to reopen: the one named by `--intent`, else the only closed Intent. The Intent in use
+ * is open by definition, so it cannot name a closed one.
+ */
+const closedIntent = (state: State, id: string | undefined) =>
+  Effect.gen(function* () {
+    if (id !== undefined) return yield* findIntent(state, id)
+    const closed = sortedById(state.intents).filter((intent) => intent.state === "closed")
+    const [only] = closed
+    if (closed.length === 1 && only !== undefined) return only
+    return yield* usageError(
+      REOPEN_USAGE,
+      closed.length === 0
+        ? "No Intent is closed"
+        : `Several Intents are closed; pass --intent <id>. Closed Intents: ${closed.map((intent) => intent.id).join(", ")}`,
+    )
+  })
+
 const intentReopen = cmd({
   path: ["intent", "reopen"],
-  usage: "intent reopen [--intent <id>]",
-  summary: "open a closed Intent again; the revision bumps",
+  usage: REOPEN_USAGE,
+  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
   root: true,
   flags: INTENT_FLAG,
   positionals: 0,
   run: (args) =>
     change((state) =>
-      activeIntent(state, stringFlag(args, "intent")).pipe(
+      closedIntent(state, stringFlag(args, "intent")).pipe(
         Effect.flatMap((target) => reopenIntent(state, target.id)),
       ),
     ).pipe(Effect.map((intent) => ({ value: intent }))),
@@ -320,21 +371,36 @@ const intentReopen = cmd({
 const intentCreate = cmd({
   path: ["intent", "create"],
   usage: "intent create",
-  summary: "record a new Intent at revision 1",
+  summary: "record a new Intent at revision 1 and put it in use; prints the Intent it replaced",
   input: '{"objective":"...","requirements":"..."?}',
   root: true,
   flags: {},
   positionals: 0,
   run: (_args, stdin) =>
     fromStdin(CreateIntentInput, stdin, "intent create").pipe(
-      Effect.flatMap((input) => change((state) => createIntent(state, input))),
+      Effect.flatMap((input) =>
+        change((state, { useIntent }) =>
+          Effect.gen(function* () {
+            // Read under the lock, so the Intent reported as replaced is the one this write replaces.
+            const replaced = intentInUse(state, yield* storedIntent)
+            const created = yield* createIntent(state, input)
+            yield* useIntent(created.value.id)
+            return {
+              state: created.state,
+              value: { ...created.value, in_use: created.value.id, replaced: replaced?.id ?? null },
+            }
+          }),
+        ),
+      ),
       Effect.map((intent) => ({ value: intent })),
     ),
 })
 
+const UPDATE_USAGE = "intent update [--intent <id>] [--material]"
+
 const intentUpdate = cmd({
   path: ["intent", "update"],
-  usage: "intent update [--intent <id>] [--material]",
+  usage: UPDATE_USAGE,
   summary: "edit the Intent; --material bumps the revision",
   input: '{"id":"..."?,"objective":"..."?,"requirements":"..."?}',
   root: true,
@@ -343,14 +409,18 @@ const intentUpdate = cmd({
   run: (args, stdin) =>
     fromStdin(IntentUpdateBody, stdin, "intent update").pipe(
       Effect.flatMap((body) =>
-        change((state) =>
-          activeIntent(state, body.id ?? stringFlag(args, "intent")).pipe(
-            Effect.flatMap((intent) =>
-              updateIntent(state, {
-                ...body,
-                id: intent.id,
-                material: booleanFlag(args, "material"),
-              }),
+        agreedIntent(UPDATE_USAGE, "JSON id", body.id, stringFlag(args, "intent")).pipe(
+          Effect.flatMap((id) =>
+            change((state) =>
+              activeIntent(state, id).pipe(
+                Effect.flatMap((intent) =>
+                  updateIntent(state, {
+                    ...body,
+                    id: intent.id,
+                    material: booleanFlag(args, "material"),
+                  }),
+                ),
+              ),
             ),
           ),
         ),

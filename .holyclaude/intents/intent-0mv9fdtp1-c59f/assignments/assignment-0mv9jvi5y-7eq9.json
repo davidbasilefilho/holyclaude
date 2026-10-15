@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of PR4's second repair to the CI watching section.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9jsv6z-z8yw.diff",
+    "Worktree pr4"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only the changed CI watching text; the fallback now lives in the core rules of a lower PR."
+  ],
+  "acceptance_criteria": [
+    "The summary-line keys map to the fields read and include unknown=; the text no longer claims failed names in the line.",
+    "The GraphQL review-threads query is syntactically valid with its variables and states its 100-thread page.",
+    "No contradiction with the core rules or the aggregation rules; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9guhvv-y9si",
+      "assignment-0mv9h1yjx-9wo6",
+      "assignment-0mv9jsv6z-z8yw",
+      "assignment-0mv9gy61n-2mkk",
+      "assignment-0mv9h46fm-i2l8"
+    ]
+  },
+  "id": "assignment-0mv9jvi5y-7eq9",
+  "state": "Succeeded",
+  "result": "PR4 CI-section re-review: C1/C2 met; B1 counts cover reported checks only, required-check list unread; B2 failed-read reason vs counts-only line; O1-O8 optional.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "B1, B2 and O5 verified against lines 130-134; taken as exact-text fixes.",
+    "criteria_evidence": {
+      "The summary-line keys map to the fields read and include unknown=; the text no longer claims failed names in the line.": "Criteria verdicts; B1, B2, O1-O8.",
+      "The GraphQL review-threads query is syntactically valid with its variables and states its 100-thread page.": "Criteria verdicts; B1, B2, O1-O8.",
+      "No contradiction with the core rules or the aggregation rules; blockers separated from optional.": "Criteria verdicts; B1, B2, O1-O8."
+    },
+    "required_evidence": {
+      "blockers": "Criteria verdicts; B1, B2, O1-O8.",
+      "optional-findings": "Criteria verdicts; B1, B2, O1-O8."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

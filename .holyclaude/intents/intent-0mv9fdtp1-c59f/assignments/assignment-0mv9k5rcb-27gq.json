@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR7 final repair (worktree pr7): time-bound the SessionStart state load and fix two review nits.",
+  "scope": [
+    "packages/cli/src/hook/session-start.ts, observe.ts, pre-tool-use.ts, main.ts and tests",
+    "plugin/scripts/holyclaude.js",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief; no content caps."
+  ],
+  "acceptance_criteria": [
+    "S1: SessionStart's state load is wrapped in a time bound (about 10 s) that degrades to the rules plus a state error; regression test.",
+    "The TooLarge hint in main.ts no longer tells the user to shorten input.",
+    "stateDirPath() is resolved in preToolUse before the recording is forked, and the 'never waits' wording in JSDoc and README says the verdict is printed first while the process ends after the bounded recording.",
+    "Format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9h76ik-a9me"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9k5rcb-27gq",
+  "state": "Succeeded",
+  "result": "PR7 final repair: SessionStart state load under a 10 s timeoutOption degrading to rules plus state error (regression test fails before); TooLarge hint reworded; state dir resolved before fork, wording fixed; gates pass (1148); bundle rebuilt.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -82,8 +82,8 @@ describe("assignment bind with an observation that cannot be written", () => {
 })
 
 const command = (path: string) => COMMANDS.find((candidate) => candidate.path.join(" ") === path)!
-const runCommand = (path: string, positionals: string[] = [], flags = {}) =>
-  Effect.runPromise(command(path).run({ positionals, flags }, Effect.succeed("")))
+const runCommand = (path: string, positionals: string[] = [], flags = {}, stdin = "") =>
+  Effect.runPromise(command(path).run({ positionals, flags }, Effect.succeed(stdin)))
 
 /** Adds a Running row as another clone left it, by writing its record the way a merge brings it. */
 const addRowFrom = async (clone: string | undefined) => {
@@ -366,6 +366,102 @@ describe("intent use and the Intent a command acts on", () => {
     await runCommand("intent use", [NEWER])
     await runCommand("intent close", [], { intent: NEWER, reason: "done" })
     expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+})
+
+describe("intent create", () => {
+  const create = (objective: string) => runCommand("intent create", [], {}, objective)
+
+  test("puts the new Intent in use and says which one it replaced", async () => {
+    await addNewerIntent()
+    await runCommand("intent use", [OLDER])
+    const made = (await create('{"objective":"third"}')).value as {
+      id: string
+      in_use: string
+      replaced: string | null
+    }
+    expect(made).toMatchObject({ in_use: made.id, replaced: OLDER, revision: 1, state: "open" })
+    expect(await Bun.file(chosenFile()).text()).toContain(made.id)
+    expect((await runCommand("intent show")).value).toMatchObject({ id: made.id })
+  })
+
+  test("replaces the only open Intent when none was chosen, and says none when none was open", async () => {
+    const first = (await create('{"objective":"second"}')).value as { replaced: string | null }
+    expect(first.replaced).toBe(OLDER)
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    for (const id of [OLDER, (first as { id?: string }).id!])
+      await runCommand("intent close", [], { intent: id, reason: "done" })
+    const fresh = (await create('{"objective":"fresh"}')).value as { replaced: string | null }
+    expect(fresh.replaced).toBeNull()
+  })
+})
+
+describe("a stored choice that cannot be read", () => {
+  test("does not block a command that names its Intent", async () => {
+    await addNewerIntent()
+    await Bun.write(chosenFile(), "{ not json")
+    expect((await runCommand("intent show", [], { intent: NEWER })).value).toMatchObject({
+      id: NEWER,
+    })
+    expect((await runCommand("intent show", [NEWER])).value).toMatchObject({ id: NEWER })
+    expect(await refusal("intent show", [])).toMatchObject({ _tag: "NoActiveIntent" })
+  })
+
+  test("counts as no choice, so the only open Intent is still used", async () => {
+    await Bun.write(chosenFile(), "{ not json")
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+})
+
+describe("intent reopen without --intent", () => {
+  const close = async (id: string) => {
+    await runCommand("intent close", [], { intent: id, reason: "done" })
+  }
+
+  test("reopens the only closed Intent", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await close(OLDER)
+    expect((await runCommand("intent reopen")).value).toMatchObject({ id: OLDER, state: "open" })
+  })
+
+  test("is a usage error naming the closed Intents when several are closed, or none", async () => {
+    expect(await refusal("intent reopen", [])).toMatchObject({ _tag: "Usage" })
+    await addNewerIntent()
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await close(OLDER)
+    await close(NEWER)
+    const error = await refusal("intent reopen", [])
+    expect(error).toMatchObject({ _tag: "Usage" })
+    expect(String(error)).toContain(OLDER)
+    expect(String(error)).toContain(NEWER)
+    expect((await runCommand("intent reopen", [], { intent: NEWER })).value).toMatchObject({
+      id: NEWER,
+      state: "open",
+    })
+  })
+})
+
+describe("two different targets", () => {
+  test("intent show with an id and a different --intent is a usage error", async () => {
+    await addNewerIntent()
+    expect(await refusal("intent show", [OLDER], { intent: NEWER })).toMatchObject({
+      _tag: "Usage",
+    })
+    expect((await runCommand("intent show", [NEWER], { intent: NEWER })).value).toMatchObject({
+      id: NEWER,
+    })
+  })
+
+  test("intent update with a JSON id and a different --intent is a usage error that changes nothing", async () => {
+    await addNewerIntent()
+    const before = await Effect.runPromise(loadState(directory))
+    const body = JSON.stringify({ id: OLDER, objective: "renamed" })
+    expect(await refusal("intent update", [], { intent: NEWER }, body)).toMatchObject({
+      _tag: "Usage",
+    })
+    expect(await Effect.runPromise(loadState(directory))).toEqual(before)
+    await runCommand("intent update", [], { intent: OLDER }, body)
+    expect((await intentOf(OLDER)).objective).toBe("renamed")
   })
 })
 

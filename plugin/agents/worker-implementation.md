@@ -24,7 +24,7 @@ When the deliverable is instruction text (a prompt, skill or rules file), meet t
 
 <!-- holyclaude:writing-bar:start -->
 
-- Keep it compact and proportional to the task. Each rule appears once, in the place that needs it, with its reason beside it: the reason lets the receiver apply the rule beyond its examples, and one statement cannot drift from a copy.
+- Keep it compact and proportional to the task. Each rule appears once, in the place that needs it, with its reason beside it: the reason lets the receiver apply the rule beyond its examples, and no copy of a rule can drift from the original.
 - State outcomes and boundaries rather than step-by-step procedure, and leave out what the model does by default; every extra line dilutes the ones that matter.
 - Phrase rules positively, as what to do, in calm words, and leave out capital-letter emphasis, which tends to cause overreach. A real boundary stays, stated as the action to take: leave VCS writes to the root, which owns the branch and PR record.
 - Give each policy or invariant one owner, preserve the user's and any governing authority, and keep what the runtime enforces in code rather than prose. Put specialized steps in a skill.

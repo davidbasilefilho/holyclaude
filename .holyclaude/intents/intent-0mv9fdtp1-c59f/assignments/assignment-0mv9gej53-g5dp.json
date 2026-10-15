@@ -41,6 +41,22 @@
   "id": "assignment-0mv9gej53-g5dp",
   "state": "Succeeded",
   "result": "PR3 repair: B1 solo line prefers a file-edit tool where available; B2 waived gate named Unknown, never Passed, other Pending/Unknown early stop; B3 speak list adds acknowledgement and solo first message; B5 references inlined; O1, O2, O4, O6 applied; block 8,540->8,532 after trimming ~430 chars elsewhere (hook-enforced VCS line, concise messages, unrelated-work clause, CLI I/O note, ask-when-nothing-left clause); gates on 1.4.3 pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gej53-g5dp.diff.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "B1: the solo-root line does not name a tool the root lacks; it says to prefer a file-edit tool over shell rewrites where one is available and to keep each edit reviewable.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B2: the finish rule states that a gate the user waived is named Unknown in the final report rather than counted as Passed, and any other Pending or Unknown result, or a waived gate counted as Passed, is an early stop; the solo line names each waived independent-review gate (for example code or security).": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B3: the speak-only list allows a one-line acknowledgement of a new user instruction and the first message of a solo run naming waived gates.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B5: no reference resolves only outside the block (the Specialists table, Sizing work, CI watching forms): name the roster via holyclaude routes, state the sizing rule inline briefly, drop the CI-forms parenthetical.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Optional: routine choices are yours to make without asking; weak-result routing stated plainly; 'After a resume, ask again any question the user left unanswered'; 'reassess the work against it'.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Size reported; format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "size-change": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

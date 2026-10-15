@@ -59,6 +59,17 @@ describe("a corrupt record file", () => {
   })
 })
 
+describe("NoActiveIntent", () => {
+  test("with no Intent open, the hint points to creating or reopening one", async () => {
+    const { code, err } = await run("intent", "show")
+    expect(code).toBe(1)
+    expect(err).toContain("error: NoActiveIntent")
+    const hint = err.split("\n").find((line) => line.startsWith("hint:")) ?? ""
+    expect(hint).toContain("intent create")
+    expect(hint).toContain("intent reopen")
+  })
+})
+
 describe("an error message", () => {
   test("is printed whole, however many lines and characters it has", async () => {
     const command = Array.from({ length: 10 }, (_, line) => `line${line}-${"x".repeat(100)}`).join(

@@ -325,7 +325,7 @@ describe("the plugin root in injected text", () => {
   test("the pointer names the CLI as given", () => {
     const context = composeForState(RULES, stateWith(150), '"/opt/hc/scripts/holyclaude"')
     expect(context).toContain(
-      'Full state: "/opt/hc/scripts/holyclaude" intent list; "/opt/hc/scripts/holyclaude" assignment list',
+      'Full state: "/opt/hc/scripts/holyclaude" intent list; "/opt/hc/scripts/holyclaude" assignment list --all',
     )
   })
 

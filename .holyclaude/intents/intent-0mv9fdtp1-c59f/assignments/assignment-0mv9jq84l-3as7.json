@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.security",
+  "objective": "Security re-review of PR7 after its repair: confirm F1, F2 and F4 are fixed and the repair adds no new exposure.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9h76ik-a9me.diff",
+    "Worktree pr7"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "F1: a repo-supplied huge observations log cannot stall or crash the PreToolUse hook before its verdict; non-holyclaude calls read nothing.",
+    "F2: validation is linear; SessionStart degrades to rules plus a state error on oversized state; F4: migration does not load logs whole.",
+    "New exposure from the detached recording, readTail, prependLines and the removed CLI stdin cap assessed; findings with severity, or none."
+  ],
+  "required_evidence": [
+    "findings",
+    "severity"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9grnt4-upxx",
+      "assignment-0mv9h76ik-a9me",
+      "assignment-0mv9h0smw-dmg4"
+    ]
+  },
+  "id": "assignment-0mv9jq84l-3as7",
+  "state": "Succeeded",
+  "result": "PR7 security re-review: no validated vulnerability; F1 and F4 closed, F2 closed for validation; S1 medium suspicion SessionStart has no time bound on repo-supplied state (fix: Effect.timeout fallback); S2 more repo text in SessionStart (accepted by decision); S3 large deny reasons vs unknown hook output limits; I1-I3 info.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Traced each fix source to sink; S1 fix accepted for the next repair.",
+    "criteria_evidence": {
+      "F1: a repo-supplied huge observations log cannot stall or crash the PreToolUse hook before its verdict; non-holyclaude calls read nothing.": "F1/F2/F4 verdicts, S1-S3, I1-I3 with severities.",
+      "F2: validation is linear; SessionStart degrades to rules plus a state error on oversized state; F4: migration does not load logs whole.": "F1/F2/F4 verdicts, S1-S3, I1-I3 with severities.",
+      "New exposure from the detached recording, readTail, prependLines and the removed CLI stdin cap assessed; findings with severity, or none.": "F1/F2/F4 verdicts, S1-S3, I1-I3 with severities."
+    },
+    "required_evidence": {
+      "findings": "F1/F2/F4 verdicts, S1-S3, I1-I3 with severities.",
+      "severity": "F1/F2/F4 verdicts, S1-S3, I1-I3 with severities."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

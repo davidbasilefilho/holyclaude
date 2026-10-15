@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.validation",
+  "objective": "Run the repository's gates on PR3's merged head (worktree pr3 at 15ae308) and report exact outcomes.",
+  "scope": [
+    "Worktree pr3 at commit 15ae308"
+  ],
+  "constraints": [
+    "Read-only on source; run checks only."
+  ],
+  "acceptance_criteria": [
+    "oxfmt --check, oxlint, bun check and bun test (Bun 1.4.3) run on 15ae308 with exit codes and counts reported; the shipped-rules session-start tests named with their result.",
+    "The bundle build matches the committed bundle (cmp)."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "bundle-check"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jyflj-3nnb",
+  "state": "Succeeded",
+  "result": "PR3 head 15ae308: oxfmt 120 files, oxlint, bun check 78 files, bun test 1136 pass; session-start shipped-rules tests 17 pass; bundle cmp identical.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Exact commands, exit codes and counts on the named SHA.",
+    "criteria_evidence": {
+      "oxfmt --check, oxlint, bun check and bun test (Bun 1.4.3) run on 15ae308 with exit codes and counts reported; the shipped-rules session-start tests named with their result.": "All gates exit 0 on 15ae308; bundle identical.",
+      "The bundle build matches the committed bundle (cmp).": "All gates exit 0 on 15ae308; bundle identical."
+    },
+    "required_evidence": {
+      "checks-run": "All gates exit 0 on 15ae308; bundle identical.",
+      "bundle-check": "All gates exit 0 on 15ae308; bundle identical."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

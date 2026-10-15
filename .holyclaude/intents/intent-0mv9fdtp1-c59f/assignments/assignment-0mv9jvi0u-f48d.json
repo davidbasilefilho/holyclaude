@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.mechanical",
+  "objective": "Apply one specified text replacement to line 32 of plugin/agents/holyclaude.md in worktree pr3.",
+  "scope": [
+    "plugin/agents/holyclaude.md line 32"
+  ],
+  "constraints": [
+    "Replace exactly the given fragment; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "The replacement is applied verbatim.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jvi0u-f48d",
+  "state": "Succeeded",
+  "result": "Line 32 replacement applied verbatim; block 9,095 chars; gates pass (1100).",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "The replacement is applied verbatim.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

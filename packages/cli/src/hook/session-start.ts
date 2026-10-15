@@ -30,7 +30,7 @@ const RULES_START = "<!-- holyclaude:core-rules:start -->"
 const RULES_END = "<!-- holyclaude:core-rules:end -->"
 const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 /** The one-line pointer to the CLI, which `cli` names as the root should run it. */
-const pointer = (cli: string) => `Full state: ${cli} intent list; ${cli} assignment list`
+const pointer = (cli: string) => `Full state: ${cli} intent list; ${cli} assignment list --all`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
 
 /** The text limit of a summary that is shown whole. */
@@ -84,7 +84,7 @@ const row = (assignment: Assignment, textLimit: number) => ({
   objective: clip(assignment.objective.replace(/\s+/g, " "), textLimit),
 })
 
-/** Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
+/** Ready, Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
 const open = (state: State) => sortedById(state.assignments).filter(isOpenAssignment)
 
 /** A state summary that is whole until the budget asks for fewer rows and shorter text. */

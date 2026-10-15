@@ -7499,10 +7499,12 @@ var IGNORE_RULES = [
 ].join(`
 `) + `
 `;
+var LOCAL_IGNORE_RULES = `*
+`;
+var LOCAL_IGNORE_READ_BYTES = 16;
 var ensureLocalDirectory = (directory) => {
   const path = localFile(directory, ".gitignore");
-  return refuseSymlinks(directory, path).pipe(andThen2(io(path, () => Bun.file(path).exists())), flatMap2((present) => present ? void_3 : io(path, () => Bun.write(path, `*
-`))), asVoid2);
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, LOCAL_IGNORE_READ_BYTES)), catchTag2("TooLarge", () => succeed5(undefined)), flatMap2((current) => current === LOCAL_IGNORE_RULES ? void_3 : io(path, () => Bun.write(path, LOCAL_IGNORE_RULES))), asVoid2);
 };
 var LEGACY_IGNORE_RULES = `*
 `;
@@ -7875,7 +7877,10 @@ var Intent = Struct({
   objective: Text,
   requirements: String4,
   revision: StoredRevision,
-  state: IntentState.pipe(withDecodingDefaultKey(succeed5("open"))),
+  state: optionalKey2(toEncoded2(IntentState)).pipe(decodeTo2(IntentState, {
+    decode: withDefault(succeed5("open")),
+    encode: transformOptional(filter((state) => state !== "open"))
+  })),
   close_reason: optionalKey2(Text),
   closed_at: optionalKey2(String4)
 });
@@ -10978,7 +10983,7 @@ var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
 var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
-var pointer = (cli) => `Full state: ${cli} intent list; ${cli} assignment list`;
+var pointer = (cli) => `Full state: ${cli} intent list; ${cli} assignment list --all`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
 var WHOLE = Number.POSITIVE_INFINITY;
@@ -11212,7 +11217,15 @@ var dispatchInfo = (assignment) => {
     rev: assignment.intent_revision
   };
 };
-var activeIntent = (state, id) => suspend2(() => readActiveIntent(stateDirPath())).pipe(flatMap2((stored) => resolveIntent(state, id, stored)));
+var storedIntent = suspend2(() => readActiveIntent(stateDirPath())).pipe(orElseSucceed2(() => {
+  return;
+}));
+var activeIntent = (state, id) => (id === undefined ? storedIntent : succeed5(undefined)).pipe(flatMap2((stored) => resolveIntent(state, id, stored)));
+var agreedIntent = (usage, source, named, flag) => gen2(function* () {
+  if (named !== undefined && flag !== undefined && named !== flag)
+    return yield* usageError(usage, `${source} ${named} and --intent ${flag} name different Intents`);
+  return named ?? flag;
+});
 var INTENT_FLAG = { intent: "string" };
 var read = (use) => loadStateFile.pipe(flatMap2(use));
 var change = (transition) => suspend2(() => updateState(stateDirPath(), transition));
@@ -11247,15 +11260,16 @@ var optionalChoice = (schema, value) => gen2(function* () {
 });
 var withRef = (id) => decodeStrict(AssignmentRef)({ assignment_id: id });
 var cmd = (command) => command;
+var SHOW_USAGE = "intent show [id | --intent <id>]";
 var intentShow = cmd({
   path: ["intent", "show"],
-  usage: "intent show [id | --intent <id>]",
+  usage: SHOW_USAGE,
   summary: "show the Intent in use, or the one named",
   root: false,
   flags: INTENT_FLAG,
   positionals: 1,
   optional: true,
-  run: (args) => read((state) => activeIntent(state, stringFlag(args, "intent") ?? args.positionals[0])).pipe(map4((intent) => ({ value: intent })))
+  run: (args) => agreedIntent(SHOW_USAGE, "Argument", args.positionals[0], stringFlag(args, "intent")).pipe(flatMap2((id) => read((state) => activeIntent(state, id))), map4((intent) => ({ value: intent })))
 });
 var INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")}]`;
 var intentList = cmd({
@@ -11304,38 +11318,57 @@ var intentClose = cmd({
     return { value: intent };
   })
 });
+var REOPEN_USAGE = "intent reopen [--intent <id>]";
+var closedIntent = (state, id) => gen2(function* () {
+  if (id !== undefined)
+    return yield* findIntent(state, id);
+  const closed = sortedById(state.intents).filter((intent) => intent.state === "closed");
+  const [only] = closed;
+  if (closed.length === 1 && only !== undefined)
+    return only;
+  return yield* usageError(REOPEN_USAGE, closed.length === 0 ? "No Intent is closed" : `Several Intents are closed; pass --intent <id>. Closed Intents: ${closed.map((intent) => intent.id).join(", ")}`);
+});
 var intentReopen = cmd({
   path: ["intent", "reopen"],
-  usage: "intent reopen [--intent <id>]",
-  summary: "open a closed Intent again; the revision bumps",
+  usage: REOPEN_USAGE,
+  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
   root: true,
   flags: INTENT_FLAG,
   positionals: 0,
-  run: (args) => change((state) => activeIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => reopenIntent(state, target.id)))).pipe(map4((intent) => ({ value: intent })))
+  run: (args) => change((state) => closedIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => reopenIntent(state, target.id)))).pipe(map4((intent) => ({ value: intent })))
 });
 var intentCreate = cmd({
   path: ["intent", "create"],
   usage: "intent create",
-  summary: "record a new Intent at revision 1",
+  summary: "record a new Intent at revision 1 and put it in use; prints the Intent it replaced",
   input: '{"objective":"...","requirements":"..."?}',
   root: true,
   flags: {},
   positionals: 0,
-  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state) => createIntent(state, input))), map4((intent) => ({ value: intent })))
+  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state, { useIntent }) => gen2(function* () {
+    const replaced = intentInUse(state, yield* storedIntent);
+    const created = yield* createIntent(state, input);
+    yield* useIntent(created.value.id);
+    return {
+      state: created.state,
+      value: { ...created.value, in_use: created.value.id, replaced: replaced?.id ?? null }
+    };
+  }))), map4((intent) => ({ value: intent })))
 });
+var UPDATE_USAGE = "intent update [--intent <id>] [--material]";
 var intentUpdate = cmd({
   path: ["intent", "update"],
-  usage: "intent update [--intent <id>] [--material]",
+  usage: UPDATE_USAGE,
   summary: "edit the Intent; --material bumps the revision",
   input: '{"id":"..."?,"objective":"..."?,"requirements":"..."?}',
   root: true,
   flags: { ...INTENT_FLAG, material: "boolean" },
   positionals: 0,
-  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => change((state) => activeIntent(state, body.id ?? stringFlag(args, "intent")).pipe(flatMap2((intent) => updateIntent(state, {
+  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => agreedIntent(UPDATE_USAGE, "JSON id", body.id, stringFlag(args, "intent")).pipe(flatMap2((id) => change((state) => activeIntent(state, id).pipe(flatMap2((intent) => updateIntent(state, {
     ...body,
     id: intent.id,
     material: booleanFlag(args, "material")
-  }))))), map4((intent) => ({ value: intent })))
+  }))))))), map4((intent) => ({ value: intent })))
 });
 var assignmentShow = cmd({
   path: ["assignment", "show"],
@@ -11730,7 +11763,7 @@ var HINTS = {
   OwnedElsewhere: "Another clone reserved this Assignment. Settle it from there, or with `holyclaude reconcile resolve <id>` once you have evidence about its worker.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError: "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
-  NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>.",
+  NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>. With none open, run `holyclaude intent create` or `holyclaude intent reopen --intent <id>`.",
   IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
   IntentBusy: "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
