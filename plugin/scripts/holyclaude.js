@@ -179,6 +179,9 @@ function isObjectKeyword(input) {
 }
 var hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(self) && (property in self));
 var isTagged = /* @__PURE__ */ dual(2, (self, tag) => hasProperty(self, "_tag") && self["_tag"] === tag);
+function isIterable(input) {
+  return hasProperty(input, Symbol.iterator) || isString(input);
+}
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Hash.js
 var symbol = "~effect/Hash";
@@ -3026,6 +3029,10 @@ var option = (self) => match3(self, {
   onFailure: none2,
   onSuccess: some2
 });
+var result = (self) => matchEager(self, {
+  onFailure: fail2,
+  onSuccess: succeed2
+});
 var matchCauseEffect = /* @__PURE__ */ dual(2, (self, options) => new OnSuccessAndFailureImpl(self, options.onSuccess.length !== 1 ? (a) => options.onSuccess(a) : options.onSuccess, options.onFailure.length !== 1 ? (cause) => options.onFailure(cause) : options.onFailure));
 var OnSuccessAndFailureProto = /* @__PURE__ */ makePrimitiveProto({
   op: "OnSuccessAndFailure",
@@ -3070,6 +3077,17 @@ var matchEffect = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffect(se
   onSuccess: options.onSuccess
 }));
 var match3 = /* @__PURE__ */ dual(2, (self, options) => new MatchImpl(self, options));
+var matchEager = /* @__PURE__ */ dual(2, (self, options) => {
+  if (effectIsExit(self)) {
+    if (self._tag === "Success")
+      return exitSucceed(options.onSuccess(self.value));
+    const error = findError(self.cause);
+    if (isFailure2(error))
+      return self;
+    return exitSucceed(options.onFailure(error.success));
+  }
+  return match3(self, options);
+});
 var exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self);
 var exitPrimitive = /* @__PURE__ */ makePrimitive({
   op: "Exit",
@@ -3294,6 +3312,22 @@ var uninterruptibleMask = (f) => withFiber((fiber) => {
   fiber._stack.push(setInterruptibleTrue);
   return f(interruptible);
 });
+var all = (arg, options) => {
+  if (isIterable(arg)) {
+    return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
+  } else if (options?.discard) {
+    return options.mode === "result" ? forEach(Object.values(arg), result, options) : forEach(Object.values(arg), identity, options);
+  }
+  return suspend(() => {
+    const out = {};
+    return as(forEach(Object.entries(arg), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => {
+      assignProperty(out, key, value);
+    }), {
+      discard: true,
+      concurrency: options?.concurrency
+    }), out);
+  });
+};
 var whileLoop = /* @__PURE__ */ makePrimitive({
   op: "While",
   [contA](value, fiber) {
@@ -4035,6 +4069,7 @@ var buildFromOptions = (options) => {
 };
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Effect.js
+var all2 = all;
 var forEach2 = forEach;
 var whileLoop2 = whileLoop;
 var promise2 = promise;
@@ -7290,6 +7325,9 @@ var parseArgs = (args, spec, usage) => gen2(function* () {
   return parsed;
 });
 
+// src/commands.ts
+import { dirname as dirname2, relative as relative4 } from "path";
+
 // ../core/src/codec.ts
 var MAX_GITIGNORE_BYTES = 256 * 1024;
 var OBSERVATIONS_ROTATE_BYTES = 1024 * 1024;
@@ -7476,6 +7514,32 @@ var refuseSymlinks = (directory, path) => gen2(function* () {
   }
 });
 
+// ../core/src/slug.ts
+var SLUG_LENGTH = 40;
+var SLUG_SOURCE_LENGTH = 512;
+var FOLDED = {
+  \u{f8}: "o",
+  \u{142}: "l",
+  \u{df}: "ss",
+  \u{e6}: "ae",
+  \u{111}: "d",
+  \u{153}: "oe",
+  \u{fe}: "th",
+  \u{131}: "i",
+  \u{127}: "h"
+};
+var slugOf = (text) => {
+  const words = text.slice(0, SLUG_SOURCE_LENGTH).normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[\u00F8\u0142\u00DF\u00E6\u0111\u0153\u00FE\u0131\u0127]/g, (letter) => FOLDED[letter] ?? letter).split(/[^a-z0-9]+/).filter((word) => word !== "");
+  let slug = "";
+  for (const word of words) {
+    const next = slug === "" ? word : `${slug}-${word}`;
+    if (next.length > SLUG_LENGTH)
+      break;
+    slug = next;
+  }
+  return slug === "" ? (words[0] ?? "").slice(0, SLUG_LENGTH) : slug;
+};
+
 // ../core/src/layout.ts
 var STORE_DIRECTORY = ".holyclaude";
 var LOCAL_DIRECTORY = "local";
@@ -7483,8 +7547,25 @@ var LEGACY_FILE = "state.json";
 var MIGRATED_FILE = "state.json.migrated";
 var projectRoot = (env = process.env) => env["CLAUDE_PROJECT_DIR"] || process.cwd();
 var stateDirPath = (env = process.env) => env["HOLYCLAUDE_STATE_DIR"] || join2(projectRoot(env), STORE_DIRECTORY);
-var intentFile = (directory, intentId) => join2(directory, "intents", intentId, "intent.json");
-var assignmentFile = (directory, intentId, id) => join2(directory, "intents", intentId, "assignments", `${id}.json`);
+var recordName = (objective, id) => {
+  const slug = slugOf(objective);
+  return slug === "" ? id : `${slug}-${id}`;
+};
+var nameEndsInId = (name, id) => name === id || name.endsWith(`-${id}`);
+var MAX_NAME_LENGTH = 255;
+var ID_STARTS = ["-intent-", "-assignment-"];
+var otherIdEnding = (name, id, ids) => {
+  for (let at = name.indexOf("-");at !== -1; at = name.indexOf("-", at + 1)) {
+    if (!ID_STARTS.some((start) => name.startsWith(start, at)))
+      continue;
+    const suffix = name.slice(at + 1);
+    if (suffix !== id && ids.has(suffix))
+      return suffix;
+  }
+  return name !== id && ids.has(name) ? name : undefined;
+};
+var intentFolder = (directory, intent) => join2(directory, "intents", recordName(intent.objective, intent.id));
+var assignmentFile = (folder, assignment) => join2(folder, "assignments", `${recordName(assignment.objective, assignment.id)}.json`);
 var localFile = (directory, name) => join2(directory, LOCAL_DIRECTORY, name);
 var observationsFile = (directory) => localFile(directory, "observations.jsonl");
 var previousObservationsFile = (directory) => localFile(directory, "observations.1.jsonl");
@@ -7983,68 +8064,184 @@ var validateState = (state) => gen2(function* () {
 
 // ../core/src/records.ts
 import { readdir } from "fs/promises";
-import { join as join3 } from "path";
+import { dirname, join as join3, relative as relative3 } from "path";
 var AssignmentRecord = Assignment.mapFields(omit2(["agent_id"]));
-var segments = (relative) => relative.split(/[\\/]/);
+var leaf = (path) => relative3(dirname(path), path);
+var withoutBackslash = (path, names) => names.some((name) => name.includes("\\")) ? fail5(new CorruptRecord({
+  path,
+  reason: "a directory or file name on its path holds a backslash; rename it"
+})) : void_3;
 var scan = (directory, pattern) => attempt(() => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: directory, onlyFiles: true }))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed5([]) : fail5(new StateIo({ path: directory, cause }))));
 var intentFolders = (directory) => attempt(() => readdir(join3(directory, "intents"))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5([]) : fail5(new StateIo({ path: join3(directory, "intents"), cause }))));
-var present = (path) => flatMap2((value) => value === undefined ? fail5(new CorruptRecord({ path, reason: "the file disappeared while reading" })) : succeed5(value));
+
+class Raced extends TaggedError2("Raced") {
+}
+var present = (path) => flatMap2((value) => value === undefined ? fail5(new Raced({ path, reason: "the file disappeared while reading" })) : succeed5(value));
 var readIntents = (directory, limit) => scan(directory, "intents/*/intent.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
   const path = join3(directory, relative);
-  const folder = segments(relative)[1] ?? "";
-  return refuseSymlinks(directory, path).pipe(andThen2(readJson(Intent, path, limit)), present(path), filterOrFail2((intent) => intent.id === folder, (intent) => new CorruptRecord({
+  const folder = leaf(dirname(relative));
+  return withoutBackslash(path, [folder]).pipe(andThen2(refuseSymlinks(directory, path)), andThen2(readJson(Intent, path, limit)), present(path), filterOrFail2((intent) => nameEndsInId(folder, intent.id), (intent) => new CorruptRecord({
     path,
-    reason: `its id ${intent.id} does not match the directory ${folder}`
-  })));
+    reason: `its id ${intent.id} does not end the directory name ${folder}`
+  })), map4((record) => ({ record, path, folder, name: folder })));
 })));
 var readAssignments = (directory, limit) => scan(directory, "intents/*/assignments/*.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
   const path = join3(directory, relative);
-  const parts = segments(relative);
-  const folder = parts[1] ?? "";
-  const name = (parts[3] ?? "").replace(/\.json$/, "");
-  return refuseSymlinks(directory, path).pipe(andThen2(readJson(AssignmentRecord, path, limit)), present(path), filterOrFail2((record) => record.id === name, (record) => new CorruptRecord({
+  const folder = leaf(dirname(dirname(relative)));
+  const file = leaf(relative);
+  const name = file.replace(/\.json$/, "");
+  return withoutBackslash(path, [folder, file]).pipe(andThen2(refuseSymlinks(directory, path)), andThen2(readJson(AssignmentRecord, path, limit)), present(path), filterOrFail2((record) => nameEndsInId(name, record.id), (record) => new CorruptRecord({
     path,
-    reason: `its id ${record.id} does not match the file name ${name}`
-  })), filterOrFail2((record) => record.intent_id === folder, (record) => new CorruptRecord({
+    reason: `its id ${record.id} does not end the file name ${name}`
+  })), map4((record) => ({
+    record,
     path,
-    reason: `its intent ${record.intent_id} does not match the directory ${folder}`
+    folder,
+    name
   })));
 })));
-var loadRecordState = (directory, limit) => gen2(function* () {
+var loadOnce = (directory, limit) => gen2(function* () {
   for (const path of [directory, join3(directory, "intents"), join3(directory, "local")])
     yield* refuseSymlinks(directory, path);
   for (const folder of yield* intentFolders(directory)) {
     yield* refuseSymlinks(directory, join3(directory, "intents", folder));
     yield* refuseSymlinks(directory, join3(directory, "intents", folder, "assignments"));
   }
-  const intents = sortedById(yield* readIntents(directory, limit));
+  const intents = yield* readIntents(directory, limit);
+  const stored = yield* readAssignments(directory, limit);
+  const files = new Map;
+  for (const { record, path } of [...intents, ...stored].toSorted((a, b) => a.path < b.path ? -1 : 1)) {
+    const first = files.get(record.id);
+    if (first !== undefined)
+      return yield* new CorruptRecord({
+        path,
+        reason: `its id ${record.id} is also held by ${first}; keep one of the two`
+      });
+    files.set(record.id, path);
+  }
+  const ids = new Set(files.keys());
+  for (const { record, path, name } of [...intents, ...stored]) {
+    const other = otherIdEnding(name, record.id, ids);
+    if (other !== undefined)
+      return yield* new CorruptRecord({
+        path,
+        reason: `its name ${name} ends in the id of ${other} as well as its own ${record.id}; rename it`
+      });
+  }
+  const folderOf = new Map(intents.map(({ record, folder }) => [record.id, folder]));
+  for (const { record, path, folder } of stored) {
+    const own = folderOf.get(record.intent_id);
+    if (own !== undefined && own !== folder)
+      return yield* new Raced({
+        path,
+        reason: `its intent ${record.intent_id} is in the directory ${own}, not in ${folder}`
+      });
+  }
   const agents = yield* readAgents(directory, limit);
-  const assignments = sortedById(yield* readAssignments(directory, limit)).map((record) => ({
+  const assignments = sortedById(stored.map(({ record }) => record)).map((record) => ({
     ...record,
     agent_id: agents[record.id] ?? null
   }));
   const workers = yield* readWorkers(directory, limit);
-  return yield* validateState({ version: 1, intents, assignments, workers });
+  const state = yield* validateState({
+    version: 1,
+    intents: sortedById(intents.map(({ record }) => record)),
+    assignments,
+    workers
+  });
+  return { state, files };
 });
-var recordTexts = (directory, state) => gen2(function* () {
+var loadRecords = (directory, limit) => loadOnce(directory, limit).pipe(retry2({ times: 1, while: (error) => error._tag === "Raced" }), catchTag2("Raced", ({ path, reason }) => fail5(new CorruptRecord({ path, reason }))));
+var recordTexts = (state) => gen2(function* () {
   const texts = new Map;
-  for (const intent of state.intents) {
-    texts.set(intentFile(directory, intent.id), yield* encodeJson(Intent, intent));
-  }
-  for (const assignment of state.assignments) {
-    const path = assignmentFile(directory, assignment.intent_id, assignment.id);
-    texts.set(path, yield* encodeJson(AssignmentRecord, assignment));
-  }
+  for (const intent of state.intents)
+    texts.set(intent.id, yield* encodeJson(Intent, intent));
+  for (const assignment of state.assignments)
+    texts.set(assignment.id, yield* encodeJson(AssignmentRecord, assignment));
   return texts;
 });
+var occupied = (cause, to) => hasCode(cause, "ENOTEMPTY") || hasCode(cause, "EEXIST") ? succeed5(true) : hasCode(cause, "EPERM") ? attempt(() => readdir(to)).pipe(map4((names) => names.length > 0), orElseSucceed2(() => false)) : succeed5(false);
+var moveFolder = (from, to, lock) => moveFile(from, to, lock).pipe(catchTag2("StateIo", (error) => occupied(error.cause, to).pipe(flatMap2((taken) => fail5(taken ? new CorruptRecord({
+  path: to,
+  reason: `it is a folder left behind, probably by a merge, where ${from} must move to; move ${to} out of intents/ (or delete it if it holds no record you need), then rerun`
+}) : error)))));
 var persist = (directory, before, after, lock) => gen2(function* () {
   yield* validateState(after);
-  const was = yield* recordTexts(directory, before);
-  const now = yield* recordTexts(directory, after);
-  for (const [path, text] of now)
-    if (was.get(path) !== text)
-      yield* commitFile(path, text, lock);
-  yield* writeLocal(directory, before, after, lock);
+  const was = yield* recordTexts(before.state);
+  const ids = new Set([...after.intents, ...after.assignments].map(({ id }) => id));
+  const files = new Map(before.files);
+  const held = new Map([...files].map(([id, path]) => [path, id]));
+  const setFile = (id, path) => {
+    const old = files.get(id);
+    if (old !== undefined && held.get(old) === id)
+      held.delete(old);
+    files.set(id, path);
+    held.set(path, id);
+  };
+  const checkName = (id, name, target, extension = "") => gen2(function* () {
+    if (name.length + extension.length > MAX_NAME_LENGTH)
+      return yield* new CorruptRecord({
+        path: target,
+        reason: `record ${id.slice(0, 80)} would need a name of ${name.length + extension.length} characters, over the ${MAX_NAME_LENGTH} that file systems allow; shorten its id`
+      });
+    const other = otherIdEnding(name, id, ids);
+    if (other !== undefined)
+      return yield* new CorruptRecord({
+        path: target,
+        reason: `record ${id} named ${name} ends in the id of ${other} too; change its objective (or rename it on disk), then rerun`
+      });
+  });
+  const claim = (id, name, target, extension = "") => gen2(function* () {
+    const holder = held.get(target);
+    if (holder !== undefined && holder !== id)
+      return yield* new CorruptRecord({
+        path: target,
+        reason: `record ${id}${files.has(id) ? ` (at ${files.get(id)})` : ""} would be written here, over record ${holder}; change the objective of one of the two, then rerun`
+      });
+    yield* checkName(id, name, target, extension);
+  });
+  const steps = [];
+  const folders = new Map;
+  for (const intent of after.intents) {
+    const current = files.get(intent.id);
+    const text = yield* encodeJson(Intent, intent);
+    if (current === undefined || text !== was.get(intent.id)) {
+      const folder = intentFolder(directory, intent);
+      const file = join3(folder, "intent.json");
+      yield* claim(intent.id, relative3(join3(directory, "intents"), folder), file);
+      const old = current === undefined ? undefined : dirname(current);
+      if (old !== undefined && old !== folder) {
+        steps.push(moveFolder(old, folder, lock));
+        for (const [id, path] of files)
+          if (dirname(dirname(path)) === old)
+            setFile(id, join3(folder, relative3(old, path)));
+      }
+      steps.push(commitFile(file, text, lock));
+      setFile(intent.id, file);
+    } else {
+      yield* checkName(intent.id, leaf(dirname(current)), current);
+    }
+    folders.set(intent.id, dirname(files.get(intent.id) ?? ""));
+  }
+  for (const assignment of after.assignments) {
+    const folder = folders.get(assignment.intent_id);
+    if (folder === undefined)
+      return yield* new UnknownRecord({ kind: "intent", id: assignment.intent_id });
+    const current = files.get(assignment.id);
+    const text = yield* encodeJson(AssignmentRecord, assignment);
+    if (current !== undefined && text === was.get(assignment.id)) {
+      yield* checkName(assignment.id, leaf(current).replace(/\.json$/, ""), current);
+      continue;
+    }
+    const target = assignmentFile(folder, assignment);
+    yield* claim(assignment.id, leaf(target).replace(/\.json$/, ""), target, ".json");
+    if (current !== undefined && current !== target)
+      steps.push(moveFile(current, target, lock));
+    steps.push(commitFile(target, text, lock));
+    setFile(assignment.id, target);
+  }
+  yield* all2(steps, { discard: true });
+  yield* writeLocal(directory, before.state, after, lock);
 });
 
 // ../core/src/legacy.ts
@@ -8091,17 +8288,18 @@ var migrateLegacy = (directory, lock) => gen2(function* () {
   const kept = yield* readText(migrated, MAX_LEGACY_STATE_BYTES);
   if (kept !== undefined && kept !== (yield* readText(legacyFile(directory), MAX_LEGACY_STATE_BYTES)))
     return yield* new MigratedFileInTheWay({ path: migrated });
-  const existing = yield* loadRecordState(directory);
-  const incoming = yield* recordTexts(directory, legacy);
-  for (const [path, text] of yield* recordTexts(directory, existing)) {
-    const old = incoming.get(path);
-    if (old !== undefined && old !== text)
+  const existing = yield* loadRecords(directory);
+  const incoming = yield* recordTexts(legacy);
+  const stored = yield* recordTexts(existing.state);
+  for (const [id, path] of existing.files) {
+    const old = incoming.get(id);
+    if (old !== undefined && old !== stored.get(id))
       return yield* new CorruptRecord({
         path,
         reason: `it disagrees with ${legacyFile(directory)}; move one of them away`
       });
   }
-  yield* persist(directory, existing, mergeLegacy(legacy, existing), lock);
+  yield* persist(directory, existing, mergeLegacy(legacy, existing.state), lock);
   yield* moveObservations(directory, lock);
   if (kept === undefined)
     yield* moveFile(legacyFile(directory), migrated, lock);
@@ -8112,22 +8310,26 @@ var migrateLegacy = (directory, lock) => gen2(function* () {
 });
 
 // ../core/src/store.ts
-var loadState = (directory, limit) => gen2(function* () {
+var loadStored = (directory, limit) => gen2(function* () {
   const legacy = yield* readLegacy(directory);
-  const existing = yield* loadRecordState(directory, limit);
-  return legacy === undefined ? existing : mergeLegacy(legacy, existing);
+  const existing = yield* loadRecords(directory, limit);
+  return {
+    state: legacy === undefined ? existing.state : mergeLegacy(legacy, existing.state),
+    files: existing.files
+  };
 });
+var loadState = (directory, limit) => loadStored(directory, limit).pipe(map4(({ state }) => state));
 var updateState = (directory, transition) => withStateLock(directory, (lock) => gen2(function* () {
   yield* keepLocalFilesOutOfVersionControl(directory);
   yield* migrateLegacy(directory, lock);
-  const before = yield* loadRecordState(directory);
+  const before = yield* loadRecords(directory);
   const cloneId = ensureCloneId(directory, lock);
-  const { state, value } = yield* transition(before, {
+  const { state, value } = yield* transition(before.state, {
     cloneId,
     useIntent: (intentId) => writeActiveIntent(directory, intentId, lock)
   });
-  if (state !== before)
-    yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock);
+  if (state !== before.state)
+    yield* persist(directory, before, yield* stampClone(cloneId, before.state, state), lock);
   return value;
 }));
 // ../core/src/model/ci.ts
@@ -11140,6 +11342,7 @@ var subagentStop = (stdin) => record2(stdin, (input) => ({
 
 // src/state.ts
 var loadStateFile = suspend2(() => loadState(stateDirPath()));
+var loadStoredFile = suspend2(() => loadStored(stateDirPath()));
 
 // src/verify.ts
 var TranscriptLine = Struct({
@@ -11232,6 +11435,12 @@ var intentRow = (intent, state) => ({
   objective: intent.objective.replace(/\s+/g, " "),
   open_assignments: state.assignments.filter((assignment) => assignment.intent_id === intent.id && isOpenAssignment(assignment)).length
 });
+var intentPath = (intent, files) => {
+  const file = files.get(intent.id);
+  const folder = file === undefined ? intentFolder(stateDirPath(), intent) : dirname2(file);
+  const root = projectRoot();
+  return isInsideRoots(folder, [root], root) ? relative4(root, folder) : folder;
+};
 var dispatchInfo = (assignment) => {
   const route = routeFor(assignment.role);
   return {
@@ -11302,18 +11511,22 @@ var INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")}]
 var intentList = cmd({
   path: ["intent", "list"],
   usage: INTENT_LIST_USAGE,
-  summary: "list Intents with state, revision, objective and open Assignments",
+  summary: "list Intents with state, revision, objective, open Assignments and path",
   root: false,
   flags: { state: "string" },
   positionals: 0,
   run: (args) => gen2(function* () {
     const value = stringFlag(args, "state");
     const wanted = yield* optionalChoice(IntentState, value).pipe(mapError2(() => usageError(INTENT_LIST_USAGE, `State ${value} is not one of ${IntentState.literals.join("|")}`)));
-    return yield* read((state) => succeed5({
+    const { state, files } = yield* loadStoredFile;
+    return {
       value: {
-        intents: sortedById(state.intents).filter((intent) => wanted === undefined || intent.state === wanted).map((intent) => intentRow(intent, state))
+        intents: sortedById(state.intents).filter((intent) => wanted === undefined || intent.state === wanted).map((intent) => ({
+          ...intentRow(intent, state),
+          path: intentPath(intent, files)
+        }))
       }
-    }));
+    };
   })
 });
 var intentUse = cmd({

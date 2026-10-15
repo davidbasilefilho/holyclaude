@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of D's third repair (25-line diff).",
+  "scope": [
+    "Diff scratchpad/diffs/assignment-0mv9pykwr-3ykc.diff, worktree d."
+  ],
+  "constraints": [
+    "Read-only; judge only the three hunks; raise blockers only."
+  ],
+  "acceptance_criteria": [
+    "The four specified edits are correct and the three hunks introduce no blocker.",
+    "Findings reported with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9pykwr-3ykc"
+    ],
+    "independent_from": [
+      "assignment-0mv9pykwr-3ykc",
+      "assignment-0mv9pe0r5-p5oo",
+      "assignment-0mv9psdv3-38iw",
+      "assignment-0mv9p4f7o-efpz",
+      "assignment-0mv9ovvqm-sdcy",
+      "assignment-0mv9oyxib-7ssj",
+      "assignment-0mv9pa01e-qy6w",
+      "assignment-0mv9pv0bb-2nmh"
+    ]
+  },
+  "id": "assignment-0mv9q93a3-5sf2",
+  "state": "Succeeded",
+  "result": "No blockers in the three hunks; four edits met; live API order unverified (no shell).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Final narrow review: no blockers.",
+    "criteria_evidence": {
+      "The four specified edits are correct and the three hunks introduce no blocker.": "met with file:line",
+      "Findings reported with file:line.": "met with file:line"
+    },
+    "required_evidence": {
+      "findings": "findings reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

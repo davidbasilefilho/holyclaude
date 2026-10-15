@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Independently review feat/named-records (uncommitted in worktree e, base PR #24).",
+  "scope": [
+    "Worktree worktree e, uncommitted changes against fe10dbb; diff file scratchpad/diffs/assignment-0mv9pb5se-y5pd.diff."
+  ],
+  "constraints": [
+    "Read-only on the worktree; never run its CLI against a live .holyclaude; scratch copies go to the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "Naming, loading, renaming and legacy compatibility behave as specified; no record schema change; open Intents omit state.",
+    "Tests would fail without the change; gates pass; bundle matches source.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9pb5se-y5pd"
+    ],
+    "independent_from": [
+      "assignment-0mv9pb5se-y5pd"
+    ]
+  },
+  "id": "assignment-0mv9pnsje-pntf",
+  "state": "Succeeded",
+  "result": "No blocker; gates pass twice (1256); bundle identical. Optional: ENOTEMPTY on rename onto a stale non-empty folder (reproduced), lock-free read can race a rename, NFKD leaves ø ł ß æ đ, SKILL.md:16 and README:35 stale, intentFile unused.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Independent review with probe and double test run; optional items taken into the repair with the security findings.",
+    "criteria_evidence": {
+      "Naming, loading, renaming and legacy compatibility behave as specified; no record schema change; open Intents omit state.": "met per review; optional items listed",
+      "Tests would fail without the change; gates pass; bundle matches source.": "met per review; optional items listed",
+      "Blockers and optional findings reported with evidence.": "met per review; optional items listed"
+    },
+    "required_evidence": {
+      "code-review-run": "invocation, checks and findings reported",
+      "checks-run": "invocation, checks and findings reported",
+      "findings": "invocation, checks and findings reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

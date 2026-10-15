@@ -156,12 +156,27 @@ describe("migration on first use", () => {
     expect(await touch()).toEqual(before)
     expect(await Effect.runPromise(loadState(directory))).toEqual(before)
     for (const path of [
-      ["intents", "intent-0001", "intent.json"],
-      ["intents", "intent-0002", "intent.json"],
-      ["intents", "intent-0001", "assignments", "assignment-0001.json"],
-      ["intents", "intent-0001", "assignments", "assignment-0002.json"],
-      ["intents", "intent-0001", "assignments", "assignment-0003.json"],
-      ["intents", "intent-0002", "assignments", "assignment-0004.json"],
+      ["intents", "share-state-between-clones-intent-0001", "intent.json"],
+      ["intents", "document-it-intent-0002", "intent.json"],
+      [
+        "intents",
+        "share-state-between-clones-intent-0001",
+        "assignments",
+        "write-the-store-assignment-0001.json",
+      ],
+      [
+        "intents",
+        "share-state-between-clones-intent-0001",
+        "assignments",
+        "review-the-store-assignment-0002.json",
+      ],
+      [
+        "intents",
+        "share-state-between-clones-intent-0001",
+        "assignments",
+        "write-the-docs-assignment-0003.json",
+      ],
+      ["intents", "document-it-intent-0002", "assignments", "polish-assignment-0004.json"],
     ])
       expect(await exists(...path)).toBe(true)
   })
@@ -177,11 +192,26 @@ describe("migration on first use", () => {
     const recorded = await Effect.runPromise(
       Effect.forEach(
         [
-          ["intents", "intent-0001", "intent.json"],
-          ["intents", "intent-0001", "assignments", "assignment-0001.json"],
-          ["intents", "intent-0001", "assignments", "assignment-0002.json"],
-          ["intents", "intent-0001", "assignments", "assignment-0003.json"],
-          ["intents", "intent-0002", "assignments", "assignment-0004.json"],
+          ["intents", "share-state-between-clones-intent-0001", "intent.json"],
+          [
+            "intents",
+            "share-state-between-clones-intent-0001",
+            "assignments",
+            "write-the-store-assignment-0001.json",
+          ],
+          [
+            "intents",
+            "share-state-between-clones-intent-0001",
+            "assignments",
+            "review-the-store-assignment-0002.json",
+          ],
+          [
+            "intents",
+            "share-state-between-clones-intent-0001",
+            "assignments",
+            "write-the-docs-assignment-0003.json",
+          ],
+          ["intents", "document-it-intent-0002", "assignments", "polish-assignment-0004.json"],
         ],
         (path) => Effect.promise(() => text(...path)),
         { concurrency: "unbounded" },
@@ -214,7 +244,7 @@ describe("migration on first use", () => {
 
   test("is done once: the next update does not touch the records", async () => {
     await touch()
-    const path = join(directory, "intents", "intent-0001", "intent.json")
+    const path = join(directory, "intents", "share-state-between-clones-intent-0001", "intent.json")
     await writeFile(path, `${await readFile(path, "utf8")}\n`)
     const marked = await readFile(path, "utf8")
     await touch()
@@ -255,7 +285,7 @@ describe("migration that stopped halfway or meets other records", () => {
 
   test("never overwrites records that disagree with the old file", async () => {
     await touch()
-    const path = join(directory, "intents", "intent-0001", "intent.json")
+    const path = join(directory, "intents", "share-state-between-clones-intent-0001", "intent.json")
     const record = JSON.parse(await readFile(path, "utf8"))
     await writeFile(path, JSON.stringify({ ...record, objective: "Edited since" }))
     await writeFile(join(directory, "state.json"), legacyText())
@@ -303,7 +333,7 @@ describe("the ignore rule while migrating", () => {
 
   const disagree = async () => {
     await touch()
-    const path = join(directory, "intents", "intent-0001", "intent.json")
+    const path = join(directory, "intents", "share-state-between-clones-intent-0001", "intent.json")
     const record = JSON.parse(await readFile(path, "utf8"))
     await writeFile(path, JSON.stringify({ ...record, objective: "Edited since" }))
     await writeFile(join(directory, "state.json"), legacyText())
@@ -343,7 +373,7 @@ describe("the old lock files", () => {
 
   test("stay when the migration fails", async () => {
     await touch()
-    const path = join(directory, "intents", "intent-0001", "intent.json")
+    const path = join(directory, "intents", "share-state-between-clones-intent-0001", "intent.json")
     const record = JSON.parse(await readFile(path, "utf8"))
     await writeFile(path, JSON.stringify({ ...record, objective: "Edited since" }))
     await writeFile(join(directory, "state.json"), legacyText())
@@ -487,7 +517,7 @@ describe("record files already on disk", () => {
 
   /** A teammate's records, as a pull brings them into a folder that still has the old file. */
   const pull = async () => {
-    const folder = join(directory, "intents", PULLED_INTENT)
+    const folder = join(directory, "intents", `theirs-${PULLED_INTENT}`)
     await mkdir(join(folder, "assignments"), { recursive: true })
     await writeFile(
       join(folder, "intent.json"),
@@ -496,7 +526,7 @@ describe("record files already on disk", () => {
     const old = JSON.parse(legacyText()).assignments[3]
     const { agent_id: _agent, ...record } = old
     await writeFile(
-      join(folder, "assignments", `${PULLED_ASSIGNMENT}.json`),
+      join(folder, "assignments", `polish-${PULLED_ASSIGNMENT}.json`),
       JSON.stringify({ ...record, id: PULLED_ASSIGNMENT, intent_id: PULLED_INTENT }),
     )
   }

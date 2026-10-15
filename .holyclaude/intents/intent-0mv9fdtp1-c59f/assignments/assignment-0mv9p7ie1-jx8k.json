@@ -36,8 +36,20 @@
     ]
   },
   "id": "assignment-0mv9p7ie1-jx8k",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "Repair merge-ready; no blockers; gates pass (1231); bundle identical; tests fail without fix.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Narrow re-review with gates, bundle cmp and a no-fix run.",
+    "criteria_evidence": {
+      "A blank or whitespace --worktree is refused with InvalidWorktree and reserves nothing; the tests fail without the fix; bundle matches source; gates pass.": "met: 3 tests fail without the fix; gates pass; bundle identical",
+      "Blockers and optional findings reported with evidence.": "met: 3 tests fail without the fix; gates pass; bundle identical"
+    },
+    "required_evidence": {
+      "code-review-run": "reported with invocation, commands and dispositions",
+      "checks-run": "reported with invocation, commands and dispositions",
+      "findings": "reported with invocation, commands and dispositions"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

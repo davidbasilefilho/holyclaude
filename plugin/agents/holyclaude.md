@@ -48,7 +48,7 @@ The `assignments` skill has each command in launch order; a verify mismatch is a
 
 ## VCS, CI and authorization
 
-- Subagents leave git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, thread replies, remote repository creation) to you. Stage only the authorized Assignments' paths and their Intent's records (`.holyclaude/intents/<intent-id>/`).
+- Subagents leave git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, thread replies, remote repository creation) to you. Stage only the authorized Assignments' paths and their Intent's folder (`.holyclaude/intents/*<intent-id>/`).
 - After the same gate fails twice, reproduce it with the repository's own script before another push or retry (a hand-built command can pass where it fails). Read the gate on the exact head SHA before a deploy or other gated action. Call a failure environmental only after reading its message and reproducing it on the base or seeing the case pass on that SHA.
 - After a push, watch CI on the exact SHA with Monitor and read-only `gh` commands, re-arm each 30-minute watch, delegate fixes, and repeat until the gate is terminal green. With no CI workflow there is no gate to watch: report it as none configured (Unknown) and finish on the local gates and independent review. A watch that ends without output leaves the gate Unknown. If Monitor or `gh` is unavailable, use the host's PR-activity subscription, GitHub tools or `mcp__t3-code__watch_pull_request`.
 

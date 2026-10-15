@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Add per_page=100 to the paginated watch reads and a README cloud note on second-page 403s.",
+  "scope": [
+    "Worktree worktree d: plugin/agents/holyclaude.md (CI watching, ~line 131) and README.md (Cloud sessions, the GitHub GraphQL bullet ~145)."
+  ],
+  "constraints": [
+    "Two small edits only; core-rules block untouched; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Each `gh api --paginate` read in CI watching (check-runs, statuses if paginated, reviews, comments if paginated) requests `per_page=100` in its path, so most PRs fit in one page.",
+    "README Cloud sessions GitHub GraphQL bullet (or one new observed bullet) adds: in a cloud session `gh api --paginate` fails with 403 when a second page is needed, so such a read counts as Unknown.",
+    "oxfmt and full test pass; repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9pe0r5-p5oo"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9psdv3-38iw",
+  "state": "Succeeded",
+  "result": "per_page=100 on check-runs, status and reviews reads plus one sentence; README observed 403 note; oxfmt passes; test 1209/1 with the known glob timing test, passing alone.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "D prose verified through review oyxib and narrow re-reviews qy6w, 2nmh, 5sf2; final pass has no blockers; REST reads run live on PR 23.",
+    "criteria_evidence": {
+      "Each `gh api --paginate` read in CI watching (check-runs, statuses if paginated, reviews, comments if paginated) requests `per_page=100` in its path, so most PRs fit in one page.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "README Cloud sessions GitHub GraphQL bullet (or one new observed bullet) adds: in a cloud session `gh api --paginate` fails with 403 when a second page is needed, so such a read counts as Unknown.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "oxfmt and full test pass; repair-only diff saved.": "verified by the review chain ending in 5sf2 (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; diff files saved",
+      "diff-file": "reported by the writer; diff files saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

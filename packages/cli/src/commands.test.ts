@@ -87,11 +87,11 @@ const runCommand = (path: string, positionals: string[] = [], flags = {}, stdin 
 
 /** Adds a Running row as another clone left it, by writing its record the way a merge brings it. */
 const addRowFrom = async (clone: string | undefined) => {
-  const folder = join(directory, "intents", "intent-0001", "assignments")
-  const record = await Bun.file(join(folder, "assignment-0001.json")).json()
+  const folder = join(directory, "intents", "o-intent-0001", "assignments")
+  const record = await Bun.file(join(folder, "o-assignment-0001.json")).json()
   const { clone_id: _own, ...unstamped } = record
   await Bun.write(
-    join(folder, "assignment-0002.json"),
+    join(folder, "o-assignment-0002.json"),
     JSON.stringify({
       ...unstamped,
       id: "assignment-0002",
@@ -222,8 +222,22 @@ describe("intent list", () => {
     await addNewerIntent()
     const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
     expect(rows.intents).toEqual([
-      { id: OLDER, state: "open", revision: 1, objective: "o", open_assignments: 1 },
-      { id: NEWER, state: "open", revision: 1, objective: "newer goal", open_assignments: 1 },
+      {
+        id: OLDER,
+        state: "open",
+        revision: 1,
+        objective: "o",
+        open_assignments: 1,
+        path: join(directory, "intents", `o-${OLDER}`),
+      },
+      {
+        id: NEWER,
+        state: "open",
+        revision: 1,
+        objective: "newer goal",
+        open_assignments: 1,
+        path: join(directory, "intents", `newer-goal-${NEWER}`),
+      },
     ])
     await runCommand("intent close", [], { intent: NEWER, reason: "done" })
     const closed = (await runCommand("intent list", [], { state: "closed" })).value
@@ -236,6 +250,22 @@ describe("intent list", () => {
     const error = await refusal("intent list", [], { state: "paused" })
     expect(error).toMatchObject({ _tag: "Usage" })
     expect(String(error)).toContain("open|closed")
+  })
+})
+
+describe("intent list inside a project", () => {
+  const previousRoot = process.env["CLAUDE_PROJECT_DIR"]
+  beforeEach(() => {
+    process.env["CLAUDE_PROJECT_DIR"] = directory
+  })
+  afterEach(() => {
+    if (previousRoot === undefined) delete process.env["CLAUDE_PROJECT_DIR"]
+    else process.env["CLAUDE_PROJECT_DIR"] = previousRoot
+  })
+
+  test("shows the path relative to the project when the state directory is inside it", async () => {
+    const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
+    expect(rows.intents).toEqual([expect.objectContaining({ path: join("intents", `o-${OLDER}`) })])
   })
 })
 
@@ -485,11 +515,11 @@ describe("assignment list scope", () => {
 
 describe("reserve and rows running elsewhere", () => {
   const readyRow = async (id: string, path: string) => {
-    const folder = join(directory, "intents", "intent-0001", "assignments")
-    const record = await Bun.file(join(folder, "assignment-0001.json")).json()
+    const folder = join(directory, "intents", "o-intent-0001", "assignments")
+    const record = await Bun.file(join(folder, "o-assignment-0001.json")).json()
     const { clone_id: _own, ...unstamped } = record
     await Bun.write(
-      join(folder, `${id}.json`),
+      join(folder, `o-${id}.json`),
       JSON.stringify({
         ...unstamped,
         id,
