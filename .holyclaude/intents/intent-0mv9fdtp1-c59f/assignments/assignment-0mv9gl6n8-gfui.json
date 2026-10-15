@@ -43,7 +43,7 @@
     "intent_revision": 2,
     "rationale": "Reviewer ran gates and rebuilt the bundle to a scratch path; dispositions reasoned against the Intent.",
     "criteria_evidence": {
-      "Reports /code-review invocation, finding count and dispositions.": "code-review /home/user/wt/pr2 high, 10 findings in a table.",
+      "Reports /code-review invocation, finding count and dispositions.": "code-review worktree pr2 high, 10 findings in a table.",
       "Judges correctness of the hook (payload shapes, specialist filter, record under launched agentId), verify's model source and fallback, and the new composition (rules whole, summary shrinks, pointer, cut only when rules alone exceed the budget).": "Judgments section covers each with tests cited.",
       "Confirms the committed bundle is byte-identical to a Bun 1.4.3 build of the worktree (build to a scratch path and compare).": "cmp IDENTICAL.",
       "Separates blockers from optional findings with evidence.": "No blockers; 5 optional."
