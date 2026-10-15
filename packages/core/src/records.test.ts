@@ -21,6 +21,7 @@ const intent = (id: string, objective = "Share state") => ({
   objective,
   requirements: "One file per record",
   revision: 1,
+  state: "open" as const,
 })
 
 const assignment = (id: string, intentId: string, overrides: Partial<Assignment> = {}) =>
@@ -178,7 +179,13 @@ describe("record files", () => {
     const text = await readFile(intentPath(INTENT_A), "utf8")
     expect(text).toBe(`${JSON.stringify(intent(INTENT_A), null, 2)}\n`)
     expect(text).toContain('\n  "objective"')
-    expect(Object.keys(JSON.parse(text))).toEqual(["id", "objective", "requirements", "revision"])
+    expect(Object.keys(JSON.parse(text))).toEqual([
+      "id",
+      "objective",
+      "requirements",
+      "revision",
+      "state",
+    ])
     const record = JSON.parse(await readFile(assignmentPath(INTENT_A, FIRST), "utf8"))
     expect(Object.keys(record)).toEqual([
       "intent_id",

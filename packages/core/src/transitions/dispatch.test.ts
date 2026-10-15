@@ -34,7 +34,7 @@ const assignment = (ownershipPaths: ReadonlyArray<string>): Assignment => ({
 
 const stateWith = (ownershipPaths: ReadonlyArray<string>): State => ({
   version: 1,
-  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1 }],
+  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1, state: "open" }],
   assignments: [assignment(ownershipPaths)],
   workers: [],
 })

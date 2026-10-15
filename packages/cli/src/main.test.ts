@@ -81,7 +81,7 @@ describe("assignment list --state", () => {
   })
 
   test("a valid state lists", async () => {
-    const { code, err } = await run("assignment", "list", "--state", "Running")
+    const { code, err } = await run("assignment", "list", "--state", "Running", "--all")
     expect(code).toBe(0)
     expect(err).toBe("")
   })

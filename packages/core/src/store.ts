@@ -2,7 +2,7 @@ import { Effect } from "effect"
 
 import { keepLocalFilesOutOfVersionControl } from "./layout.ts"
 import { mergeLegacy, migrateLegacy, readLegacy } from "./legacy.ts"
-import { ensureCloneId, stampClone } from "./local.ts"
+import { ensureCloneId, stampClone, writeActiveIntent } from "./local.ts"
 import { withStateLock } from "./lock.ts"
 import type { Change, State } from "./model/state.ts"
 import { loadRecordState, persist } from "./records.ts"
@@ -28,6 +28,8 @@ export interface UpdateContext {
    * keeps two first-time writers from each making one.
    */
   readonly cloneId: ReturnType<typeof ensureCloneId>
+  /** Stores this clone's choice of Intent in a local file, which version control never sees. */
+  readonly useIntent: (intentId: string) => ReturnType<typeof writeActiveIntent>
 }
 
 /**
@@ -48,7 +50,10 @@ export const updateState = <A, E>(
       yield* migrateLegacy(directory, lock)
       const before = yield* loadRecordState(directory)
       const cloneId = ensureCloneId(directory, lock)
-      const { state, value } = yield* transition(before, { cloneId })
+      const { state, value } = yield* transition(before, {
+        cloneId,
+        useIntent: (intentId) => writeActiveIntent(directory, intentId, lock),
+      })
       if (state !== before)
         yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock)
       return value

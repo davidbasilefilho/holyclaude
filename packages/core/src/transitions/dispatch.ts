@@ -9,6 +9,7 @@ import {
   invalidTransition,
   replaceAssignment,
   requireLiveRevision,
+  requireOpen,
   type State,
 } from "../model/state.ts"
 import type { Worker } from "../model/worker.ts"
@@ -58,6 +59,7 @@ export const reserve = (state: State, input: ReserveInput, context: DispatchCont
     const assignment = yield* findAssignment(state, input.assignment_id)
     if (assignment.state !== "Ready") return yield* invalidTransition(assignment, "reserve")
     const intent = yield* findIntent(state, assignment.intent_id)
+    yield* requireOpen(intent)
     yield* requireLiveRevision(intent, assignment.intent_revision)
 
     const refuse = (reason: DispatchRefused["reason"], detail: string) =>

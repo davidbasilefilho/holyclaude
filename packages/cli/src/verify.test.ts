@@ -12,7 +12,7 @@ import { verifyAssignment } from "./verify.ts"
 /** A read-only reviewer, the kind of agent that never calls a tool the guard judges. */
 const state: State = {
   version: 1,
-  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1 }],
+  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1, state: "open" }],
   assignments: [
     {
       id: "assignment-0001",

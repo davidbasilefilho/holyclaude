@@ -1,7 +1,9 @@
 import { Effect, Schema } from "effect"
 
 import {
+  IntentClosed,
   InvalidRecord,
+  NoActiveIntent,
   OwnedElsewhere,
   InvalidTransition,
   NoRevision,
@@ -75,8 +77,38 @@ export const requireLiveRevision = (intent: Intent, given: number) =>
       ? Effect.void
       : Effect.fail(new StaleRevision({ given, live: intent.revision }))
 
-/** The latest Intent: the one with the greatest id, which is the one created last. */
-export const latestIntent = (state: State): Intent | undefined => sortedById(state.intents).at(-1)
+/** Fails with IntentClosed unless the Intent is open. A closed Intent authorizes no dispatch. */
+export const requireOpen = (intent: Intent) =>
+  intent.state === "open" ? Effect.void : Effect.fail(new IntentClosed({ intent_id: intent.id }))
+
+/** The open Intents, oldest first. */
+export const openIntents = (state: State): ReadonlyArray<Intent> =>
+  sortedById(state.intents).filter((intent) => intent.state === "open")
+
+/**
+ * The Intent this clone works on without being told: the stored choice while it is still open,
+ * otherwise the only open Intent. Undefined when neither names one.
+ */
+export const intentInUse = (state: State, stored: string | undefined): Intent | undefined => {
+  const open = openIntents(state)
+  const chosen = open.find((intent) => intent.id === stored)
+  return chosen ?? (open.length === 1 ? open[0] : undefined)
+}
+
+/**
+ * The Intent a command acts on: the one named by `flag` (open or closed), else the one
+ * {@link intentInUse} finds. Fails with NoActiveIntent, listing the open Intents, when nothing names
+ * one.
+ */
+export const resolveIntent = (state: State, flag: string | undefined, stored: string | undefined) =>
+  Effect.gen(function* () {
+    if (flag !== undefined) return yield* findIntent(state, flag)
+    const inUse = intentInUse(state, stored)
+    if (inUse !== undefined) return inUse
+    return yield* new NoActiveIntent({
+      open: openIntents(state).map(({ id, objective }) => ({ id, objective })),
+    })
+  })
 
 /** Returns the state with one Assignment replaced. */
 export const withAssignment = (state: State, next: Assignment): State => ({

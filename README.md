@@ -16,22 +16,24 @@ State is kept as one JSON file per record in the project's `.holyclaude/` direct
   intents/<intent-id>/intent.json
   intents/<intent-id>/assignments/<assignment-id>.json
   local/                              never committed
+    .gitignore                        `*`, so local files stay ignored whatever the folder's own list says
     lock, lock.breaking               the write lock and its guard
     workers.json                      the worker list: subagent ids, roster fingerprints, history
     agents.json                       the subagent id of each Assignment, keyed by Assignment id
     clone.json                        this clone's random id
+    active-intent.json                the Intent this clone works on, set by `intent use`
     observations.jsonl                what the hooks saw of running subagents, with transcript paths
     observations.1.jsonl              the previous generation of that log
   state.json.migrated                 an earlier version's single state file, after migration
 ```
 
-Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. The latest Intent is the last in that order, and `assignment list`, `reconcile` and the session summary use it too.
+Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. No command picks an Intent by its position in that order; see "Intents and collaborators" below.
 
 Each record's id must match its file or directory name; a file that does not is rejected as `CorruptRecord`, which names the file. Writes go through a temporary file and a rename under a local lock, and only the records a command changed are written. Record files and local files have no size limit: holyclaude never refuses or shortens what you write into an Intent, an Assignment or a result. The local files are never merged and only grow (the agent id of a finished Assignment still feeds `verify`, and a worker's history feeds the independence rule), so their entries cannot be pruned safely. The observations log is the exception: it is only a note for `verify` and the hooks, so once it passes 1 MiB the next append moves it, under the lock, to `observations.1.jsonl` (replacing the generation before) and starts a new one. Readers read both generations, oldest first, so the log on disk stays at about two generations and the newest records are never the ones dropped. A repository can commit a log of any size, though, and every specialist tool call reads it, so a read takes only the last 4 MiB of each generation, from the first whole line on; a log that follows the rotation is near 1 MiB per generation and is read whole. The other bounds only guard the reading of input that holyclaude does not own, and a read past one fails as `TooLarge` rather than load the file: the lock and guard files are read only up to 4 KiB (a larger one counts as unreadable and is judged by its age), the `.gitignore` up to 256 KiB, a legacy `state.json` up to 1 MiB, a subagent transcript that `assignment verify` opens up to 64 MiB, and each state file that the SessionStart hook reads up to 64 MiB. The CLI itself reads state files and the JSON on its stdin at any size, since both come from its user.
 
-Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every `intents/<id>/` and `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `clone.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead.
+Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every `intents/<id>/` and `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `clone.json`, `active-intent.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead.
 
-The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
+The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. Whenever the CLI creates `local/`, it also writes `local/.gitignore` containing `*`, so local files stay ignored even if a repository replaces `.holyclaude/.gitignore`. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
 
 The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
 
@@ -42,6 +44,22 @@ The worker VCS guard recognizes the state directory by its name: it refuses a sp
 ### Clones and reconcile
 
 Each clone gets a random id in `local/clone.json` on first use. When an Assignment enters Running, the store stamps that id on it as `clone_id`. `holyclaude reconcile` lists the Running rows this clone reserved under `running` (rows without a stamp count as its own), and rows another clone reserved under `running_elsewhere`. It leaves the latter alone, since the other clone's root confirms them; `holyclaude reconcile resolve <id>` still settles one when you name it, while `assignment bind`, `rollback`, `cancel` and `finish` on such a row are refused as `OwnedElsewhere`, naming the clone, since its worker lives in that clone's session. Only this clone's Running writers (and unstamped ones) hold their ownership paths against a local `reserve`; a row another clone reserved does not, because git shows an overlap at merge. Deleting `.holyclaude/local/` gives the clone a new id, so its earlier Running rows then show as running elsewhere.
+
+### Intents and collaborators
+
+An Intent is `open` or `closed`. A closed Intent carries `close_reason` and `closed_at`, and it authorizes no dispatch: `assignment create`, `assignment reserve` and `assignment follow-up` refuse it with `IntentClosed`. A record with no `state` reads as open, so Intents written before this version are open until someone closes them.
+
+| Command                                        | What it does                                                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intent list [--state open\|closed]`           | One row per Intent: id, state, revision, objective and the count of open Assignments (Running, or Succeeded and not yet accepted)                  |
+| `intent use <id>`                              | Makes this clone work on that Intent. The choice is stored in `local/active-intent.json`, which is never committed, and a closed Intent is refused |
+| `intent close [--intent <id>] --reason <text>` | Closes the Intent; refused while any of its Assignments is Running                                                                                 |
+| `intent reopen [--intent <id>]`                | Opens it again and bumps its revision, so an acceptance recorded before the close does not authorize new work                                      |
+| `assignment list [--intent <id> \| --all]`     | Lists the Assignments of the Intent in use; `--intent` selects another and `--all` shows every Intent                                              |
+
+A command that acts on an Intent (`intent show`, `intent update`, `intent close`, `intent reopen`, `assignment list`) finds it in this order: the `--intent <id>` flag, then the Intent stored by `intent use` while it is still open, then the only open Intent when exactly one is open. Otherwise it fails with `NoActiveIntent`, which lists the open Intents and says to run `intent use`. The SessionStart summary names every open Intent and marks the one in use by the same rule.
+
+Collaborators on one repository need the same holyclaude version. The `state`, `close_reason` and `closed_at` fields are new, and an older version rejects an Intent record that carries them as a corrupt record, so update every clone before anyone creates, edits or closes an Intent.
 
 ### Where state lives
 
@@ -220,11 +238,13 @@ hook leaves them out and injects only the state summary, which saves about 8,000
 start, resume, clear and compaction. A payload that cannot be read gets the rules.
 
 The injected context is capped at 10,000 characters, and the rules are the part that must survive.
-The state summary shows the Intent text, each Assignment objective and any state error whole; only
+The state summary names every open Intent (id, revision, objective, open Assignments), marks the one
+in use and shows its requirements, and lists each Assignment that needs attention. It shows the
+objectives and any state error whole; only
 when the rules and that summary do not fit together does the summary shrink to fit. The text of the
-Intent and of every row is clipped step by step (to 2,000, 400, then 120 characters), so each row
+Intents and of every row is clipped step by step (to 2,000, 400, then 120 characters), so each row
 keeps its id and agent id; only then does it show fewer rows (with a count of the rest), then no
-text, then only the one-line pointer to `intent show` and `assignment list`. The rules are cut, from
+text, then only the one-line pointer to `intent list` and `assignment list`. The rules are cut, from
 their end with a marker, only when they alone do not fit beside that pointer. The hook reads each
 state file up to 64 MiB, since a repository can commit files into the state directory; past that the
 context carries the rules and a state error in place of the summary.

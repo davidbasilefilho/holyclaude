@@ -6,9 +6,6 @@ export class Usage extends Data.TaggedError("Usage")<{
   readonly hint: string
 }> {}
 
-/** There is no Intent yet, so the operation has nothing to act on. */
-export class NoIntent extends Data.TaggedError("NoIntent")<{ readonly message: string }> {}
-
 /** The Assignment has no bound agent yet, so there is nothing to verify. */
 export class NotBound extends Data.TaggedError("NotBound")<{ readonly id: string }> {
   override get message() {

@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import { commitFile, encodeJson, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
-import { AssignmentId, CloneId, compareIds, newId } from "./model/ids.ts"
+import { AssignmentId, CloneId, IntentId, compareIds, newId } from "./model/ids.ts"
 import { Id } from "./model/primitives.ts"
 import type { State } from "./model/state.ts"
 import { Worker } from "./model/worker.ts"
@@ -16,10 +16,13 @@ const WorkersFile = Schema.Struct({ workers: Schema.Array(Worker) })
 /** Subagent ids keyed by Assignment id. They name agents of one session on one machine. */
 const AgentsFile = Schema.Record(AssignmentId, Id)
 const CloneFile = Schema.Struct({ clone_id: CloneId })
+/** The Intent this clone works on, chosen with `intent use`. */
+const ActiveIntentFile = Schema.Struct({ intent_id: IntentId })
 
 const workersPath = (directory: string) => localFile(directory, "workers.json")
 const agentsPath = (directory: string) => localFile(directory, "agents.json")
 const clonePath = (directory: string) => localFile(directory, "clone.json")
+const activeIntentPath = (directory: string) => localFile(directory, "active-intent.json")
 
 const readLocal = <S extends Schema.Decoder<unknown>>(
   schema: S,
@@ -41,6 +44,21 @@ export const readWorkers = (directory: string, limit?: number) =>
 export const readAgents = (directory: string, limit?: number) =>
   readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(
     Effect.map((file) => file ?? {}),
+  )
+
+/**
+ * The id of the Intent this clone chose to work on, or undefined when it chose none. The Intent may
+ * since have closed or gone, so check it against the state. A file over `limit` is TooLarge.
+ */
+export const readActiveIntent = (directory: string, limit?: number) =>
+  readLocal(ActiveIntentFile, directory, activeIntentPath(directory), limit).pipe(
+    Effect.map((file) => file?.intent_id),
+  )
+
+/** Stores this clone's choice of Intent. Call it under the lock. */
+export const writeActiveIntent = (directory: string, intentId: string, lock: Lock) =>
+  encodeJson(ActiveIntentFile, { intent_id: intentId }).pipe(
+    Effect.flatMap((content) => commitFile(activeIntentPath(directory), content, lock)),
   )
 
 /**

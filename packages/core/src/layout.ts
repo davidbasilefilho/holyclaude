@@ -74,6 +74,21 @@ const IGNORE_RULES =
     "/state.observations.jsonl",
   ].join("\n") + "\n"
 
+/**
+ * Makes the `local/` folder when it is missing, with its own `.gitignore` that ignores everything
+ * in it, so local files stay out of version control even if a repository replaces the folder's
+ * `.gitignore`. A `.gitignore` already there stays. Nothing is created through a symbolic link.
+ * Call it wherever `local/` may come into being.
+ */
+export const ensureLocalDirectory = (directory: string) => {
+  const path = localFile(directory, ".gitignore")
+  return refuseSymlinks(directory, path).pipe(
+    Effect.andThen(io(path, () => Bun.file(path).exists())),
+    Effect.flatMap((present) => (present ? Effect.void : io(path, () => Bun.write(path, "*\n")))),
+    Effect.asVoid,
+  )
+}
+
 /** What an earlier version wrote: a rule that ignores the whole folder, records included. */
 const LEGACY_IGNORE_RULES = "*\n"
 

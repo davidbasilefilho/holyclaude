@@ -38,7 +38,10 @@ const HINTS: Readonly<Record<string, string>> = {
     "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError:
     "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
-  NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
+  NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>.",
+  IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
+  IntentBusy:
+    "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
   NotBound:
     "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>.",

@@ -32,7 +32,7 @@ const assignment = (index: number, dependencies: ReadonlyArray<string>): Assignm
 
 const stateOf = (assignments: ReadonlyArray<Assignment>): State => ({
   ...emptyState,
-  intents: [{ id: "intent-1", objective: "o", requirements: "", revision: 1 }],
+  intents: [{ id: "intent-1", objective: "o", requirements: "", revision: 1, state: "open" }],
   assignments,
 })
 

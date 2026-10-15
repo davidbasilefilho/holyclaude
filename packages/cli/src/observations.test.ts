@@ -94,6 +94,11 @@ describe("appendObservation", () => {
     expect(await Bun.file(observationsPath(dir)).text()).toBe(`${JSON.stringify(record)}\n`)
   })
 
+  test("makes local/ with a .gitignore of * so the log stays ignored on its own", async () => {
+    await Effect.runPromise(appendObservation(record, dir))
+    expect(await Bun.file(join(dir, "local", ".gitignore")).text()).toBe("*\n")
+  })
+
   test("replaces the ignore-everything rule of an earlier version, whatever is left beside it", async () => {
     writeFileSync(join(dir, ".gitignore"), "*\n")
     writeFileSync(join(dir, "state.json"), "{}")

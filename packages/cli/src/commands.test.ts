@@ -11,7 +11,7 @@ import { observationsPath } from "./observations.ts"
 
 const reserved: State = {
   version: 1,
-  intents: [{ id: "intent-0001", objective: "o", requirements: "r", revision: 1 }],
+  intents: [{ id: "intent-0001", objective: "o", requirements: "r", revision: 1, state: "open" }],
   assignments: [
     {
       id: "assignment-0001",
@@ -172,31 +172,218 @@ describe("JSON on stdin", () => {
 })
 
 describe("order by id", () => {
-  test("intent show without an id shows the greatest id, and assignment list is in id order", async () => {
-    await Effect.runPromise(
-      updateState(directory, (state) =>
-        Effect.succeed({
-          state: {
-            ...state,
-            intents: [
-              { id: "intent-0mg8k2x1a-7f3q", objective: "newer", requirements: "", revision: 1 },
-              ...state.intents,
-            ],
-          },
-          value: 0,
-        }),
-      ),
-    )
-    expect((await runCommand("intent show")).value).toMatchObject({ objective: "newer" })
-    expect((await runCommand("intent show", ["intent-0001"])).value).toMatchObject({
-      id: "intent-0001",
-    })
+  test("assignment list is in id order", async () => {
     await addRowFrom(undefined)
     const { value } = await runCommand("assignment list")
     expect(ids((value as { assignments: unknown }).assignments)).toEqual([
       "assignment-0001",
       "assignment-0002",
     ])
+  })
+})
+
+const OLDER = "intent-0001"
+const NEWER = "intent-0mg8k2x1a-7f3q"
+const AT = /^\d{4}-\d\d-\d\dT/
+
+/** Adds a second open Intent, and a Ready Assignment of it, to the state. */
+const addNewerIntent = () =>
+  Effect.runPromise(
+    updateState(directory, (state) =>
+      Effect.succeed({
+        state: {
+          ...state,
+          intents: [
+            ...state.intents,
+            { id: NEWER, objective: "newer\n  goal", requirements: "", revision: 1, state: "open" },
+          ],
+          assignments: [
+            ...state.assignments,
+            {
+              ...reserved.assignments[0]!,
+              id: "assignment-0009",
+              intent_id: NEWER,
+              state: "Ready",
+            },
+          ],
+        },
+        value: 0,
+      }),
+    ),
+  )
+
+const intentOf = async (id: string) =>
+  (await Effect.runPromise(loadState(directory))).intents.find((intent) => intent.id === id)!
+
+const chosenFile = () => join(directory, "local", "active-intent.json")
+
+describe("intent list", () => {
+  test("prints id, state, revision, objective and the open-Assignment count, and filters by state", async () => {
+    await addNewerIntent()
+    const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
+    expect(rows.intents).toEqual([
+      { id: OLDER, state: "open", revision: 1, objective: "o", open_assignments: 1 },
+      { id: NEWER, state: "open", revision: 1, objective: "newer goal", open_assignments: 0 },
+    ])
+    await runCommand("intent close", [], { intent: NEWER, reason: "done" })
+    const closed = (await runCommand("intent list", [], { state: "closed" })).value
+    expect(closed).toEqual({
+      intents: [expect.objectContaining({ id: NEWER, state: "closed", open_assignments: 0 })],
+    })
+  })
+
+  test("an unknown state is a usage error that names the states", async () => {
+    const error = await refusal("intent list", [], { state: "paused" })
+    expect(error).toMatchObject({ _tag: "Usage" })
+    expect(String(error)).toContain("open|closed")
+  })
+})
+
+describe("intent close and reopen", () => {
+  test("close is refused while an Assignment of the Intent is Running", async () => {
+    expect(await refusal("intent close", [], { reason: "done" })).toMatchObject({
+      _tag: "IntentBusy",
+      running: ["assignment-0001"],
+    })
+    expect((await intentOf(OLDER)).state).toBe("open")
+  })
+
+  test("close records the reason and the time once nothing runs, and a reason is required", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    expect(await refusal("intent close", [])).toMatchObject({ _tag: "Usage" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect(await intentOf(OLDER)).toMatchObject({
+      state: "closed",
+      close_reason: "shipped",
+      closed_at: expect.stringMatching(AT),
+      revision: 1,
+    })
+  })
+
+  test("reopen returns it to open and bumps the revision", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    await runCommand("intent reopen", [], { intent: OLDER })
+    const reopened = await intentOf(OLDER)
+    expect(reopened).toMatchObject({ state: "open", revision: 2 })
+    expect(reopened).not.toHaveProperty("close_reason")
+  })
+
+  test("a closed Intent refuses to be created into, reserved, or followed up", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    const draft = {
+      intent_id: OLDER,
+      intent_revision: 1,
+      role: "Explorer.lookup",
+      objective: "o",
+      acceptance_criteria: ["a"],
+      required_evidence: ["e"],
+      mutability: "ReadOnly",
+    }
+    const json = JSON.stringify(draft)
+    for (const [path, positionals] of [
+      ["assignment create", []],
+      ["assignment follow-up", ["assignment-0001"]],
+    ] as const)
+      expect(await refusal(path, [...positionals], {}, json)).toMatchObject({
+        _tag: "IntentClosed",
+      })
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            assignments: state.assignments.map((row) => ({ ...row, state: "Ready" as const })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    expect(
+      await refusal("assignment reserve", ["assignment-0001"], { root: ["src"] }),
+    ).toMatchObject({ _tag: "IntentClosed" })
+  })
+})
+
+describe("intent use and the Intent a command acts on", () => {
+  test("with one open Intent, commands act on it without a choice", async () => {
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+    expect(
+      ids(((await runCommand("assignment list")).value as { assignments: unknown }).assignments),
+    ).toEqual(["assignment-0001"])
+  })
+
+  test("with several open and no choice, commands fail listing the open Intents", async () => {
+    await addNewerIntent()
+    for (const [path, flags] of [
+      ["intent show", {}],
+      ["assignment list", {}],
+      ["intent close", { reason: "x" }],
+    ] as const) {
+      const error = await refusal(path, [], flags)
+      expect(error).toMatchObject({ _tag: "NoActiveIntent" })
+      expect(String(error)).toContain(OLDER)
+      expect(String(error)).toContain(NEWER)
+      expect(String(error)).toContain("intent use")
+    }
+  })
+
+  test("use stores the choice in a local file, and commands then follow it", async () => {
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    expect(await Bun.file(chosenFile()).text()).toContain(NEWER)
+    expect((await runCommand("intent show")).value).toMatchObject({ id: NEWER })
+    const rows = (await runCommand("assignment list")).value as { assignments: unknown }
+    expect(ids(rows.assignments)).toEqual(["assignment-0009"])
+  })
+
+  test("the choice is local: no record of the state changes", async () => {
+    await addNewerIntent()
+    const before = await Effect.runPromise(loadState(directory))
+    await runCommand("intent use", [NEWER])
+    expect(await Effect.runPromise(loadState(directory))).toEqual(before)
+  })
+
+  test("--intent beats the choice", async () => {
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    expect((await runCommand("intent show", [], { intent: OLDER })).value).toMatchObject({
+      id: OLDER,
+    })
+  })
+
+  test("use refuses a closed Intent and an unknown one", async () => {
+    await addNewerIntent()
+    await runCommand("intent close", [], { intent: NEWER, reason: "done" })
+    expect(await refusal("intent use", [NEWER])).toMatchObject({ _tag: "IntentClosed" })
+    expect(await refusal("intent use", ["intent-9999"])).toMatchObject({ _tag: "UnknownRecord" })
+    expect(await Bun.file(chosenFile()).exists()).toBe(false)
+  })
+
+  test("a chosen Intent that closed later is ignored", async () => {
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    await runCommand("intent close", [], { intent: NEWER, reason: "done" })
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+})
+
+describe("assignment list scope", () => {
+  test("defaults to the Intent in use, --intent selects another, --all shows every Intent", async () => {
+    await addNewerIntent()
+    await runCommand("intent use", [OLDER])
+    const list = async (flags = {}) =>
+      ids(
+        ((await runCommand("assignment list", [], flags)).value as { assignments: unknown })
+          .assignments,
+      )
+    expect(await list()).toEqual(["assignment-0001"])
+    expect(await list({ intent: NEWER })).toEqual(["assignment-0009"])
+    expect(await list({ all: true })).toEqual(["assignment-0001", "assignment-0009"])
+    expect(await refusal("assignment list", [], { all: true, intent: NEWER })).toMatchObject({
+      _tag: "Usage",
+    })
   })
 })
 
