@@ -7245,7 +7245,7 @@ var runForEach2 = /* @__PURE__ */ dual(2, (self, f) => runForEach(self.channel, 
 // package.json
 var package_default = {
   name: "@holyclaude/cli",
-  version: "0.2.0",
+  version: "0.2.1",
   description: "The holyclaude command line: Intent and Assignment state, plugin hooks.",
   license: "Apache-2.0",
   bin: {

@@ -1,0 +1,39 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Reviewer.code",
+  "objective": "Independently review the 0.2.1 version PR.",
+  "scope": [
+    "Branch release/0.2.1/chore/version against main 3aa88d4, worktree g."
+  ],
+  "constraints": [
+    "Read-only; scratch builds in the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "Every shipped version string reads 0.2.1 including the bun.lock workspace entries, and the bundle is byte-identical to a fresh build.",
+    "Gates, frozen install and both validate --strict runs pass; findings reported."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9t4aoo-3zns"
+    ],
+    "independent_from": [
+      "assignment-0mv9t4aoo-3zns"
+    ]
+  },
+  "id": "assignment-0mv9t6poe-7ccb",
+  "state": "Ready",
+  "result": null,
+  "acceptance": null
+}
