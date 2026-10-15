@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { $ } from "bun"
 
+import { DISPATCH_TOOL } from "./dispatch.ts"
 import { JUDGED_TOOLS } from "./policy.ts"
 
 const PLUGIN = join(import.meta.dir, "..", "..", "..", "..", "plugin")
@@ -49,8 +50,15 @@ describe("the PreToolUse matcher", () => {
     for (const tool of JUDGED_TOOLS) expect(runsFor(group?.matcher, tool)).toBe(true)
   })
 
+  test("runs the dispatch guard for the Agent tool", () => {
+    expect(DISPATCH_TOOL).toBe("Agent")
+    expect(runsFor(group?.matcher, DISPATCH_TOOL)).toBe(true)
+  })
+
   test("lists nothing else, so an unmatched tool never reaches the guard", () => {
-    expect(group?.matcher?.split("|").toSorted()).toEqual([...JUDGED_TOOLS].toSorted())
+    expect(group?.matcher?.split("|").toSorted()).toEqual(
+      [...JUDGED_TOOLS, DISPATCH_TOOL].toSorted(),
+    )
     for (const tool of [
       "Read",
       "Grep",
@@ -60,7 +68,7 @@ describe("the PreToolUse matcher", () => {
       "TodoWrite",
       "Skill",
       "SendMessage",
-      "Agent",
+      "Agents",
       "mcp__server__write",
       "Bash2",
       "bash",

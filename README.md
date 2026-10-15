@@ -71,11 +71,11 @@ Managed-only keys apply in any session, cloud or local. Documented: Claude Code 
 
 | Setting                                                                                                 | Why                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }`                                                           | Turns off fork mode. A fork inherits the root's Opus model, which would bypass the pinned Haiku and Sonnet specialists.                                                                                                                                                                                                                                       |
-| `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }` | Forks inherit the Opus model, and the built-in agent types ignore the pinned specialists, so denying them keeps every dispatch on a holyclaude specialist.                                                                                                                                                                                                    |
+| `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }`                                                           | Turns off fork mode. A fork inherits the root's Opus model, which would bypass the pinned Haiku and Sonnet specialists. A backstop: the `PreToolUse` hook already refuses a fork when the root is holyclaude.                                                                                                                                                 |
+| `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }` | Forks inherit the Opus model, and the built-in agent types ignore the pinned specialists, so denying them keeps every dispatch on a holyclaude specialist. A backstop: the `PreToolUse` hook already refuses these calls when the root is holyclaude.                                                                                                         |
 | `"subagentPromptCacheTtl": "1h"`                                                                        | Leave it unset. The Sonnet specialists, the only workers the root resumes, ask for a one-hour cache in their own frontmatter (`experimental.cacheTtl`), and this setting would override that choice for every subagent, Haiku included.                                                                                                                       |
 | `"promptCacheTtl": "1h"`                                                                                | Keeps the root cached on API-key setups, where the default is five minutes; frontmatter `cacheTtl` applies only to subagents, so the root needs this setting. It carries a higher cache-write cost.                                                                                                                                                           |
-| `"autoCompactWindow": 450000` or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`                               | Compacts the root and every subagent at 450,000 tokens. See below.                                                                                                                                                                                                                                                                                            |
+| `"autoCompactWindow": 450000` or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`                               | A recommended default: compacts the root and every specialist at 450,000 tokens. The plugin does not set it. See below.                                                                                                                                                                                                                                       |
 | `"permissions": { "allow": ["Bash(gh pr view *)", "Bash(gh run list *)", "Bash(gh run view *)"] }`      | The root watches CI through Monitor with read-only `gh` commands, and Monitor commands pass through Bash permission rules. Allow the read commands you want it to run without a prompt. The watch's `gh api` reads still prompt unless you write a rule you trust, because a prefix rule such as `Bash(gh api *)` also matches write forms (`-X POST`, `-f`). |
 | `"deniedModels": ["fable"]` in managed settings                                                         | Blocks Fable-class models so no session or per-call override reaches them. The key is managed-only (see the note above the table). Adjust the entry to the model family you want to block.                                                                                                                                                                    |
 | `CLAUDE_CODE_EFFORT_LEVEL` left unset                                                                   | The variable overrides every specialist's pinned effort, so leaving it unset lets each specialist run at its own level.                                                                                                                                                                                                                                       |
@@ -87,7 +87,7 @@ and how the deny list and that skill interact is not fully verified.
 
 #### The 450K compaction threshold
 
-Settings key, in user, project or local settings:
+The plugin does not set the window. Set it yourself, in user, project or local settings:
 
 ```json
 { "autoCompactWindow": 450000 }
@@ -104,7 +104,7 @@ What the mechanism does, read from the Claude Code documentation and source:
 
 - The value is an integer number of tokens from 100,000 to 1,000,000, capped at the model's context
   window. The environment variable beats the settings key.
-- Subagents use the same logic, so the root and every worker compact at the same threshold.
+- Subagents use the same logic, so one setting compacts the root and every specialist at the same threshold.
 - Since 2.1.288, a per-model `modelSettings.<model>.autoCompactWindow` saved by `/autocompact` beats
   the top-level key for that model. Check `/autocompact` if a model compacts at another size.
 - Opus 5.5, Sonnet 5.5 and Haiku 5.5 each have a 1M window by default, so 450,000 sets a real,
@@ -218,17 +218,17 @@ The first time a command that changes state runs against the `.holyclaude/state.
 }
 ```
 
-| Event           | Matcher                                                           | `<name>`         | What it does                                                            |
-| --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
-| `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
-| `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
-| `PostToolUse`   | `Agent`                                                           | `post-tool-use`  | Records the model a launched specialist started on. It never blocks.    |
-| `SubagentStart` | none                                                              | `subagent-start` | Records a specialist's agent type. It cannot block.                     |
-| `SubagentStop`  | none                                                              | `subagent-stop`  | Records a specialist's effort and transcript. It never blocks.          |
+| Event           | Matcher                                                                  | `<name>`         | What it does                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SessionStart`  | `startup\|resume\|clear\|compact`                                        | `session-start`  | Injects the core rules and state as additional context.                                                                                                      |
+| `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit\|Agent` | `pre-tool-use`   | Guards specialists' shell and file-write calls, also refuses a holyclaude root's subagent calls that are not holyclaude specialists, and records the effort. |
+| `PostToolUse`   | `Agent`                                                                  | `post-tool-use`  | Records the model a launched specialist started on. It never blocks.                                                                                         |
+| `SubagentStart` | none                                                                     | `subagent-start` | Records a specialist's agent type. It cannot block.                                                                                                          |
+| `SubagentStop`  | none                                                                     | `subagent-stop`  | Records a specialist's effort and transcript. It never blocks.                                                                                               |
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
-`Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
-the two in step.
+`Grep` and `Glob` cost no process. The matcher lists every tool the hook judges (the guard's shell and file-write tools, and `Agent` for the dispatch check),
+and a test keeps the two in step.
 
 The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<role-task>`,
 because only they feed `assignment verify` and the independence rule. An agent with another type,

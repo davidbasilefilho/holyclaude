@@ -8671,6 +8671,10 @@ var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
 // src/fingerprint.ts
 import { join as join5 } from "path";
 var PLUGIN_NAME = "holyclaude";
+var ROOT_AGENT_TYPES = [
+  `${PLUGIN_NAME}:${PLUGIN_NAME}`,
+  PLUGIN_NAME
+];
 var agentType = (role) => `${PLUGIN_NAME}:${routeFor(role).agent}`;
 var rootCandidates = () => [
   ...process.env["CLAUDE_PLUGIN_ROOT"] ? [process.env["CLAUDE_PLUGIN_ROOT"]] : [],
@@ -8849,6 +8853,20 @@ var postToolUse = (stdin) => gen2(function* () {
     yield* observe(agentId, { agent_type: type, model: resolvedModel });
   return "";
 });
+
+// src/hook/dispatch.ts
+var DISPATCH_TOOL = "Agent";
+
+class DispatchRefused2 extends TaggedError2("DispatchRefused") {
+  get message() {
+    return `The holyclaude root dispatches only holyclaude specialists, so this Agent call is refused: its subagent_type must be a ${PLUGIN_NAME}:<role-task> type, and a call without one, a fork, general-purpose, Explore or Plan is not. \`select <id>\` and \`assignment reserve <id>\` of the holyclaude CLI print the subagent_type to launch, for example ${PLUGIN_NAME}:worker-implementation.`;
+  }
+}
+var guardDispatch = (input) => {
+  const type = input.launch.subagent_type;
+  const refused = input.tool_name === DISPATCH_TOOL && input.agent === undefined && ROOT_AGENT_TYPES.includes(input.agent_type ?? "") && !type?.startsWith(`${PLUGIN_NAME}:`);
+  return refused ? fail5(new DispatchRefused2) : void_3;
+};
 
 // src/hook/glob.ts
 var SEPARATORS = "/\\=";
@@ -10702,7 +10720,7 @@ var preToolUse = (stdin) => gen2(function* () {
     return deny(REFUSALS.unreadable);
   const agent = input.agent;
   if (agent === undefined)
-    return "";
+    return yield* guardDispatch(input).pipe(as2(""), catchTag2("DispatchRefused", (refusal) => succeed5(deny(refusal.message))));
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
   if (agent.id !== undefined) {
     const directory = stateDirPath();
@@ -11246,7 +11264,6 @@ var toon = (value) => `${encode2(value)}
 `;
 
 // src/hook/session-start.ts
-var MAIN_AGENT_TYPES = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME];
 var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
@@ -11351,7 +11368,7 @@ var sessionStart = (stdin, { load = loadState, budget = STATE_LOAD_BUDGET } = {}
   const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
     return;
   }));
-  const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "");
+  const runsAsMainAgent = ROOT_AGENT_TYPES.includes(input?.agent_type ?? "");
   const rules = runsAsMainAgent ? undefined : extractRules(yield* tryPromise2(() => file.text()), root);
   const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(flatMap2((state) => readActiveIntent(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(orElseSucceed2(() => {
     return;
