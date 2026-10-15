@@ -1,0 +1,42 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review the restructured README and the LICENSE line.",
+  "scope": [
+    "Diff scratchpad/diffs/assignment-0mv9slk0p-w1qy.diff (README.md) and scratchpad/diffs/assignment-0mv9s8b8u-z7x0.diff (LICENSE); full files in /home/user/holyclaude; base main c3d2131."
+  ],
+  "constraints": [
+    "Read-only; first review, read the whole README."
+  ],
+  "acceptance_criteria": [
+    "The README follows the owner's layout exactly, keeps every applicable fact from the base README, mentions T3 Code only in Special thanks, and its internal and docs links resolve.",
+    "Why holyclaude? makes only claims the repository supports; Special thanks and License match the owner's request; the LICENSE line reads Copyright 2026 David Basile Filho with the rest verbatim.",
+    "Blockers and optional findings reported with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9slk0p-w1qy",
+      "assignment-0mv9s8b8u-z7x0"
+    ],
+    "independent_from": [
+      "assignment-0mv9slk0p-w1qy",
+      "assignment-0mv9s8b8u-z7x0"
+    ]
+  },
+  "id": "assignment-0mv9snxr5-ybwu",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

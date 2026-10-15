@@ -1,5 +1,7 @@
 # holyclaude
 
+## What is holyclaude?
+
 holyclaude is a Claude Code plugin whose `agent` setting starts the main thread as a root agent, as
 observed in local sessions and not in [cloud sessions](#cloud-sessions). The root
 plans work as an Intent with Assignments, dispatches pinned Haiku and Sonnet specialists,
@@ -7,87 +9,16 @@ judges their reports, and accepts work on evidence. State lives in the project's
 `.holyclaude/` directory (see [State](#state)) and is reached through the `holyclaude` command line tool that the
 plugin ships. There is no MCP server.
 
-## State
+## How does it work?
 
-State is kept as one JSON file per record in the project's `.holyclaude/` directory, which is meant to be committed ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)):
-
-```text
-.holyclaude/
-  .gitignore                          committed; lists the local files below and an earlier version's
-  intents/<slug>-<intent-id>/intent.json
-  intents/<slug>-<intent-id>/assignments/<slug>-<assignment-id>.json
-  local/                              never committed
-    .gitignore                        `*`, restored if it differs, so local files stay ignored whatever the folder's own list says
-    lock, lock.breaking               the write lock and its guard
-    workers.json                      the worker list: subagent ids, roster fingerprints, history
-    agents.json                       the subagent id of each Assignment, keyed by Assignment id
-    worktrees.json                    the worktree key of each Running writer, keyed by Assignment id
-    clone.json                        this clone's random id
-    active-intent.json                the Intent this clone works on, set by `intent use`
-    observations.jsonl                what the hooks saw of running subagents, with transcript paths
-    observations.1.jsonl              the previous generation of that log
-  state.json.migrated                 an earlier version's single state file, after migration
-```
-
-Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. No command picks an Intent by its position in that order; see "Intents and collaborators" below.
-
-The slug comes from the record's own objective, so `git diff --stat` shows what a record is about: lower-case, accents folded to ASCII (`ação` becomes `acao`), every run of other characters a hyphen, cut at a word boundary within about 40 characters (only the first 512 characters of an objective are read, and `ø ł ß æ đ œ þ` fold to `o l ss ae d oe th`). It only keeps the name a safe file name; the objective itself has no limit, and an objective with no letter or digit leaves just the id. The id is the key and ends the name: a record's `id` must equal the end of its file or directory name (an Assignment's `intent_id` that of its directory), and names without a slug, such as `intents/intent-0001/`, still load. A record that does not match is rejected as `CorruptRecord`, which names the file, and so is an id found at two paths (the error names both), a name that ends in a second record's id, and an Assignment outside the folder of its own Intent's record. A write never replaces another record's file: a name that would land on a path another record holds, or end in another record's id, fails as `CorruptRecord` naming both records, and so does a folder rename onto a folder left behind (by a merge, say), which is named so you can move it away and rerun. When an objective changes, the slug changes and the directory or file is renamed in one move under the write lock, which git shows as a rename. `intent list` prints each Intent's path. Writes go through a temporary file and a rename under a local lock, and only the records a command changed are written. Record files and local files have no size limit: holyclaude never refuses or shortens what you write into an Intent, an Assignment or a result. The local files are never merged. The worker list and the agent ids only grow (the agent id of a finished Assignment still feeds `verify`, and a worker's history feeds the independence rule), so their entries cannot be pruned safely; `clone.json` and `active-intent.json` each hold one value, and a new choice replaces the old. The observations log is the exception: it is only a note for `verify` and the hooks, so once it passes 1 MiB the next append moves it, under the lock, to `observations.1.jsonl` (replacing the generation before) and starts a new one. Readers read both generations, oldest first, so the log on disk stays at about two generations and the newest records are never the ones dropped. A repository can commit a log of any size, though, and every specialist tool call reads it, so a read takes only the last 4 MiB of each generation, from the first whole line on; a log that follows the rotation is near 1 MiB per generation and is read whole. The other bounds only guard the reading of input that holyclaude does not own, and a read past one fails as `TooLarge` rather than load the file: the lock and guard files are read only up to 4 KiB (a larger one counts as unreadable and is judged by its age), the `.gitignore` up to 256 KiB, `local/.gitignore` up to 16 bytes (anything else is rewritten to `*`), a legacy `state.json` up to 1 MiB, a subagent transcript that `assignment verify` opens up to 64 MiB, and each state file that the SessionStart hook reads up to 64 MiB. The CLI itself reads state files and the JSON on its stdin at any size, since both come from its user.
-
-Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every Intent folder under `intents/` and its `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `worktrees.json`, `clone.json`, `active-intent.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead. One read is lenient instead: a stored Intent choice (`local/active-intent.json`) that is a link or unreadable counts as no choice; writing it still refuses a link.
-
-The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. Whenever the CLI creates `local/`, it also writes `local/.gitignore` containing `*`, so local files stay ignored even if a repository replaces `.holyclaude/.gitignore`. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
-
-The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
-
-A record that arrives through a pull or a merge is unauthenticated input from whoever wrote it, like any other committed file. An objective, a constraint or a result is read by your root and by workers as instructions and evidence, so review changes under `.holyclaude/` as you would code before you rely on them.
-
-The worker VCS guard recognizes the state directory by its name: it refuses a specialist's writes to any path that contains `.holyclaude`. A `HOLYCLAUDE_STATE_DIR` outside a folder with that name is therefore not protected from specialists, so keep it under a `.holyclaude` folder.
-
-### Clones and reconcile
-
-Each clone gets a random id in `local/clone.json` on first use. When an Assignment enters Running, the store stamps that id on it as `clone_id`. `holyclaude reconcile` lists the Running rows this clone reserved under `running` (rows without a stamp count as its own), and rows another clone reserved under `running_elsewhere`. It leaves the latter alone, since the other clone's root confirms them; `holyclaude reconcile resolve <id>` still settles one when you name it, while `assignment bind`, `rollback`, `cancel` and `finish` on such a row are refused as `OwnedElsewhere`, naming the clone, since its worker lives in that clone's session. Only this clone's Running writers (and unstamped ones) hold their ownership paths against a local `reserve`; a row another clone reserved does not, because git shows an overlap at merge. Within a clone, `assignment reserve --worktree <dir>` makes an existing directory (another git worktree of the repository) the base that ownership paths and `--root` resolve against, and keys the reservation to it with a hash of the directory's real path, kept in `local/worktrees.json` (never in a record) until the row leaves Running. Writers hold paths against each other only within one key, so writers in different worktrees run in parallel; a reserve without `--worktree` keys to the project root, and a Running row with no key holds against everyone. `--root` still narrows the writable roots, relative to the worktree. Deleting `.holyclaude/local/` gives the clone a new id, so its earlier Running rows then show as running elsewhere.
-
-`reconcile` also lists, under `closed_with_open_work`, each closed Intent that still has Ready or Running Assignments.
-
-`assignment accept <id> --carry-forward` accepts a Succeeded Assignment made for an earlier Intent revision when the acceptance record carries the live one, so work that still holds after a material change need not be redone. Without the flag the earlier revision is refused as `StaleRevision`; on an Assignment at the live revision the flag changes nothing. The record shows the carry-forward as an acceptance revision above the Assignment's.
-
-A record file with git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) fails the load as `CorruptRecord`, naming the file and saying to resolve the conflict in git and rerun.
-
-### Intents and collaborators
-
-An Intent is `open` or `closed`. A closed Intent carries `close_reason` and `closed_at`, and it authorizes no dispatch: `assignment create`, `assignment reserve` and `assignment follow-up` refuse it with `IntentClosed`. An open Intent is written without `state`, and a record with none reads as open, so Intents written before this version stay open until someone closes them. Collaborators on one repository need 0.2.0: 0.1.x reads the slugged names as corrupt records.
-
-| Command                                        | What it does                                                                                                                                                                               |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `intent list [--state open\|closed]`           | One row per Intent: id, state, revision, objective, the count of open Assignments (Ready, Running, or Succeeded and not yet accepted) and its directory                                    |
-| `intent create`                                | Records a new Intent from the JSON on stdin and puts it in use on this clone. The reply names it under `in_use` and the Intent it displaced under `replaced` (`null` when none was in use) |
-| `intent use <id>`                              | Makes this clone work on that Intent. The choice is stored in `local/active-intent.json`, which is never committed, and a closed Intent is refused                                         |
-| `intent close [--intent <id>] --reason <text>` | Closes the Intent; refused while any Assignment is Running or Succeeded and unaccepted; `--allow-unaccepted <reason>` overrides the second                                                 |
-| `intent reopen [--intent <id>]`                | Opens it again, puts it in use, and bumps its revision, so an acceptance recorded before the close does not authorize new work; without `--intent` it reopens the only closed Intent       |
-| `assignment list [--intent <id> \| --all]`     | Lists the Assignments of the Intent in use; `--intent` selects another and `--all` shows every Intent                                                                                      |
-
-A command that acts on an Intent (`intent show`, `intent update`, `intent close`, `intent reopen`, `assignment list`) finds it in this order: the `--intent <id>` flag, then the Intent stored by `intent use` while it is still open, then the only open Intent when exactly one is open. Otherwise (several open and none in use, or none open) it fails with `NoActiveIntent`, which lists the open Intents and says to run `intent use`, or to create or reopen one when none is open. A stored choice that cannot be read counts as none, and is not read at all when `--intent` is given. `intent show <id>` and a JSON `id` in `intent update` name an Intent too; one that differs from `--intent` is a usage error. The SessionStart summary names every open Intent and marks the one in use by the same rule.
-
-`intent close` lists every Succeeded Assignment that was never accepted in an `UnacceptedAssignments` error and closes nothing. `--allow-unaccepted <reason>` closes anyway for work dropped on purpose, and `close_reason` then holds the `--reason`, the ids and this reason; no field is added to the record. `intent reopen` replies like `intent create`, with `in_use` and the Intent it displaced under `replaced`.
-
-Collaborators on one repository need the same holyclaude version. Only a closed Intent writes the new `state`, `close_reason` and `closed_at` fields, and an older version rejects a record that carries them as a corrupt record, so update every clone before anyone closes an Intent.
-
-### Where state lives
-
-The state directory is `$CLAUDE_PROJECT_DIR/.holyclaude`, or `.holyclaude` in the working directory when that variable is unset. `HOLYCLAUDE_STATE_DIR` overrides it with a directory of your choice. It replaces `HOLYCLAUDE_STATE_FILE`, which named the single state file and is no longer read.
-
-### Migrating from the single file
-
-The first time a command that changes state runs against the `.holyclaude/state.json` of an earlier version, the file becomes record files. Legacy ids are kept, agent ids and workers move to the local files, the observations log moves into `local/` as its previous generation, whole whatever its size (moved, or streamed in front of a previous generation, never loaded whole), the old file is renamed `state.json.migrated`, and the old lock files (`state.json.lock` and `state.json.lock.breaking`) are deleted last, under the new lock. A `.holyclaude/.gitignore` that holds only the old `*` rule is replaced by the list above before the migration starts, and it already covers the old file, its lock files and its log, so nothing the migration has yet to move can be staged by accident. Any other `.gitignore` there is left as it is, so check that it covers the files in the list. A `state.json.migrated` that is already there is never overwritten: if it holds the same text as `state.json` (a migration that stopped before its last step), `state.json` is simply removed; if it differs, the migration stops with `MigratedFileInTheWay` before writing any record and keeps both files, and you move the old copy away (or delete it) and run the command again. It does not rename to a suffixed name, because such a name would not be covered by the `.gitignore` and could be committed. Record files already on disk, such as a teammate's, are kept; the ones the old file also has must agree with it, or the migration stops with `CorruptRecord`. A previous generation already in `local/` gets the old lines in front of it; the log hooks append to is never rewritten. Read-only commands read an unmigrated file together with the record files. Commit `.holyclaude/` after the first migration. The repository's own `.gitignore` no longer lists `.holyclaude/`.
-
-## Requirements
+### Requirements
 
 - Claude Code 2.1.293 or later.
 - [Bun](https://bun.sh) on `PATH`, as a real `bun` executable that Claude Code can start without a
   shell. Without it the hooks do not start and the `holyclaude` command prints a one-line error; see
   [Hooks](#hooks).
 
-## Install and test in plain Claude Code
+### Install and test
 
 Try it straight from a clone, without installing:
 
@@ -112,49 +43,7 @@ shell as `claude plugin marketplace add <source>` and `claude plugin install hol
 Check a checkout with `claude plugin validate <path-to-clone>/plugin` and
 `claude plugin validate <path-to-clone>`.
 
-## Install and test in T3 Code nightly
-
-T3 Code drives Claude through the Agent SDK and loads the user, project and local settings, which
-include `enabledPlugins` and `agent`. It does not pass a plugin directory, so `--plugin-dir` does
-not apply there. Install through the marketplace route above, from a plain `claude` session on the
-same machine, so the plugin is enabled in the settings T3 reads. Then start a thread in T3 Code and
-confirm that the thread runs the `holyclaude` root and that `holyclaude:` specialists can be dispatched. In plain local `claude` sessions, the plugin's `agent` setting has been observed to start the session with the root; in T3 Code this is unverified. In a cloud session it did not start the root (see [Cloud sessions](#cloud-sessions)).
-
-T3 Code's `$` skills picker lists only skills in the Claude config directory and the project's
-`.claude/skills`, so the plugin's skills do not appear there. The root and the workers still load
-them through the Skill tool.
-
-This has not been observed live in T3 Code. If the plugin does not load, or the `agent` setting does
-not take effect, use the fallback below.
-
-### The `.claude/` fallback
-
-T3 Code loads Claude's default settings sources, so the same pieces can live in `.claude/`. The
-fallback must not rely on the plugin's own SessionStart hook:
-
-- the holyclaude root agent file in `~/.claude/agents/` or `.claude/agents/`;
-- the user-level `settings.json` setting `agent` to it;
-- the specialists and skills in `.claude/agents` and `.claude/skills`;
-- the CLI on `PATH` through `bun link` in `packages/cli`, with
-  `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"` in the copied agents and skills replaced by
-  `holyclaude`, because Claude Code substitutes that variable only in a plugin's own files;
-- the hooks in user or project settings.
-
-If T3 Code turns out to ignore `agent` in user settings too, the main thread would stay on the default
-agent. Then a SessionStart hook in user or project settings could inject the root rules, and the
-root's restraint would depend on its instructions alone.
-
-## Cloud sessions
-
-Cloud sessions (Claude Code on the web) differ from a local session in five ways that matter here. Each point is marked as documented (stated in the Claude Code documentation, checked 2026-10-15 for Claude Code 2.1.300) or observed (seen in two cloud sessions with holyclaude loaded, not documented).
-
-- **Settings.** Documented: a cloud session does not read user settings (`~/.claude/settings.json`) or local settings. A single-repository session reads the repository's committed `.claude/settings.json`; a multi-repository session reads only `enabledPlugins` and `extraKnownMarketplaces` from it. Commit the keys you need, such as those in [Settings the plugin cannot ship](#settings-the-plugin-cannot-ship) except its managed-only keys, to `.claude/settings.json` of a single-repository project, or set them as environment variables on the cloud environment (in `.env` format).
-- **The root agent.** Observed: the plugin's `agent` setting did not make the main thread the `holyclaude` agent. The main thread ran as the default agent, and the core rules that the SessionStart hook injects were the root's copy of its instructions.
-- **Stop hooks.** Observed in two cloud sessions: the environment ran a stop hook that asked for uncommitted files to be committed, and it flagged the `.holyclaude/` state, which is meant to be committed with the work (see [State](#state)), so commit it together with the change.
-- **GitHub GraphQL.** Observed: `gh pr view --json ...` and `gh api graphql` fail because GraphQL is blocked, while REST through `gh api` (for example `repos/<owner>/<repo>/pulls/<number>`) works. The root's CI watch reads REST and reports review threads, which only GraphQL exposes, as Unknown where GraphQL is blocked, review comments exist and no host GitHub tools can read them. `gh api --paginate` fails with 403 when a read needs a second page, so such a read counts as Unknown.
-- **PR activity subscriptions.** Observed: a subscription to a PR's activity can stop delivering partway through a session, so the root falls back to polling with Monitor.
-
-## Settings the plugin cannot ship
+### Settings the plugin cannot ship
 
 A plugin's `settings.json` honors only `agent` and `subagentStatusLine`, so everything below is
 yours to set. Put each entry in the settings file for the scope where you run the holyclaude root.
@@ -174,13 +63,12 @@ Managed-only keys apply in any session, cloud or local. Documented: Claude Code 
 | `"deniedModels": ["fable"]` in managed settings                                                         | Blocks Fable-class models so no session or per-call override reaches them. The key is managed-only (see the note above the table). Adjust the entry to the model family you want to block.                                                                                                                                                                    |
 | `CLAUDE_CODE_EFFORT_LEVEL` left unset                                                                   | The variable overrides every specialist's pinned effort, so leaving it unset lets each specialist run at its own level.                                                                                                                                                                                                                                       |
 | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" }` (optional)                                           | A fallback default for definitions that lack a model. Leave `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset: it forces one model on every subagent and would block Sonnet.                                                                                                                                                                                           |
-| T3 Code Queue mode (Settings, General, Follow-up behavior)                                              | Messages sent mid-run wait for the turn to finish. Steer interrupts in-flight tools.                                                                                                                                                                                                                                                                          |
 
 The built-in `/code-review` skill, which Reviewer.code uses, starts one general-purpose review subagent
 of its own on the reviewer's model. A test run with `Agent(general-purpose)` denied still saw it start,
 and how the deny list and that skill interact is not fully verified.
 
-### The 450K compaction threshold
+#### The 450K compaction threshold
 
 Settings key, in user, project or local settings:
 
@@ -206,13 +94,94 @@ What the mechanism does, read from the Claude Code documentation and source:
   earlier threshold for each of them.
 - `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` holds those models to 200K. The value is then capped at the
   window and does nothing useful, so leave that variable unset.
-- In T3 Code, the Claude provider setting "Auto-compact after" passes its value
-  inline and overrides `settings.json`. Enter `450000` there as well.
 
 This setup has not been observed taking effect in a live session. Watch for the first compaction near
 450,000 tokens before relying on it.
 
-## Hooks
+### Cloud sessions
+
+Cloud sessions (Claude Code on the web) differ from a local session in five ways that matter here. Each point is marked as documented (stated in the Claude Code documentation, checked 2026-10-15 for Claude Code 2.1.300) or observed (seen in two cloud sessions with holyclaude loaded, not documented).
+
+- **Settings.** Documented: a cloud session does not read user settings (`~/.claude/settings.json`) or local settings. A single-repository session reads the repository's committed `.claude/settings.json`; a multi-repository session reads only `enabledPlugins` and `extraKnownMarketplaces` from it. Commit the keys you need, such as those in [Settings the plugin cannot ship](#settings-the-plugin-cannot-ship) except its managed-only keys, to `.claude/settings.json` of a single-repository project, or set them as environment variables on the cloud environment (in `.env` format).
+- **The root agent.** Observed: the plugin's `agent` setting did not make the main thread the `holyclaude` agent. The main thread ran as the default agent, and the core rules that the SessionStart hook injects were the root's copy of its instructions.
+- **Stop hooks.** Observed in two cloud sessions: the environment ran a stop hook that asked for uncommitted files to be committed, and it flagged the `.holyclaude/` state, which is meant to be committed with the work (see [State](#state)), so commit it together with the change.
+- **GitHub GraphQL.** Observed: `gh pr view --json ...` and `gh api graphql` fail because GraphQL is blocked, while REST through `gh api` (for example `repos/<owner>/<repo>/pulls/<number>`) works. The root's CI watch reads REST and reports review threads, which only GraphQL exposes, as Unknown where GraphQL is blocked, review comments exist and no host GitHub tools can read them. `gh api --paginate` fails with 403 when a read needs a second page, so such a read counts as Unknown.
+- **PR activity subscriptions.** Observed: a subscription to a PR's activity can stop delivering partway through a session, so the root falls back to polling with Monitor.
+
+### State
+
+State is kept as one JSON file per record in the project's `.holyclaude/` directory, which is meant to be committed ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)):
+
+```text
+.holyclaude/
+  .gitignore                          committed; lists the local files below and an earlier version's
+  intents/<slug>-<intent-id>/intent.json
+  intents/<slug>-<intent-id>/assignments/<slug>-<assignment-id>.json
+  local/                              never committed
+    .gitignore                        `*`, restored if it differs, so local files stay ignored whatever the folder's own list says
+    lock, lock.breaking               the write lock and its guard
+    workers.json                      the worker list: subagent ids, roster fingerprints, history
+    agents.json                       the subagent id of each Assignment, keyed by Assignment id
+    worktrees.json                    the worktree key of each Running writer, keyed by Assignment id
+    clone.json                        this clone's random id
+    active-intent.json                the Intent this clone works on, set by `intent use`
+    observations.jsonl                what the hooks saw of running subagents, with transcript paths
+    observations.1.jsonl              the previous generation of that log
+  state.json.migrated                 an earlier version's single state file, after migration
+```
+
+Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. No command picks an Intent by its position in that order; see [Intents and collaborators](#intents-and-collaborators).
+
+The slug comes from the record's own objective, so `git diff --stat` shows what a record is about: lower-case, accents folded to ASCII (`ação` becomes `acao`), every run of other characters a hyphen, cut at a word boundary within about 40 characters (only the first 512 characters of an objective are read, and `ø ł ß æ đ œ þ` fold to `o l ss ae d oe th`). It only keeps the name a safe file name; the objective itself has no limit, and an objective with no letter or digit leaves just the id. The id is the key and ends the name: a record's `id` must equal the end of its file or directory name (an Assignment's `intent_id` that of its directory), and names without a slug, such as `intents/intent-0001/`, still load. A record that does not match is rejected as `CorruptRecord`, which names the file, and so is an id found at two paths (the error names both), a name that ends in a second record's id, and an Assignment outside the folder of its own Intent's record. A write never replaces another record's file: a name that would land on a path another record holds, or end in another record's id, fails as `CorruptRecord` naming both records, and so does a folder rename onto a folder left behind (by a merge, say), which is named so you can move it away and rerun. When an objective changes, the slug changes and the directory or file is renamed in one move under the write lock, which git shows as a rename. `intent list` prints each Intent's path. Writes go through a temporary file and a rename under a local lock, and only the records a command changed are written. Record files and local files have no size limit: holyclaude never refuses or shortens what you write into an Intent, an Assignment or a result. The local files are never merged. The worker list and the agent ids only grow (the agent id of a finished Assignment still feeds `verify`, and a worker's history feeds the independence rule), so their entries cannot be pruned safely; `clone.json` and `active-intent.json` each hold one value, and a new choice replaces the old. The observations log is the exception: it is only a note for `verify` and the hooks, so once it passes 1 MiB the next append moves it, under the lock, to `observations.1.jsonl` (replacing the generation before) and starts a new one. Readers read both generations, oldest first, so the log on disk stays at about two generations and the newest records are never the ones dropped. A repository can commit a log of any size, though, and every specialist tool call reads it, so a read takes only the last 4 MiB of each generation, from the first whole line on; a log that follows the rotation is near 1 MiB per generation and is read whole. The other bounds only guard the reading of input that holyclaude does not own, and a read past one fails as `TooLarge` rather than load the file: the lock and guard files are read only up to 4 KiB (a larger one counts as unreadable and is judged by its age), the `.gitignore` up to 256 KiB, `local/.gitignore` up to 16 bytes (anything else is rewritten to `*`), a legacy `state.json` up to 1 MiB, a subagent transcript that `assignment verify` opens up to 64 MiB, and each state file that the SessionStart hook reads up to 64 MiB. The CLI itself reads state files and the JSON on its stdin at any size, since both come from its user.
+
+Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every Intent folder under `intents/` and its `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `worktrees.json`, `clone.json`, `active-intent.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead. One read is lenient instead: a stored Intent choice (`local/active-intent.json`) that is a link or unreadable counts as no choice; writing it still refuses a link.
+
+The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. Whenever the CLI creates `local/`, it also writes `local/.gitignore` containing `*`, so local files stay ignored even if a repository replaces `.holyclaude/.gitignore`. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
+
+The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
+
+A record that arrives through a pull or a merge is unauthenticated input from whoever wrote it, like any other committed file. An objective, a constraint or a result is read by your root and by workers as instructions and evidence, so review changes under `.holyclaude/` as you would code before you rely on them.
+
+The worker VCS guard recognizes the state directory by its name: it refuses a specialist's writes to any path that contains `.holyclaude`. A `HOLYCLAUDE_STATE_DIR` outside a folder with that name is therefore not protected from specialists, so keep it under a `.holyclaude` folder.
+
+#### Clones and reconcile
+
+Each clone gets a random id in `local/clone.json` on first use. When an Assignment enters Running, the store stamps that id on it as `clone_id`. `holyclaude reconcile` lists the Running rows this clone reserved under `running` (rows without a stamp count as its own), and rows another clone reserved under `running_elsewhere`. It leaves the latter alone, since the other clone's root confirms them; `holyclaude reconcile resolve <id>` still settles one when you name it, while `assignment bind`, `rollback`, `cancel` and `finish` on such a row are refused as `OwnedElsewhere`, naming the clone, since its worker lives in that clone's session. Only this clone's Running writers (and unstamped ones) hold their ownership paths against a local `reserve`; a row another clone reserved does not, because git shows an overlap at merge. Within a clone, `assignment reserve --worktree <dir>` makes an existing directory (another git worktree of the repository) the base that ownership paths and `--root` resolve against, and keys the reservation to it with a hash of the directory's real path, kept in `local/worktrees.json` (never in a record) until the row leaves Running. Writers hold paths against each other only within one key, so writers in different worktrees run in parallel; a reserve without `--worktree` keys to the project root, and a Running row with no key holds against everyone. `--root` still narrows the writable roots, relative to the worktree. Deleting `.holyclaude/local/` gives the clone a new id, so its earlier Running rows then show as running elsewhere.
+
+`reconcile` also lists, under `closed_with_open_work`, each closed Intent that still has Ready or Running Assignments.
+
+`assignment accept <id> --carry-forward` accepts a Succeeded Assignment made for an earlier Intent revision when the acceptance record carries the live one, so work that still holds after a material change need not be redone. Without the flag the earlier revision is refused as `StaleRevision`; on an Assignment at the live revision the flag changes nothing. The record shows the carry-forward as an acceptance revision above the Assignment's.
+
+A record file with git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) fails the load as `CorruptRecord`, naming the file and saying to resolve the conflict in git and rerun.
+
+#### Intents and collaborators
+
+An Intent is `open` or `closed`. A closed Intent carries `close_reason` and `closed_at`, and it authorizes no dispatch: `assignment create`, `assignment reserve` and `assignment follow-up` refuse it with `IntentClosed`. An open Intent is written without `state`, and a record with none reads as open, so Intents written before this version stay open until someone closes them. Collaborators on one repository need 0.2.0: 0.1.x reads the slugged names as corrupt records.
+
+| Command                                        | What it does                                                                                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `intent list [--state open\|closed]`           | One row per Intent: id, state, revision, objective, the count of open Assignments (Ready, Running, or Succeeded and not yet accepted) and its directory                                    |
+| `intent create`                                | Records a new Intent from the JSON on stdin and puts it in use on this clone. The reply names it under `in_use` and the Intent it displaced under `replaced` (`null` when none was in use) |
+| `intent use <id>`                              | Makes this clone work on that Intent. The choice is stored in `local/active-intent.json`, which is never committed, and a closed Intent is refused                                         |
+| `intent close [--intent <id>] --reason <text>` | Closes the Intent; refused while any Assignment is Running or Succeeded and unaccepted; `--allow-unaccepted <reason>` overrides the second                                                 |
+| `intent reopen [--intent <id>]`                | Opens it again, puts it in use, and bumps its revision, so an acceptance recorded before the close does not authorize new work; without `--intent` it reopens the only closed Intent       |
+| `assignment list [--intent <id> \| --all]`     | Lists the Assignments of the Intent in use; `--intent` selects another and `--all` shows every Intent                                                                                      |
+
+A command that acts on an Intent (`intent show`, `intent update`, `intent close`, `intent reopen`, `assignment list`) finds it in this order: the `--intent <id>` flag, then the Intent stored by `intent use` while it is still open, then the only open Intent when exactly one is open. Otherwise (several open and none in use, or none open) it fails with `NoActiveIntent`, which lists the open Intents and says to run `intent use`, or to create or reopen one when none is open. A stored choice that cannot be read counts as none, and is not read at all when `--intent` is given. `intent show <id>` and a JSON `id` in `intent update` name an Intent too; one that differs from `--intent` is a usage error. The SessionStart summary names every open Intent and marks the one in use by the same rule.
+
+`intent close` lists every Succeeded Assignment that was never accepted in an `UnacceptedAssignments` error and closes nothing. `--allow-unaccepted <reason>` closes anyway for work dropped on purpose, and `close_reason` then holds the `--reason`, the ids and this reason; no field is added to the record. `intent reopen` replies like `intent create`, with `in_use` and the Intent it displaced under `replaced`.
+
+Collaborators on one repository need the same holyclaude version. Only a closed Intent writes the new `state`, `close_reason` and `closed_at` fields, and an older version rejects a record that carries them as a corrupt record, so update every clone before anyone closes an Intent.
+
+#### Where state lives
+
+The state directory is `$CLAUDE_PROJECT_DIR/.holyclaude`, or `.holyclaude` in the working directory when that variable is unset. `HOLYCLAUDE_STATE_DIR` overrides it with a directory of your choice. It replaces `HOLYCLAUDE_STATE_FILE`, which named the single state file and is no longer read.
+
+#### Migrating from the single file
+
+The first time a command that changes state runs against the `.holyclaude/state.json` of an earlier version, the file becomes record files. Legacy ids are kept, agent ids and workers move to the local files, the observations log moves into `local/` as its previous generation, whole whatever its size (moved, or streamed in front of a previous generation, never loaded whole), the old file is renamed `state.json.migrated`, and the old lock files (`state.json.lock` and `state.json.lock.breaking`) are deleted last, under the new lock. A `.holyclaude/.gitignore` that holds only the old `*` rule is replaced by the list above before the migration starts, and it already covers the old file, its lock files and its log, so nothing the migration has yet to move can be staged by accident. Any other `.gitignore` there is left as it is, so check that it covers the files in the list. A `state.json.migrated` that is already there is never overwritten: if it holds the same text as `state.json` (a migration that stopped before its last step), `state.json` is simply removed; if it differs, the migration stops with `MigratedFileInTheWay` before writing any record and keeps both files, and you move the old copy away (or delete it) and run the command again. It does not rename to a suffixed name, because such a name would not be covered by the `.gitignore` and could be committed. Record files already on disk, such as a teammate's, are kept; the ones the old file also has must agree with it, or the migration stops with `CorruptRecord`. A previous generation already in `local/` gets the old lines in front of it; the log hooks append to is never rewritten. Read-only commands read an unmigrated file together with the record files. Commit `.holyclaude/` after the first migration. The repository's own `.gitignore` no longer lists `.holyclaude/`.
+
+### Hooks
 
 `plugin/hooks/hooks.json` registers five hooks. Each runs in Claude Code's exec form, which spawns
 `bun` directly with an argument list and no shell:
@@ -294,7 +263,7 @@ The observations log keeps its format: one JSON line per sighting, each with onl
 would otherwise let the project redirect the state file or preload code into every hook. The config
 is an empty file shipped in the plugin, because `/dev/null` exists only under MSYS or Unix.
 
-### On Windows
+#### On Windows
 
 Exec form needs `command` to be a real `.exe`, and `bun` is one: Claude Code finds it on `PATH`
 without Git Bash, so a hook costs one Bun process and no shell. Through a mise shim (a `bun.exe` in
@@ -311,7 +280,7 @@ replaces it the same way in the core rules it injects. The wrapper's common path
 command substitution, only parameter expansion and the `command -v` builtin), which spares Git Bash
 four processes per call. Only a symlinked wrapper forks, for `readlink`.
 
-### Without Bun
+#### Without Bun
 
 Claude Code cannot start a hook whose `bun` is not on `PATH`. For each hook that is a non-blocking
 error: the call, start or stop goes ahead and the transcript shows a hook error notice. So the guard
@@ -320,7 +289,7 @@ call. A Bun in `~/.bun/bin` that is not on `PATH` is not found either; the wrapp
 for the `holyclaude` command, the hooks do not. The `holyclaude` command without Bun prints one TOON
 error line and exits 127.
 
-## Skills
+### Skills
 
 The plugin ships eight skills. `assignments`, `continue-work`, `grill-me` and `handoff` serve the root.
 The specialists preload the rest through their `skills` frontmatter: `specialist-conduct` (every
@@ -328,7 +297,7 @@ specialist), `merge-ready-code` (the code writers, Reviewer.code and Reviewer.te
 `interface-inspection` with the vendored `frontend-design` (Worker.visual and Reviewer.visual). `/code-review` is Claude Code's built-in skill,
 which review Assignments call; it is neither vendored nor wrapped.
 
-## Limits
+### Limits
 
 - holyclaude puts no word, character or byte limit on content: the text of an Intent, an Assignment,
   a result, a list row, a hook's deny reason or a command's error is kept and shown whole. The
@@ -370,7 +339,21 @@ which review Assignments call; it is neither vendored nor wrapped.
 - Reviewer.code, Worker.validation and Reviewer.testing hold Bash under an instruction-only
   no-mutation boundary.
 
+## Why holyclaude?
+
+Each choice below is recorded in the repository; [docs/DECISIONS.md](docs/DECISIONS.md) keeps the standing decisions with their reasons.
+
+- **A root that decides and specialists that work.** The root holds the user relationship, the plan and the acceptance, and delegates edits, runs, checks, review and research. Its context stays on decisions, and the work is split into Assignments that each end in a report with evidence.
+- **Cost and model routing.** The 18 specialists are pinned to Haiku or Sonnet, each with its own effort, so routine work does not run on the root's Opus model. That is why the [settings](#settings-the-plugin-cannot-ship) turn off fork mode and deny the built-in agent types, and why `holyclaude assignment verify` checks the model and effort a worker actually ran on against what was dispatched.
+- **Independent review.** Work that changes code, artifacts or behavior is reviewed by a specialist with no history on it, and a re-review goes to a different reviewer than the one who found the problem. Work is accepted on evidence, not on a worker's say-so.
+- **Workers cannot write to the repository's history.** Specialists leave commits, pushes and pull requests to the root, and a hook guards their shell and file writes (see [Hooks](#hooks) and [Limits](#limits)).
+- **State that survives.** Intents and Assignments are plain files in `.holyclaude/`, committed with the work, so a team or several clones share them and a record outlives a lost machine ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)).
+- **Compact instructions.** The generated instructions stay short because every token is read on every turn, and the root asks the user only about choices that are theirs ([compact instructions](docs/DECISIONS.md#compact-generated-instructions-no-plan-feature), [grill-me](docs/DECISIONS.md#grill-me-only-for-material-choices)).
+- **No MCP server and no `bin/`.** The plugin reaches its state through a command line tool it ships, and it ships no `bin/` directory so that it installs everywhere ([why](docs/DECISIONS.md#no-bin-in-the-plugin)).
+
 ## Development
+
+### Tasks
 
 Tasks live in `mise.toml`, which pins Bun. Run them with `mise run <task>`; the root `bun run`
 scripts (`fmt`, `fmt:readonly`, `lint`, `lint:readonly`, `typecheck`, `test`) and the CLI package's
@@ -391,6 +374,8 @@ mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli chang
 | `build`                                   | Bundle the CLI into `plugin/scripts/holyclaude.js`                   |
 | `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the six version files and `bun.lock`, print old and new version |
 
+### Versions
+
 Versions follow `0.X.Y-Z`: `X` is the minor, `Y` the patch and `Z` an optional hotfix. A bump
 resets the later positions, so from `0.3.2-1` a minor bump gives `0.4.0`, a patch bump gives
 `0.3.3` and a hotfix bump gives `0.3.2-2`. The version appears in the root, `packages/cli`,
@@ -401,6 +386,18 @@ the version string changes. The bump tasks refuse to run, writing nothing, when 
 CLI reads its version from `packages/cli/package.json` at build time; commit the rebuilt
 `plugin/scripts/holyclaude.js` together with the version change.
 
-## Third-party material
+### Third-party material
 
 `plugin/skills/frontend-design` is vendored byte-identical, with its `LICENSE.txt` (Apache-2.0), from [anthropics/skills](https://github.com/anthropics/skills), path `skills/frontend-design`, at commit `dbd4588f9e1033efb41dad4bef2f7947c8993d44`. The same skill is in [anthropics/claude-code](https://github.com/anthropics/claude-code) at `plugins/frontend-design/skills/frontend-design`: that repository's HEAD at verification on 2026-10-15 was `94506ff0d3bd9185f1752da36e968775021fb48f`, and the skill there matches the vendored copy. The directory is excluded from formatting so it stays byte-identical. [docs/DECISIONS.md](docs/DECISIONS.md) records why.
+
+## Special thanks!
+
+- The [Claude Code](https://github.com/anthropics/claude-code) team, for the plugin system that holyclaude is built on.
+- The [T3](https://github.com/pingdotgg/t3code) team: T3 Code works great with holyclaude.
+- [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) and its author code-yeongyu, for the work that came before.
+- The [OpenCode](https://github.com/anomalyco/opencode) team, for their open-source agent.
+- [HolyCodex](https://github.com/davidbasilefilho/holycodex), the Codex plugin that holyclaude was adapted from.
+
+## License
+
+holyclaude is licensed under Apache-2.0. See [LICENSE](LICENSE).

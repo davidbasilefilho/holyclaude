@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Librarian.research",
+  "objective": "Find the best-supported way to keep an MIT LICENSE copyright year current.",
+  "scope": [
+    "Authoritative sources on copyright notice years (US Copyright Office, Berne/UK guidance, OSI/SPDX/REUSE, major projects' practice) and maintained GitHub Actions or approaches that update the year on January 1."
+  ],
+  "constraints": [
+    "Separate sourced facts from inference; cite every claim."
+  ],
+  "acceptance_criteria": [
+    "States whether the notice year must or should change yearly and what major projects do (start year, range, or no year).",
+    "Compares concrete automation options (scheduled GitHub Actions workflow on 1 January UTC opening a PR, specific maintained actions with versions and pinning, a CI check that fails on a stale year, avoiding the need) with trade-offs, and recommends one for a small Bun/TypeScript repo whose CI pins actions by commit SHA and whose contributing rules forbid new overlapping tools."
+  ],
+  "required_evidence": [
+    "sources",
+    "recommendation"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "license"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9s21d3-wlqb",
+  "state": "Succeeded",
+  "result": "Recommend filling the Apache appendix line once with Copyright 2026 David Basile Filho (first-publication year), no NOTICE, no automation; optional rolling-year via scheduled PR workflow or FantasticFiasco/action-update-license-year v3 (node20, token needs). Several primary pages unreachable; excerpts flagged.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Research checked: first publication confirmed 2026-10-13 from repo history; sources cited with excerpts flagged.",
+    "criteria_evidence": {
+      "States whether the notice year must or should change yearly and what major projects do (start year, range, or no year).": "answered with cited sources and stated gaps",
+      "Compares concrete automation options (scheduled GitHub Actions workflow on 1 January UTC opening a PR, specific maintained actions with versions and pinning, a CI check that fails on a stale year, avoiding the need) with trade-offs, and recommends one for a small Bun/TypeScript repo whose CI pins actions by commit SHA and whose contributing rules forbid new overlapping tools.": "answered with cited sources and stated gaps"
+    },
+    "required_evidence": {
+      "sources": "sources and recommendation reported",
+      "recommendation": "sources and recommendation reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

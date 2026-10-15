@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Worker.implementation",
+  "objective": "Restructure the README into the owner's section layout.",
+  "scope": [
+    "/home/user/holyclaude (branch ccr-dd890d7d-vpxecw = main plus the LICENSE line): README.md, and docs/DECISIONS.md only to fix links into renamed README sections."
+  ],
+  "constraints": [
+    "Writing bar; keep every technical fact that still applies; T3 Code appears only in Special thanks; no word or byte caps; no git writes; leave .holyclaude and LICENSE alone."
+  ],
+  "acceptance_criteria": [
+    "Top-level sections exactly: # holyclaude, ## What is holyclaude?, ## How does it work?, ## Why holyclaude?, ## Development, ## Special thanks!, ## License; subsections where they help.",
+    "All existing content is placed (state, requirements, install, settings, cloud sessions, hooks, skills, limits, development, third-party attribution) except T3-specific instructions, which are removed; internal links resolve.",
+    "Special thanks credits the Claude Code team, the T3 team (T3 Code works great with holyclaude), the oh-my-opencode project and its author, the OpenCode team, and HolyCodex, with the confirmed links; License links LICENSE and says Apache-2.0.",
+    "fmt passes; wc -c before and after; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "sizes",
+    "section-map"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "docs/DECISIONS.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9sjqy0-uya5"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9slk0p-w1qy",
+  "state": "Succeeded",
+  "result": "README restructured into What/How/Why/Development/Special thanks!/License with subsections; T3-only content removed (install section, .claude fallback, Queue row, auto-compact bullet); links resolve; oxfmt passes; 45809 -> 45960 bytes.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
