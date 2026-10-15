@@ -69,6 +69,17 @@ describe("the PreToolUse matcher", () => {
   })
 })
 
+describe("the PostToolUse matcher", () => {
+  test("is one group that runs for the Agent tool only", () => {
+    const [group, ...others] = groups("PostToolUse")
+    expect(others).toEqual([])
+    expect(group?.hooks[0]?.args?.slice(-2)).toEqual(["hook", "post-tool-use"])
+    expect(runsFor(group?.matcher, "Agent")).toBe(true)
+    for (const tool of ["Bash", "Write", "Read", "SendMessage", "mcp__server__agent", "Agents"])
+      expect(runsFor(group?.matcher, tool)).toBe(false)
+  })
+})
+
 describe("the hooks run in exec form on Bun", () => {
   const entries = Object.entries(config.hooks).flatMap(([event, eventGroups]) =>
     eventGroups.flatMap((group) => group.hooks.map((hook) => ({ event, hook }))),
@@ -76,6 +87,7 @@ describe("the hooks run in exec form on Bun", () => {
 
   test("hooks the plugin registers for session start, tool use and the subagent lifecycle", () => {
     expect(Object.keys(config.hooks).toSorted()).toEqual([
+      "PostToolUse",
       "PreToolUse",
       "SessionStart",
       "SubagentStart",

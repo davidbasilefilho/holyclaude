@@ -8092,6 +8092,15 @@ var toolInput = (value) => {
   };
 };
 var isAgentId = (value) => value !== undefined && value !== null && value !== "";
+var fieldsOf = (value) => lenient(Record(String4, Unknown2), value) ?? {};
+var agentLaunch = (envelope) => {
+  const response = fieldsOf(envelope["tool_response"]);
+  return {
+    subagent_type: lenient(String4, fieldsOf(envelope["tool_input"])["subagent_type"]),
+    agentId: lenient(String4, response["agentId"]),
+    resolvedModel: lenient(String4, response["resolvedModel"])
+  };
+};
 var decode2 = decodeUnknownEffect2(Envelope);
 var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
   agent: isAgentId(envelope["agent_id"]) ? { id: lenient(String4, envelope["agent_id"]) } : undefined,
@@ -8100,7 +8109,8 @@ var decodeHookInput = (text) => decode2(text).pipe(map4((envelope) => ({
   agent_type: lenient(String4, envelope["agent_type"]),
   transcript_path: lenient(String4, envelope["transcript_path"]),
   agent_transcript_path: lenient(String4, envelope["agent_transcript_path"]),
-  effort: lenient(Effort2, envelope["effort"])
+  effort: lenient(Effort2, envelope["effort"]),
+  launch: agentLaunch(envelope)
 })));
 var effortOf = (input) => {
   const { effort } = input;
@@ -8126,6 +8136,7 @@ var Observed = Struct({
   agent_type: optionalKey2(Text2),
   effort: optionalKey2(Text2),
   transcript: optionalKey2(Text2),
+  model: optionalKey2(Text2),
   at: String4
 });
 var Override = Struct({
@@ -8180,6 +8191,8 @@ var seenOf = (records, agentId) => {
       seen.effort = record.effort;
     if (record.transcript !== undefined)
       seen.transcript = record.transcript;
+    if (record.model !== undefined)
+      seen.model = record.model;
   }
   return seen;
 };
@@ -8191,9 +8204,12 @@ var observe = (agentId, sighting) => gen2(function* () {
   const seen = {
     ...sighting.agent_type ? { agent_type: sighting.agent_type } : {},
     ...sighting.effort ? { effort: sighting.effort } : {},
-    ...sighting.transcript ? { transcript: sighting.transcript } : {}
+    ...sighting.transcript ? { transcript: sighting.transcript } : {},
+    ...sighting.model ? { model: sighting.model } : {}
   };
   const known = seenOf(yield* readObservations(), agentId);
+  if (!(sighting.agent_type || known.agent_type)?.startsWith(`${PLUGIN_NAME}:`))
+    return;
   const keys = Object.keys(seen);
   if (keys.every((key) => seen[key] === known[key]))
     return;
@@ -8204,6 +8220,17 @@ var observe = (agentId, sighting) => gen2(function* () {
     at: yield* nowIso
   });
 }).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
+
+// src/hook/post-tool-use.ts
+var postToolUse = (stdin) => gen2(function* () {
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const { subagent_type: type, agentId, resolvedModel } = input?.launch ?? {};
+  if (type?.startsWith(`${PLUGIN_NAME}:`) && agentId && resolvedModel)
+    yield* observe(agentId, { agent_type: type, model: resolvedModel });
+  return "";
+});
 
 // src/hook/glob.ts
 var SEPARATORS = "/\\=";
@@ -10600,6 +10627,7 @@ var toon = (value) => `${encode2(value)}
 `;
 
 // src/hook/session-start.ts
+var MAIN_AGENT_TYPES = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME];
 var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
@@ -10607,7 +10635,6 @@ var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
 var pointer = (cli) => `Full state: ${cli} intent show; ${cli} assignment list`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
-var RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]";
 var clip = (text, max) => max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
 var cutRules = (rules, room) => {
   const cut = rules.slice(0, room);
@@ -10673,17 +10700,13 @@ var composeContext = (rules, summary, cli) => {
   const tail = `
 
 ${pointer(cli)}`;
-  const room = CAP - tail.length - `
+  if (rules !== undefined && rules.length + tail.length > CAP)
+    return `${cutRules(rules, CAP - tail.length - RULES_CUT.length)}${RULES_CUT}${tail}`;
+  const roomForState = CAP - tail.length - (rules === undefined ? 0 : rules.length + 2);
+  const body = [rules, fitSummary(summary, roomForState)].filter((part) => part);
+  return `${body.join(`
 
-${state}`.length - RULES_CUT.length;
-  if (rules !== undefined && room > 0)
-    return `${cutRules(rules, room)}${RULES_CUT}
-
-${state}${tail}`;
-  const marker = rules === undefined ? "" : `${RULES_DROPPED}
-
-`;
-  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart();
+`)}${tail}`.trimStart();
 };
 var extractRules = (agentFile, root) => {
   const start = agentFile.indexOf(RULES_START);
@@ -10693,14 +10716,18 @@ var extractRules = (agentFile, root) => {
   const rules = agentFile.slice(start + RULES_START.length, end).trim();
   return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root);
 };
-var sessionStart = gen2(function* () {
+var sessionStart = (stdin) => gen2(function* () {
   const root = yield* pluginRoot;
   if (root === undefined)
     return "";
   const file = Bun.file(join6(root, "agents", "holyclaude.md"));
   if (!(yield* tryPromise2(() => file.exists())))
     return "";
-  const rules = extractRules(yield* tryPromise2(() => file.text()), root);
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "");
+  const rules = runsAsMainAgent ? undefined : extractRules(yield* tryPromise2(() => file.text()), root);
   const summary = yield* loadState(stateDirPath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
   const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
@@ -10720,6 +10747,7 @@ var record2 = (stdin, sighting) => gen2(function* () {
 });
 var subagentStart = (stdin) => record2(stdin, (input) => ({ agent_type: input.agent_type }));
 var subagentStop = (stdin) => record2(stdin, (input) => ({
+  agent_type: input.agent_type,
   effort: effortOf(input),
   transcript: input.agent_transcript_path
 }));
@@ -10763,8 +10791,9 @@ var verifyAssignment = (id) => gen2(function* () {
     agent_type: `${PLUGIN_NAME}:${assignment.role}`
   };
   const seen = seenOf(records, agentId);
-  const models = seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
-  const observedModel = models.length === 0 ? undefined : models.join("|");
+  const models = seen.model !== undefined || seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
+  const observedModel = seen.model ?? (models.length === 0 ? undefined : models.join("|"));
+  const modelSource = seen.model !== undefined ? "hook" : observedModel !== undefined ? "transcript" : "none";
   const rows = [
     {
       field: "model",
@@ -10792,6 +10821,7 @@ var verifyAssignment = (id) => gen2(function* () {
       role: assignment.role,
       agent_id: agentId,
       expected_source: override === undefined ? "route" : "override",
+      model_source: modelSource,
       checks: rows,
       verdict
     },
@@ -11176,12 +11206,14 @@ var reconcileResolve = cmd({
 var hookSessionStart = cmd({
   path: ["hook", "session-start"],
   usage: "hook session-start",
-  summary: "SessionStart hook: core rules and state as additionalContext",
+  summary: "SessionStart hook: core rules whole, plus a state summary that shrinks to fit, as additionalContext",
+  input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
-  run: () => sessionStart.pipe(map4((text) => ({ text })))
+  run: (_args, stdin) => stdin.pipe(orElseSucceed2(() => ""), flatMap2(sessionStart), map4((text) => ({ text })))
 });
 var hookPreToolUse = cmd({
   path: ["hook", "pre-tool-use"],
@@ -11217,6 +11249,17 @@ var hookSubagentStop = cmd({
   positionals: 0,
   run: (_args, stdin) => stdin.pipe(flatMap2(subagentStop), map4((text) => ({ text })))
 });
+var hookPostToolUse = cmd({
+  path: ["hook", "post-tool-use"],
+  usage: "hook post-tool-use",
+  summary: "PostToolUse hook on the Agent tool: observe the model a specialist started on",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) => stdin.pipe(flatMap2(postToolUse), map4((text) => ({ text })))
+});
 var COMMANDS = [
   intentShow,
   intentCreate,
@@ -11239,7 +11282,8 @@ var COMMANDS = [
   hookSessionStart,
   hookPreToolUse,
   hookSubagentStart,
-  hookSubagentStop
+  hookSubagentStop,
+  hookPostToolUse
 ].toSorted((a, b) => b.path.length - a.path.length);
 
 // src/main.ts

@@ -25,11 +25,13 @@ export const subagentStart = (stdin: string) =>
 
 /**
  * The SubagentStop hook. It records the effort and the agent's own transcript path, so an agent
- * that never called a guarded tool, such as a read-only reviewer, still verifies. Never blocks the
- * stop. Returns "".
+ * that never called a guarded tool, such as a read-only reviewer, still verifies. The payload's
+ * agent type goes along, since `observe` keeps only holyclaude specialists. Never blocks the stop.
+ * Returns "".
  */
 export const subagentStop = (stdin: string) =>
   record(stdin, (input) => ({
+    agent_type: input.agent_type,
     effort: effortOf(input),
     transcript: input.agent_transcript_path,
   }))

@@ -10,8 +10,16 @@ import {
 } from "@holyclaude/core"
 import { Effect } from "effect"
 
-import { pluginRoot } from "../fingerprint.ts"
+import { PLUGIN_NAME, pluginRoot } from "../fingerprint.ts"
 import { toon } from "../toon.ts"
+import { decodeHookInput } from "./input.ts"
+
+/**
+ * The `agent_type` a SessionStart payload shows when the main thread runs as the holyclaude agent:
+ * the plugin-qualified name, or the bare one. That agent's system prompt already carries the core
+ * rules.
+ */
+const MAIN_AGENT_TYPES: ReadonlyArray<string> = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME]
 
 /** SessionStart `additionalContext` is capped at this many characters. */
 const CAP = 10_000
@@ -21,7 +29,6 @@ const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 /** The one-line pointer to the CLI, which `cli` names as the root should run it. */
 const pointer = (cli: string) => `Full state: ${cli} intent show; ${cli} assignment list`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
-const RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]"
 
 /** Shortens text to at most `max` characters, ending in an ellipsis when it was cut. */
 export const clip = (text: string, max: number) =>
@@ -101,20 +108,20 @@ const fitSummary = (summary: Summary, budget: number): string => {
 }
 
 /**
- * Joins the pieces under the cap. The core rules are cut first, then the state summary shrinks, and
- * the one-line pointer to the CLI stays last.
+ * Joins the pieces under the cap. The core rules stay whole: the state summary shrinks first (fewer
+ * rows, shorter text, then nothing but the one-line pointer to the CLI). The rules are cut, from
+ * their end, only when they cannot fit even beside the pointer.
  */
 const composeContext = (rules: string | undefined, summary: Summary, cli: string): string => {
   const state = block(summary.render(summary.rows, 400))
   const full = [rules, state].filter((part) => part !== undefined).join("\n\n")
   if (full.length <= CAP) return full
   const tail = `\n\n${pointer(cli)}`
-  const room = CAP - tail.length - `\n\n${state}`.length - RULES_CUT.length
-  if (rules !== undefined && room > 0)
-    return `${cutRules(rules, room)}${RULES_CUT}\n\n${state}${tail}`
-  // The rules are dropped whole. Say so, so the root knows to read its agent prompt.
-  const marker = rules === undefined ? "" : `${RULES_DROPPED}\n\n`
-  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart()
+  if (rules !== undefined && rules.length + tail.length > CAP)
+    return `${cutRules(rules, CAP - tail.length - RULES_CUT.length)}${RULES_CUT}${tail}`
+  const roomForState = CAP - tail.length - (rules === undefined ? 0 : rules.length + 2)
+  const body = [rules, fitSummary(summary, roomForState)].filter((part) => part)
+  return `${body.join("\n\n")}${tail}`.trimStart()
 }
 
 /** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */
@@ -139,21 +146,28 @@ export const extractRules = (agentFile: string, root?: string): string | undefin
 
 /**
  * The SessionStart hook: the core rules from the root agent file plus a TOON summary of the
- * authoritative state, as `additionalContext` within the 10,000 character cap. Emits nothing when
- * the agent file is absent.
+ * authoritative state, as `additionalContext` within the 10,000 character cap. When the payload
+ * shows the main thread already runs as the holyclaude agent, the rules are left out, since its
+ * system prompt carries them; any other payload, or one that cannot be read, gets them, because
+ * then this is the root's only copy. Emits nothing when the agent file is absent.
  */
-export const sessionStart = Effect.gen(function* () {
-  const root = yield* pluginRoot
-  if (root === undefined) return ""
-  const file = Bun.file(join(root, "agents", "holyclaude.md"))
-  if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
-  const rules = extractRules(yield* Effect.tryPromise(() => file.text()), root)
-  const summary = yield* loadState(stateDirPath()).pipe(
-    Effect.map(summaryOf),
-    Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
-  )
-  const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)
-  return JSON.stringify({
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
+export const sessionStart = (stdin: string) =>
+  Effect.gen(function* () {
+    const root = yield* pluginRoot
+    if (root === undefined) return ""
+    const file = Bun.file(join(root, "agents", "holyclaude.md"))
+    if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
+    const input = yield* decodeHookInput(stdin).pipe(Effect.orElseSucceed(() => undefined))
+    const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "")
+    const rules = runsAsMainAgent
+      ? undefined
+      : extractRules(yield* Effect.tryPromise(() => file.text()), root)
+    const summary = yield* loadState(stateDirPath()).pipe(
+      Effect.map(summaryOf),
+      Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
+    )
+    const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)
+    return JSON.stringify({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
+    })
   })
-})

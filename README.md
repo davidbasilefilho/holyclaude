@@ -31,7 +31,7 @@ Each record's id must match its file or directory name; a file that does not is 
 
 Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every `intents/<id>/` and `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `clone.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read, and each of which is also refused over the 4 MiB local cap), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead.
 
-The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log.
+The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
 
 The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
 
@@ -173,7 +173,7 @@ This setup has not been observed taking effect in a live session. Watch for the 
 
 ## Hooks
 
-`plugin/hooks/hooks.json` registers four hooks. Each runs in Claude Code's exec form, which spawns
+`plugin/hooks/hooks.json` registers five hooks. Each runs in Claude Code's exec form, which spawns
 `bun` directly with an argument list and no shell:
 
 ```json
@@ -195,18 +195,51 @@ This setup has not been observed taking effect in a live session. Watch for the 
 | --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
 | `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
 | `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
-| `SubagentStart` | none                                                              | `subagent-start` | Records the agent type. It cannot block.                                |
-| `SubagentStop`  | none                                                              | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.    |
+| `PostToolUse`   | `Agent`                                                           | `post-tool-use`  | Records the model a launched specialist started on. It never blocks.    |
+| `SubagentStart` | none                                                              | `subagent-start` | Records a specialist's agent type. It cannot block.                     |
+| `SubagentStop`  | none                                                              | `subagent-stop`  | Records a specialist's effort and transcript. It never blocks.          |
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
 `Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
 the two in step.
 
-`holyclaude assignment verify` combines the three observation sources field by field, the newest
+The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<Role.task>`,
+because only they feed `assignment verify` and the independence rule. An agent with another type,
+an empty one or none (Claude Code's own internal agents, built-in types, other plugins' agents)
+leaves no trace: nothing is written, so a repository that loads holyclaude without using it gains
+no `.holyclaude/` directory and no `.gitignore`. A payload without an agent type still counts when
+the log already holds a holyclaude type for that agent id from its `SubagentStart`. `PostToolUse`
+judges the launched agent by the call's `subagent_type` instead, so only `holyclaude:<Role.task>`
+launches are recorded there.
+
+`SessionStart` injects the core rules because the root may not run as the holyclaude agent: in
+some environments the plugin's `agent` setting is not applied, and the injection is then the root's
+only copy. When the payload's `agent_type` shows the main thread runs as that agent
+(`holyclaude:holyclaude`, or `holyclaude`), its system prompt already carries the same rules, so the
+hook leaves them out and injects only the state summary, which saves about 8,000 characters on every
+start, resume, clear and compaction. A payload that cannot be read gets the rules.
+
+The injected context is capped at 10,000 characters, and the rules are the part that must survive:
+when the rules and the full state summary do not fit together, the summary shrinks first. It shows
+fewer Assignment rows (with a count of the rest), then shorter Intent text, then only the one-line
+pointer to `intent show` and `assignment list`. The rules are cut, from their end with a marker,
+only when they alone do not fit beside that pointer.
+
+`PostToolUse` runs on the `Agent` tool (Claude Code's `Task` tool under its current name). Its
+payload carries the call's `tool_input.subagent_type` and a `tool_response` with the launched
+`agentId` and `resolvedModel`, the model the subagent started on, which may differ from the model
+requested. A background launch (`status: "async_launched"`) and a foreground completion
+(`status: "completed"`) both carry them, so the model is on record before the subagent writes a
+transcript. Other fields in the payload are ignored.
+
+`holyclaude assignment verify` combines the observation sources field by field, the newest
 record winning: the agent type from `SubagentStart`, the effort from `PreToolUse` or `SubagentStop`,
-and the transcript path, which gives the model, from `SubagentStop` or `PreToolUse`. A read-only
-reviewer that never calls a guarded tool therefore verifies completely after it stops. The
-observations log keeps its format: one JSON line per sighting, each with only the fields it saw.
+and the model from `PostToolUse`. When no model was recorded, the model is read from the transcript
+instead, whose path comes from `SubagentStop` or `PreToolUse`. The output's `model_source` says
+which was used: `hook`, `transcript`, or `none` when the model is unobserved. The recorded model is
+a full id such as `claude-sonnet-5-5`, which matches the expected alias (`sonnet`) by family name.
+A read-only reviewer that never calls a guarded tool therefore verifies completely after it stops.
+The observations log keeps its format: one JSON line per sighting, each with only the fields it saw.
 
 `--no-env-file` and `--config` keep Bun from reading the project's `.env` and `bunfig.toml`, which
 would otherwise let the project redirect the state file or preload code into every hook. The config

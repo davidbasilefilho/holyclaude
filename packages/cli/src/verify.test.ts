@@ -80,9 +80,9 @@ const writeObservations = (...records: ReadonlyArray<ObservationRecord>) => {
 
 const verify = async () => {
   const { value, code } = await Effect.runPromise(verifyAssignment("assignment-0001"))
-  const { verdict, checks } = value
+  const { verdict, checks, model_source } = value
   const status = Object.fromEntries(checks.map((row) => [row.field, row.status]))
-  return { verdict, status, code }
+  return { verdict, status, code, model_source }
 }
 
 describe("verify combines what the three hooks saw", () => {
@@ -96,6 +96,7 @@ describe("verify combines what the three hooks saw", () => {
       verdict: "ok",
       status: { model: "match", effort: "match", agent_type: "match" },
       code: 0,
+      model_source: "transcript",
     })
   })
 
@@ -105,6 +106,7 @@ describe("verify combines what the three hooks saw", () => {
       verdict: "incomplete",
       status: { model: "unobserved", effort: "unobserved", agent_type: "match" },
       code: 0,
+      model_source: "none",
     })
   })
 
@@ -139,6 +141,7 @@ describe("verify combines what the three hooks saw", () => {
       verdict: "mismatch",
       status: { model: "match", effort: "mismatch", agent_type: "match" },
       code: 3,
+      model_source: "transcript",
     })
   })
 
@@ -160,6 +163,48 @@ describe("verify combines what the three hooks saw", () => {
   })
 })
 
+describe("the model comes from the PostToolUse record when there is one", () => {
+  const REVIEWER = { agent_type: "holyclaude:Reviewer.audit", effort: "high" }
+
+  test("a full model id matches the expected alias, with no transcript at all", async () => {
+    writeObservations(observed({ ...REVIEWER, model: "claude-haiku-5-5" }))
+    expect(await verify()).toEqual({
+      verdict: "ok",
+      status: { model: "match", effort: "match", agent_type: "match" },
+      code: 0,
+      model_source: "hook",
+    })
+  })
+
+  test("a full model id of another family is a mismatch, exit code 3", async () => {
+    writeObservations(observed({ ...REVIEWER, model: "claude-sonnet-5-5" }))
+    expect(await verify()).toMatchObject({ status: { model: "mismatch" }, code: 3 })
+  })
+
+  test("the recorded model wins over what the transcript shows", async () => {
+    writeTranscript("claude-sonnet-5-5")
+    writeObservations(observed({ ...REVIEWER, transcript, model: "claude-haiku-5-5" }))
+    expect(await verify()).toMatchObject({ status: { model: "match" }, model_source: "hook" })
+  })
+
+  test("a record without a model falls back to the transcript", async () => {
+    writeTranscript("claude-haiku-5-5")
+    writeObservations(observed({ ...REVIEWER, transcript }))
+    expect(await verify()).toMatchObject({ status: { model: "match" }, model_source: "transcript" })
+  })
+
+  test("the row reports the model it compared", async () => {
+    writeObservations(observed({ ...REVIEWER, model: "claude-haiku-5-5" }))
+    const { value } = await Effect.runPromise(verifyAssignment("assignment-0001"))
+    expect(value.checks[0]).toEqual({
+      field: "model",
+      expected: "haiku",
+      observed: "claude-haiku-5-5",
+      status: "match",
+    })
+  })
+})
+
 describe("seenOf", () => {
   test("keeps each field from the newest record that carries it", () => {
     expect(
@@ -172,6 +217,13 @@ describe("seenOf", () => {
         "agent-1",
       ),
     ).toEqual({ agent_type: "a", effort: "high", transcript: "t" })
+  })
+
+  test("takes the model from the record that carries it", () => {
+    expect(seenOf([observed({ model: "m" }), observed({ effort: "high" })], "agent-1")).toEqual({
+      model: "m",
+      effort: "high",
+    })
   })
 
   test("is empty for an agent no hook has seen", () => {
