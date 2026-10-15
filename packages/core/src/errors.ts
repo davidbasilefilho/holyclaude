@@ -64,6 +64,16 @@ export class IntentBusy extends Data.TaggedError("IntentBusy")<{
   }
 }
 
+/** The Intent cannot close while Succeeded Assignments of it wait for the root's acceptance. */
+export class UnacceptedAssignments extends Data.TaggedError("UnacceptedAssignments")<{
+  readonly intent_id: string
+  readonly unaccepted: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} has Succeeded Assignments that were never accepted (${this.unaccepted.join(", ")}); accept them before closing it`
+  }
+}
+
 /** No Intent was named, none is in use, and the open ones are not exactly one. */
 export class NoActiveIntent extends Data.TaggedError("NoActiveIntent")<{
   readonly open: ReadonlyArray<{ readonly id: string; readonly objective: string }>

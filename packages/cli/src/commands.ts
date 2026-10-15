@@ -19,6 +19,7 @@ import {
   bindAgent,
   cancel,
   closeIntent,
+  closedWithOpenWork,
   createAssignment,
   createIntent,
   decodeJsonStrict,
@@ -311,22 +312,31 @@ const intentUse = cmd({
     ).pipe(Effect.map((row) => ({ value: row }))),
 })
 
-const CLOSE_USAGE = "intent close [--intent <id>] --reason <text>"
+const CLOSE_USAGE = "intent close [--intent <id>] --reason <text> [--allow-unaccepted <reason>]"
 
 const intentClose = cmd({
   path: ["intent", "close"],
   usage: CLOSE_USAGE,
-  summary: "close the Intent with a reason; refused while its Assignments run",
+  summary:
+    "close the Intent with a reason; refused while its Assignments run or Succeeded ones are unaccepted (--allow-unaccepted <reason> closes anyway)",
   root: true,
-  flags: { ...INTENT_FLAG, reason: "string" },
+  flags: { ...INTENT_FLAG, reason: "string", "allow-unaccepted": "string" },
   positionals: 0,
   run: (args) =>
     Effect.gen(function* () {
       const reason = yield* flagValue(args, "reason", CLOSE_USAGE)
       const at = yield* nowIso
+      const allowed = stringFlag(args, "allow-unaccepted")
       const intent = yield* change((state) =>
         activeIntent(state, stringFlag(args, "intent")).pipe(
-          Effect.flatMap((target) => decodeStrict(CloseIntentInput)({ id: target.id, reason, at })),
+          Effect.flatMap((target) =>
+            decodeStrict(CloseIntentInput)({
+              id: target.id,
+              reason,
+              at,
+              ...(allowed === undefined ? {} : { allow_unaccepted: allowed }),
+            }),
+          ),
           Effect.flatMap((input) => closeIntent(state, input)),
         ),
       )
@@ -357,15 +367,24 @@ const closedIntent = (state: State, id: string | undefined) =>
 const intentReopen = cmd({
   path: ["intent", "reopen"],
   usage: REOPEN_USAGE,
-  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
+  summary:
+    "open a closed Intent again (the only closed one, else --intent) and put it in use; the revision bumps; prints the Intent it replaced",
   root: true,
   flags: INTENT_FLAG,
   positionals: 0,
   run: (args) =>
-    change((state) =>
-      closedIntent(state, stringFlag(args, "intent")).pipe(
-        Effect.flatMap((target) => reopenIntent(state, target.id)),
-      ),
+    change((state, { useIntent }) =>
+      Effect.gen(function* () {
+        const target = yield* closedIntent(state, stringFlag(args, "intent"))
+        // Read under the lock, as in create, so the Intent reported as replaced is the one replaced.
+        const replaced = intentInUse(state, yield* storedIntent)
+        const reopened = yield* reopenIntent(state, target.id)
+        yield* useIntent(reopened.value.id)
+        return {
+          state: reopened.state,
+          value: { ...reopened.value, in_use: reopened.value.id, replaced: replaced?.id ?? null },
+        }
+      }),
     ).pipe(Effect.map((intent) => ({ value: intent }))),
 })
 
@@ -664,18 +683,23 @@ const AcceptBody = AcceptanceRecord
 
 const assignmentAccept = cmd({
   path: ["assignment", "accept"],
-  usage: "assignment accept <id>",
-  summary: "record the evidence review of a Succeeded Assignment",
+  usage: "assignment accept <id> [--carry-forward]",
+  summary:
+    "record the evidence review of a Succeeded Assignment; --carry-forward accepts one made for an earlier revision at the live one",
   input:
     '{"intent_revision":N,"rationale":"...","criteria_evidence":{"<label>":"..."},"required_evidence":{"<label>":"..."}}',
   root: true,
-  flags: {},
+  flags: { "carry-forward": "boolean" },
   positionals: 1,
   run: (args, stdin) =>
     Effect.gen(function* () {
       const acceptance = yield* fromStdin(AcceptBody, stdin, "assignment accept")
       const done = yield* change((state) =>
-        accept(state, { assignment_id: args.positionals[0] ?? "", acceptance }),
+        accept(state, {
+          assignment_id: args.positionals[0] ?? "",
+          acceptance,
+          carry_forward: booleanFlag(args, "carry-forward"),
+        }),
       )
       return { value: summaryRow(done) }
     }),
@@ -768,7 +792,8 @@ const routes = cmd({
 const reconcileList = cmd({
   path: ["reconcile"],
   usage: "reconcile",
-  summary: "list Running rows to confirm by agent id, and those running elsewhere",
+  summary:
+    "list Running rows to confirm by agent id, those running elsewhere, and closed Intents with open work",
   root: false,
   flags: {},
   positionals: 0,
@@ -777,6 +802,7 @@ const reconcileList = cmd({
       Effect.suspend(() => readCloneId(stateDirPath())).pipe(
         Effect.map((cloneId) => {
           const { local, elsewhere } = reconcile(state, cloneId)
+          const stranded = closedWithOpenWork(state)
           return {
             value: {
               running: local.map(summaryRow),
@@ -787,6 +813,16 @@ const reconcileList = cmd({
                     running_elsewhere: elsewhere.map((row) => ({
                       ...summaryRow(row),
                       clone: row.clone_id,
+                    })),
+                  }),
+              // A close in one clone and new work in another meet only here; git cannot flag it.
+              ...(stranded.length === 0
+                ? {}
+                : {
+                    closed_with_open_work: stranded.map(({ intent, assignments }) => ({
+                      intent: intent.id,
+                      close_reason: intent.close_reason ?? null,
+                      assignments: assignments.map(summaryRow),
                     })),
                   }),
             },

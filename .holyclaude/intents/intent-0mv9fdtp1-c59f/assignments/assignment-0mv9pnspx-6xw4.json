@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.security",
+  "objective": "Security review of feat/named-records: filesystem paths derived from record content.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9pb5se-y5pd.diff; files in worktree e: packages/core/src/slug.ts, layout.ts, records.ts, store.ts, legacy.ts, files.ts."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Trace record content (objectives, ids, directory and file names arriving through git from collaborators) to every filesystem read, write, rename and mkdir; report any path traversal, symlink, case-folding collision, overwrite or denial-of-service vector with a concrete input.",
+    "Findings substantiated or explicitly cleared."
+  ],
+  "required_evidence": [
+    "trace",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9pb5se-y5pd"
+    ],
+    "independent_from": [
+      "assignment-0mv9pb5se-y5pd"
+    ]
+  },
+  "id": "assignment-0mv9pnspx-6xw4",
+  "state": "Succeeded",
+  "result": "F1 blocker: slug-id name aliasing lets a crafted record id that is a hyphen-suffix of another make persist rename or write onto another record path (rename replaces silently). F2 possible quadratic NFKD on huge objectives every persist. F3 cross-filing accepted by suffix match. Traversal, symlinks, lock, case folding, outside writes cleared.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Trace-backed security review; F1 verified by reading layout.ts:33 and records.ts:222-224; taken as a repair with F2 and F3.",
+    "criteria_evidence": {
+      "Trace record content (objectives, ids, directory and file names arriving through git from collaborators) to every filesystem read, write, rename and mkdir; report any path traversal, symlink, case-folding collision, overwrite or denial-of-service vector with a concrete input.": "F1-F3 with code paths and inputs; other classes cleared with evidence",
+      "Findings substantiated or explicitly cleared.": "F1-F3 with code paths and inputs; other classes cleared with evidence"
+    },
+    "required_evidence": {
+      "trace": "trace and findings reported",
+      "findings": "trace and findings reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

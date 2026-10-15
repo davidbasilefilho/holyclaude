@@ -373,6 +373,18 @@ describe("a record that disagrees with where it lives", () => {
     expect(error).toMatchObject({ _tag: "CorruptRecord", path: intentPath(INTENT_A) })
   })
 
+  test("a record with git conflict markers names the file and says to resolve it in git", async () => {
+    await write(base)
+    const record = await readFile(intentPath(INTENT_A), "utf8")
+    const merged = `<<<<<<< HEAD\n${record}=======\n${record}>>>>>>> feature\n`
+    await writeFile(intentPath(INTENT_A), merged)
+    const error = await failure(loadState(directory))
+    expect(error).toMatchObject({ _tag: "CorruptRecord", path: intentPath(INTENT_A) })
+    expect(String(error)).toContain(intentPath(INTENT_A))
+    expect(String(error)).toContain("resolve the conflict in git")
+    expect(String(error)).toContain("rerun")
+  })
+
   test("an update refuses to run over a corrupt record", async () => {
     await write(base)
     await writeFile(intentPath(INTENT_A), "{ not json")

@@ -44,6 +44,8 @@ const HINTS: Readonly<Record<string, string>> = {
   IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
   IntentBusy:
     "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
+  UnacceptedAssignments:
+    "Review and accept them with `holyclaude assignment accept <id>`, then close again. To close with work left unaccepted, add `--allow-unaccepted <reason>`.",
   NotBound:
     "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>.",

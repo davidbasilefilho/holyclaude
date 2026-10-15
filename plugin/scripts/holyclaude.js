@@ -7338,6 +7338,12 @@ class IntentBusy extends TaggedError2("IntentBusy") {
   }
 }
 
+class UnacceptedAssignments extends TaggedError2("UnacceptedAssignments") {
+  get message() {
+    return `Intent ${this.intent_id} has Succeeded Assignments that were never accepted (${this.unaccepted.join(", ")}); accept them before closing it`;
+  }
+}
+
 class NoActiveIntent extends TaggedError2("NoActiveIntent") {
   get message() {
     return this.open.length === 0 ? "No Intent is open; create one with `holyclaude intent create`, or reopen one with `holyclaude intent reopen --intent <id>`" : `Several Intents are open and none is in use; run \`holyclaude intent use <id>\` or pass --intent <id>. Open Intents: ${this.open.map((intent) => `${intent.id} (${intent.objective.replace(/\s+/g, " ")})`).join("; ")}`;
@@ -7590,7 +7596,11 @@ var withStateLock = (directory, use) => {
 };
 // ../core/src/files.ts
 import { rename } from "fs/promises";
-var readJson = (schema, path, limit) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
+var CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?:\s|$)/m;
+var readJson = (schema, path, limit) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({
+  path,
+  reason: CONFLICT_MARKER.test(text) ? "it holds git conflict markers; resolve the conflict in git, then rerun" : error.message
+})))));
 var encodeJson = (schema, value) => encodeEffect(schema)(value).pipe(map4((encoded) => `${JSON.stringify(encoded, null, 2)}
 `));
 var moveFile = (from, to, lock) => gen2(function* () {
@@ -8205,7 +8215,11 @@ var CancelInput = Struct({
   notification: Literal2("stopped"),
   reason: optionalKey2(Text)
 });
-var AcceptInput = Struct({ assignment_id: Id, acceptance: AcceptanceRecord });
+var AcceptInput = Struct({
+  assignment_id: Id,
+  acceptance: AcceptanceRecord,
+  carry_forward: optionalKey2(Boolean3)
+});
 var ResolveReconcileInput = Union2([
   TaggedStruct("Fail", { assignment_id: Id, reason: Text }),
   TaggedStruct("Keep", { assignment_id: Id })
@@ -8248,7 +8262,8 @@ var accept = (state, input) => gen2(function* () {
   if (assignment.state !== "Succeeded")
     return yield* invalidTransition(assignment, "accept");
   const intent = yield* findIntent(state, assignment.intent_id);
-  yield* requireLiveRevision(intent, assignment.intent_revision);
+  if (!(input.carry_forward === true && assignment.intent_revision < intent.revision))
+    yield* requireLiveRevision(intent, assignment.intent_revision);
   yield* requireLiveRevision(intent, acceptance.intent_revision);
   const problems = [
     ...coverageProblems("criteria", assignment.acceptance_criteria, acceptance.criteria_evidence),
@@ -8266,6 +8281,10 @@ var reconcile = (state, cloneId) => {
     elsewhere: running.filter(isElsewhere)
   };
 };
+var closedWithOpenWork = (state) => sortedById(state.intents).filter((intent) => intent.state === "closed").map((intent) => ({
+  intent,
+  assignments: sortedById(state.assignments.filter((assignment) => assignment.intent_id === intent.id && (assignment.state === "Ready" || assignment.state === "Running")))
+})).filter(({ assignments }) => assignments.length > 0);
 var resolveReconcile = (state, input) => gen2(function* () {
   const assignment = yield* findAssignment(state, input.assignment_id);
   if (assignment.state !== "Running")
@@ -8397,7 +8416,12 @@ var UpdateIntentInput = Struct({
   requirements: optionalKey2(String4),
   material: Boolean3
 });
-var CloseIntentInput = Struct({ id: Id, reason: Text, at: Text });
+var CloseIntentInput = Struct({
+  id: Id,
+  reason: Text,
+  at: Text,
+  allow_unaccepted: optionalKey2(Text)
+});
 var replaceIntent = (state, next) => ({
   state: { ...state, intents: state.intents.map((it) => it.id === next.id ? next : it) },
   value: next
@@ -8423,10 +8447,13 @@ var closeIntent = (state, input) => gen2(function* () {
   const running = state.assignments.filter((row) => row.intent_id === current.id && row.state === "Running").map((row) => row.id);
   if (running.length > 0)
     return yield* new IntentBusy({ intent_id: current.id, running });
+  const unaccepted = state.assignments.filter((row) => row.intent_id === current.id && row.state === "Succeeded" && row.acceptance === null).map((row) => row.id);
+  if (unaccepted.length > 0 && input.allow_unaccepted === undefined)
+    return yield* new UnacceptedAssignments({ intent_id: current.id, unaccepted });
   return replaceIntent(state, {
     ...current,
     state: "closed",
-    close_reason: input.reason,
+    close_reason: unaccepted.length > 0 ? `${input.reason} (unaccepted ${unaccepted.join(", ")} allowed: ${input.allow_unaccepted})` : input.reason,
     closed_at: input.at
   });
 });
@@ -11341,18 +11368,24 @@ var intentUse = cmd({
     return { state, value: intentRow(intent, state) };
   })).pipe(map4((row) => ({ value: row })))
 });
-var CLOSE_USAGE = "intent close [--intent <id>] --reason <text>";
+var CLOSE_USAGE = "intent close [--intent <id>] --reason <text> [--allow-unaccepted <reason>]";
 var intentClose = cmd({
   path: ["intent", "close"],
   usage: CLOSE_USAGE,
-  summary: "close the Intent with a reason; refused while its Assignments run",
+  summary: "close the Intent with a reason; refused while its Assignments run or Succeeded ones are unaccepted (--allow-unaccepted <reason> closes anyway)",
   root: true,
-  flags: { ...INTENT_FLAG, reason: "string" },
+  flags: { ...INTENT_FLAG, reason: "string", "allow-unaccepted": "string" },
   positionals: 0,
   run: (args) => gen2(function* () {
     const reason = yield* flagValue(args, "reason", CLOSE_USAGE);
     const at = yield* nowIso;
-    const intent = yield* change((state) => activeIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => decodeStrict(CloseIntentInput)({ id: target.id, reason, at })), flatMap2((input) => closeIntent(state, input))));
+    const allowed = stringFlag(args, "allow-unaccepted");
+    const intent = yield* change((state) => activeIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => decodeStrict(CloseIntentInput)({
+      id: target.id,
+      reason,
+      at,
+      ...allowed === undefined ? {} : { allow_unaccepted: allowed }
+    })), flatMap2((input) => closeIntent(state, input))));
     return { value: intent };
   })
 });
@@ -11369,11 +11402,20 @@ var closedIntent = (state, id) => gen2(function* () {
 var intentReopen = cmd({
   path: ["intent", "reopen"],
   usage: REOPEN_USAGE,
-  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
+  summary: "open a closed Intent again (the only closed one, else --intent) and put it in use; the revision bumps; prints the Intent it replaced",
   root: true,
   flags: INTENT_FLAG,
   positionals: 0,
-  run: (args) => change((state) => closedIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => reopenIntent(state, target.id)))).pipe(map4((intent) => ({ value: intent })))
+  run: (args) => change((state, { useIntent }) => gen2(function* () {
+    const target = yield* closedIntent(state, stringFlag(args, "intent"));
+    const replaced = intentInUse(state, yield* storedIntent);
+    const reopened = yield* reopenIntent(state, target.id);
+    yield* useIntent(reopened.value.id);
+    return {
+      state: reopened.state,
+      value: { ...reopened.value, in_use: reopened.value.id, replaced: replaced?.id ?? null }
+    };
+  })).pipe(map4((intent) => ({ value: intent })))
 });
 var intentCreate = cmd({
   path: ["intent", "create"],
@@ -11569,15 +11611,19 @@ var assignmentCancel = cmd({
 var AcceptBody = AcceptanceRecord;
 var assignmentAccept = cmd({
   path: ["assignment", "accept"],
-  usage: "assignment accept <id>",
-  summary: "record the evidence review of a Succeeded Assignment",
+  usage: "assignment accept <id> [--carry-forward]",
+  summary: "record the evidence review of a Succeeded Assignment; --carry-forward accepts one made for an earlier revision at the live one",
   input: '{"intent_revision":N,"rationale":"...","criteria_evidence":{"<label>":"..."},"required_evidence":{"<label>":"..."}}',
   root: true,
-  flags: {},
+  flags: { "carry-forward": "boolean" },
   positionals: 1,
   run: (args, stdin) => gen2(function* () {
     const acceptance = yield* fromStdin(AcceptBody, stdin, "assignment accept");
-    const done = yield* change((state) => accept(state, { assignment_id: args.positionals[0] ?? "", acceptance }));
+    const done = yield* change((state) => accept(state, {
+      assignment_id: args.positionals[0] ?? "",
+      acceptance,
+      carry_forward: booleanFlag(args, "carry-forward")
+    }));
     return { value: summaryRow(done) };
   })
 });
@@ -11659,12 +11705,13 @@ var routes2 = cmd({
 var reconcileList = cmd({
   path: ["reconcile"],
   usage: "reconcile",
-  summary: "list Running rows to confirm by agent id, and those running elsewhere",
+  summary: "list Running rows to confirm by agent id, those running elsewhere, and closed Intents with open work",
   root: false,
   flags: {},
   positionals: 0,
   run: () => read((state) => suspend2(() => readCloneId(stateDirPath())).pipe(map4((cloneId) => {
     const { local, elsewhere } = reconcile(state, cloneId);
+    const stranded = closedWithOpenWork(state);
     return {
       value: {
         running: local.map(summaryRow),
@@ -11672,6 +11719,13 @@ var reconcileList = cmd({
           running_elsewhere: elsewhere.map((row) => ({
             ...summaryRow(row),
             clone: row.clone_id
+          }))
+        },
+        ...stranded.length === 0 ? {} : {
+          closed_with_open_work: stranded.map(({ intent, assignments }) => ({
+            intent: intent.id,
+            close_reason: intent.close_reason ?? null,
+            assignments: assignments.map(summaryRow)
           }))
         }
       }
@@ -11807,6 +11861,7 @@ var HINTS = {
   NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>. With none open, run `holyclaude intent create` or `holyclaude intent reopen --intent <id>`.",
   IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
   IntentBusy: "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
+  UnacceptedAssignments: "Review and accept them with `holyclaude assignment accept <id>`, then close again. To close with work left unaccepted, add `--allow-unaccepted <reason>`.",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>."
 };
