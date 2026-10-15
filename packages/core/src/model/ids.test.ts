@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Schema } from "effect"
 
 import { AssignmentId, compareIds, IntentId, newId, sortedById } from "./ids.ts"
-import { latestIntent, emptyState } from "./state.ts"
 
 const generate = (kind: Parameters<typeof newId>[0]) => Effect.runPromise(newId(kind))
 
@@ -75,17 +74,6 @@ describe("id schemas", () => {
 })
 
 describe("ordering by id", () => {
-  const intent = (id: string) => ({ id, objective: "o", requirements: "", revision: 1 })
-
-  test("the latest Intent is the greatest id whatever the array order", () => {
-    const state = {
-      ...emptyState,
-      intents: [intent("intent-0mg8k2x1a-7f3q"), intent("intent-0002"), intent("intent-0001")],
-    }
-    expect(latestIntent(state)?.id).toBe("intent-0mg8k2x1a-7f3q")
-    expect(latestIntent(emptyState)).toBeUndefined()
-  })
-
   test("sortedById leaves the input alone and orders oldest first", () => {
     const records = [{ id: "b" }, { id: "a" }, { id: "c" }]
     expect(sortedById(records).map((record) => record.id)).toEqual(["a", "b", "c"])
@@ -127,18 +115,5 @@ describe("comparing legacy and generated ids", () => {
       "intent-0mg8k2x0z-aaaa",
       "intent-0mg8k2x1a-7f3q",
     ])
-  })
-
-  test("the latest Intent is a generated one over legacy 1000", () => {
-    const state = {
-      ...emptyState,
-      intents: ["intent-1000", "intent-0mg8k2x1a-7f3q", "intent-0999"].map((id) => ({
-        id,
-        objective: "o",
-        requirements: "",
-        revision: 1,
-      })),
-    }
-    expect(latestIntent(state)?.id).toBe("intent-0mg8k2x1a-7f3q")
   })
 })

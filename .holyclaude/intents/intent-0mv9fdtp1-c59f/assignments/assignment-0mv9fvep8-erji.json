@@ -43,6 +43,25 @@
   "id": "assignment-0mv9fvep8-erji",
   "state": "Succeeded",
   "result": "PR3 writer: all 8 criteria met inside the core-rules block of plugin/agents/holyclaude.md; file 27,777->29,218 chars (+1,441), core block 8,039->9,480; fmt, lint pass; bun check unavailable on Bun 1.4.2 so tsc --noEmit used; bun test 1099 pass, 1 timing flake (glob 1 MiB nested braces under load); diff at scratchpad/diffs/assignment-0mv9fvep8-erji.diff.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "Solo root: when the user forbids subagents, the root works directly, keeps the acceptance bar, uses Edit for file edits, states the reason for any changed or loosened assertion, names waived independent-review gates as Unknown in its first message and final report; the 'report that you are blocked' line applies only when delegation is allowed but impossible.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "A user's explicit instruction about how to ask (for example a plain-text question) or not to delegate wins over the root's defaults.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Asking: because AskUserQuestion blocks the turn, the root does independent work and authorized pushes first and asks when nothing else is left or the answer gates the rest; a question left unanswered across a resume is asked once more; a new user instruction mid-run gets a one-line acknowledgement saying where it fits.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "After a classifier denial, the root does not redo the same change through another tool; it continues other work and reports it.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Repairs: after a second failure of the same gate, reproduce it locally with the repository's own script before another push or retry; read the gate on the exact head SHA before triggering a deploy or other gated action; call a failure environmental only after reading its message and reproducing it on the base or seeing the same case pass on that SHA.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Final report: when the request lists numbered deliverables, the report starts with one done / partial / not-started line per deliverable; untested causes are stated as hypotheses.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Showing images: to show a screenshot to the user, the root reads the image in the main thread; a path or link is not delivery.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Size change reported; format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "changed-paths": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "size-change": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

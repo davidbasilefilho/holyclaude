@@ -37,6 +37,7 @@ The `assignments` skill has each command in launch order; a verify mismatch is a
 
 - Run `holyclaude intent show` before the first dispatch and before follow-up work. The revision bumps only on a material change; a record without one reads as 0 and never authorizes a dispatch. After a stale-revision rejection, reread the Intent and reassess the work against it.
 - A writer's ownership paths must not overlap a Running writer's, and dependencies unlock once accepted at the same revision. Size each Assignment as one coherent change a reviewer can judge whole; split only for a large, independently mergeable part, a different reviewer class or a user request.
+- At session start, when several Intents are open and none is in use (for example a fresh cloud clone), ask the user which one and run `holyclaude intent use <id>`, so every command acts on the Intent they mean.
 - After a resume or compaction, run `holyclaude reconcile` and confirm each Running worker by agent id before failing it or keeping it reserved.
 
 ## Acceptance
@@ -167,12 +168,17 @@ When the request or the repository's workflow authorizes it, push completed work
 
 This is the bar for every model-facing instruction you write or have written: Assignments, prompts, skills and rules files.
 
-- Keep it compact and proportional to the task. Each rule appears once, in the place that needs it, with its reason beside it: the reason lets the receiver apply the rule beyond its examples, and one statement cannot drift from a copy.
+<!-- holyclaude:writing-bar:start -->
+
+- Keep it compact and proportional to the task. Each rule appears once, in the place that needs it, with its reason beside it: the reason lets the receiver apply the rule beyond its examples, and no copy of a rule can drift from the original.
 - State outcomes and boundaries rather than step-by-step procedure, and leave out what the model does by default; every extra line dilutes the ones that matter.
 - Phrase rules positively, as what to do, in calm words, and leave out capital-letter emphasis, which tends to cause overreach. A real boundary stays, stated as the action to take: leave VCS writes to the root, which owns the branch and PR record.
 - Give each policy or invariant one owner, preserve the user's and any governing authority, and keep what the runtime enforces in code rather than prose. Put specialized steps in a skill.
+
+<!-- holyclaude:writing-bar:end -->
+
 - For an Assignment, name the receiver, the outcome, the context it needs, the scope, the constraints, the observable acceptance evidence and where the work stops. Put long context first and the task last, so recurring text stays stable and cacheable. Name the required-evidence labels, say which checks to run and report as run or not run, and state the scope boundary beside the ownership paths.
-- An Assignment whose deliverable is instruction text quotes this bar and states the expected size relative to the text it replaces, and you check the delivered size against that expectation. Worker.implementation writes such text and Reviewer.artifact reviews it, reporting redundant, obsolete, conflicting and over-long instructions as findings.
+- An Assignment whose deliverable is instruction text states the expected size relative to the text it replaces, and you check the delivered size against that expectation. Worker.implementation and Reviewer.artifact carry this bar themselves, so the Assignment leaves it out; Reviewer.artifact reports redundant, obsolete, conflicting and over-long instructions as findings.
 - Search the web only when the task needs fresh evidence.
 
 ## Skills

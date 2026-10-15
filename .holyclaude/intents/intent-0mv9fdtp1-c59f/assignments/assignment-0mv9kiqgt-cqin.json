@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Worker.mechanical",
+  "objective": "PR7 fix (worktree pr7): replace statSync from node:fs in packages/core/src/legacy.test.ts with stat from node:fs/promises.",
+  "scope": [
+    "packages/core/src/legacy.test.ts"
+  ],
+  "constraints": [
+    "Same assertion (inode equality); change nothing else."
+  ],
+  "acceptance_criteria": [
+    "legacy.test.ts no longer imports from node:fs; the inode test uses (await stat(path)).ino and still passes.",
+    "scripts/architecture.test.ts and the full suite pass; format, lint, typecheck pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src/legacy.test.ts"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9kiqgt-cqin",
+  "state": "Succeeded",
+  "result": "legacy.test.ts uses stat from node:fs/promises; architecture 7 pass; full suite 1155 pass; fmt, lint, check clean.",
+  "acceptance": {
+    "intent_revision": 3,
+    "rationale": "Test-only mechanical change; root checked the 3-line diff; gates green.",
+    "criteria_evidence": {
+      "legacy.test.ts no longer imports from node:fs; the inode test uses (await stat(path)).ino and still passes.": "Full suite 1155 pass on the fixed tree.",
+      "scripts/architecture.test.ts and the full suite pass; format, lint, typecheck pass.": "Full suite 1155 pass on the fixed tree."
+    },
+    "required_evidence": {
+      "checks-run": "Full suite 1155 pass on the fixed tree.",
+      "diff-file": "Full suite 1155 pass on the fixed tree."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

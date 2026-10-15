@@ -1,0 +1,42 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.code",
+  "objective": "Narrow review of PR7's final repair: SessionStart load time bound, TooLarge hint, state dir resolved before the fork.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9k5rcb-27gq.diff (judge only session-start.ts, main.ts, pre-tool-use.ts, observe.ts changes and their tests)",
+    "Worktree pr7"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Run the session-start, pre-tool-use and observe tests with bunx bun@1.4.3."
+  ],
+  "acceptance_criteria": [
+    "The time bound degrades to rules plus a state error and its regression test is behavior-sensitive.",
+    "The hint no longer tells the user to shorten input; the state dir is resolved before forking.",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9k5rcb-27gq",
+      "assignment-0mv9h76ik-a9me",
+      "assignment-0mv9grnt4-upxx"
+    ]
+  },
+  "id": "assignment-0mv9kbhr1-0ys6",
+  "state": "Succeeded",
+  "result": "PR7 final-repair review: no blockers; hook tests 823 pass, bun check clean; mutation removing the time bound makes the new test fail; optional README sentence for the 10 s bound, hint wording, default wiring.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

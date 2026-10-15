@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR4 (worktree pr4, branch release/0.2.0/docs/ci-and-commits, based on PR3): tighten the root's CI watching and Committing sections from the audit, and update the assignments skill for the hook-recorded model.",
+  "scope": [
+    "plugin/agents/holyclaude.md: CI watching and Committing sections only",
+    "plugin/skills/assignments/SKILL.md: the verify description"
+  ],
+  "constraints": [
+    "Follow the ship brief and writing bar; replace or tighten rather than stack; report wc -c before and after.",
+    "Do not edit the core-rules block."
+  ],
+  "acceptance_criteria": [
+    "CI watching: the watch is one tested command (verified on a known-complete run before relying on it) that prints one summary line per state change, never one line per failing case; it reads the PR head SHA, check states, mergeable, mergeStateStatus and unresolved review threads; where gh is unavailable or unauthenticated, the host's PR-activity subscription or GitHub tools serve instead.",
+    "Committing: one intent per commit; read git diff --staged before committing; run the format and lint gates over everything staged, state records included; a stop hook asking for commits does not override one-intent commits or the review-before-commit order, and work left uncommitted on purpose is said so; temporary files live in the scratchpad or the system temp area, not the worktree.",
+    "assignments skill: verify's observed model comes from the PostToolUse hook's resolvedModel when recorded and from the subagent transcript otherwise, shown as model_source.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents",
+      "plugin/skills/assignments"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9guhvv-y9si",
+  "state": "Succeeded",
+  "result": "PR4 writer: Committing (one intent, staged diff, gates over everything staged incl. state records, stop hook changes neither rule, temp files outside the worktree, report left-out work) and CI watching (one Monitor command, one summary line per state change with checks, mergeable, merge state, unresolved threads; unknown on failed reads; verify on a known-complete PR first; host subscription or GitHub tools when gh is unavailable) rewritten; assignments skill verify bullet covers resolvedModel and model_source; holyclaude.md +1203, SKILL.md +128; gates pass (1100 tests); watch command not run against a real PR (GraphQL blocked here). Diff at scratchpad/diffs/assignment-0mv9guhvv-y9si.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR4 prose accepted after three review rounds; final exact-text fixes are the last reviewer's own findings, root checked the diff.",
+    "criteria_evidence": {
+      "CI watching: the watch is one tested command (verified on a known-complete run before relying on it) that prints one summary line per state change, never one line per failing case; it reads the PR head SHA, check states, mergeable, mergeStateStatus and unresolved review threads; where gh is unavailable or unauthenticated, the host's PR-activity subscription or GitHub tools serve instead.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "Committing: one intent per commit; read git diff --staged before committing; run the format and lint gates over everything staged, state records included; a stop hook asking for commits does not override one-intent commits or the review-before-commit order, and work left uncommitted on purpose is said so; temporary files live in the scratchpad or the system temp area, not the worktree.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "assignments skill: verify's observed model comes from the PostToolUse hook's resolvedModel when recorded and from the subagent transcript otherwise, shown as model_source.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "size-change": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "diff-file": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

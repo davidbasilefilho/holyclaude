@@ -74,7 +74,7 @@ const plant = async (file: string, content: string, mtime?: Date) => {
 const withIntent = (state: typeof emptyState, objective = "o"): Change<string> => ({
   state: {
     ...state,
-    intents: [{ id: "intent-1", objective, requirements: "r", revision: 1 }],
+    intents: [{ id: "intent-1", objective, requirements: "r", revision: 1, state: "open" }],
   },
   value: "ok",
 })
@@ -226,13 +226,19 @@ describe("commit", () => {
 
   test("a normal write leaves no temp file and no lock", async () => {
     await Effect.runPromise(updateState(directory, (state) => Effect.succeed(withIntent(state))))
-    expect(await files()).toEqual([".gitignore", INTENT_FILE])
+    expect(await files()).toEqual([".gitignore", INTENT_FILE, "local/.gitignore"])
   })
 })
 
 describe("writing", () => {
   test("refuses a state that loading would reject, and leaves the store usable", async () => {
-    const intent = { id: "intent-1", objective: "o", requirements: "r", revision: 1 }
+    const intent = {
+      id: "intent-1",
+      objective: "o",
+      requirements: "r",
+      revision: 1,
+      state: "open" as const,
+    }
     const failure = await Effect.runPromise(
       updateState(directory, (state) =>
         Effect.succeed({
@@ -242,7 +248,7 @@ describe("writing", () => {
       ).pipe(Effect.flip),
     )
     expect(failure._tag).toBe("InvalidRecord")
-    expect(await files()).toEqual([".gitignore"])
+    expect(await files()).toEqual([".gitignore", "local/.gitignore"])
     expect(await Effect.runPromise(loadState(directory))).toEqual(emptyState)
   })
 })
@@ -266,7 +272,7 @@ describe("transient Windows errors", () => {
       expect(await commit(code)).toBe("ok")
       expect(injected.rename.calls).toBe(3)
     }
-    expect(await files()).toEqual([".gitignore", INTENT_FILE])
+    expect(await files()).toEqual([".gitignore", INTENT_FILE, "local/.gitignore"])
   })
 
   test("a rename that keeps failing gives up with StateIo and cleans up", async () => {
@@ -277,7 +283,7 @@ describe("transient Windows errors", () => {
     expect(failure._tag).toBe("StateIo")
     expect(injected.rename.calls).toBeGreaterThan(1)
     expect(injected.rename.calls).toBeLessThan(10)
-    expect(await files()).toEqual([".gitignore"])
+    expect(await files()).toEqual([".gitignore", "local/.gitignore"])
   })
 
   test("any other code is not retried", async () => {

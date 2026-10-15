@@ -1,0 +1,62 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Reviewer.code",
+  "objective": "Independently review PR8 (release/0.2.0/fix/content-caps...release/0.2.0/feat/collaborative-intents, head 258ab95): collaborative Intents in the CLI and hooks.",
+  "scope": [
+    "git diff release/0.2.0/fix/content-caps...release/0.2.0/feat/collaborative-intents in worktree pr8",
+    "Saved diff scratchpad/diffs/pr8-full.diff"
+  ],
+  "constraints": [
+    "Read-only; leave the worktree as found.",
+    "First pass /code-review on release/0.2.0/fix/content-caps...release/0.2.0/feat/collaborative-intents at effort high, no --comment, no --fix.",
+    "Gates via bunx bun@1.4.3."
+  ],
+  "acceptance_criteria": [
+    "Reports /code-review invocation, finding count and dispositions.",
+    "Judges Intent state decoding (absent reads as open), close/reopen guards and revision bump, closed-Intent dispatch refusal, intent list/use, resolution order (--intent, stored choice, only open, else NoActiveIntent), assignment list default and --all, SessionStart open Intents, local/.gitignore creation, Ready counted as open.",
+    "Confirms the bundle is byte-identical to a Bun 1.4.3 build.",
+    "Separates blockers from optional findings with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "bundle-check",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9kcrjn-7ui8",
+      "assignment-0mv9kcroa-ru9o",
+      "assignment-0mv9ktq2k-obv3"
+    ]
+  },
+  "id": "assignment-0mv9kymvp-4hvr",
+  "state": "Succeeded",
+  "result": "PR8 code review: no blockers; gates green (1199); bundle identical; optional: SessionStart pointer names commands that fail with several open (name --all), create does not set in use (user: set it and print the switch), reopen without --intent cannot succeed, closed Intent keeps Ready rows, intents array not row-limited, stale open() JSDoc, conflicting --intent/positional/body id silently resolved, corrupt choice file blocks --intent.",
+  "acceptance": {
+    "intent_revision": 3,
+    "rationale": "Reviewer reproduced each finding against the fresh bundle in scratch state; gates and bundle verified.",
+    "criteria_evidence": {
+      "Reports /code-review invocation, finding count and dispositions.": "No blockers; 9 optional findings dispositioned.",
+      "Judges Intent state decoding (absent reads as open), close/reopen guards and revision bump, closed-Intent dispatch refusal, intent list/use, resolution order (--intent, stored choice, only open, else NoActiveIntent), assignment list default and --all, SessionStart open Intents, local/.gitignore creation, Ready counted as open.": "No blockers; 9 optional findings dispositioned.",
+      "Confirms the bundle is byte-identical to a Bun 1.4.3 build.": "No blockers; 9 optional findings dispositioned.",
+      "Separates blockers from optional findings with evidence.": "No blockers; 9 optional findings dispositioned."
+    },
+    "required_evidence": {
+      "code-review-run": "No blockers; 9 optional findings dispositioned.",
+      "checks-run": "No blockers; 9 optional findings dispositioned.",
+      "bundle-check": "No blockers; 9 optional findings dispositioned.",
+      "blockers": "No blockers; 9 optional findings dispositioned.",
+      "optional-findings": "No blockers; 9 optional findings dispositioned."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

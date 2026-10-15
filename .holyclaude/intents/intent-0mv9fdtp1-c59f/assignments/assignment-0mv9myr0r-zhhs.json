@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Worker.mechanical",
+  "objective": "PR8 doc fixes (worktree pr8): continue-work step 2 wording, README read-bound and symlinked-choice notes.",
+  "scope": [
+    "plugin/skills/continue-work/SKILL.md",
+    "README.md"
+  ],
+  "constraints": [
+    "Apply the given text; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "The three edits applied.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/skills/continue-work",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9myr0r-zhhs",
+  "state": "Succeeded",
+  "result": "Three PR8 doc replacements applied verbatim; gates pass (glob timing flake reran alone green).",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "PR8 accepted: code, security and prose reviews plus repair review found no remaining blockers; user decisions applied; gates pass (1210).",
+    "criteria_evidence": {
+      "The three edits applied.": "Reviews 0mv9kymvp, 0mv9kyn0u, 0mv9kyn5x, 0mv9migai; regression tests fail on base.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9kymvp, 0mv9kyn0u, 0mv9kyn5x, 0mv9migai; regression tests fail on base."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9kymvp, 0mv9kyn0u, 0mv9kyn5x, 0mv9migai; regression tests fail on base.",
+      "diff-file": "Reviews 0mv9kymvp, 0mv9kyn0u, 0mv9kyn5x, 0mv9migai; regression tests fail on base."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,50 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Reviewer.security",
+  "objective": "Security review of PR8: new local files (active-intent choice, local/.gitignore), Intent state fields read from committed records, SessionStart naming every open Intent.",
+  "scope": [
+    "Saved diff scratchpad/diffs/pr8-full.diff",
+    "Worktree pr8 at 258ab95"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Assesses whether committed or local files a repository supplies can redirect writes, bypass the closed-Intent refusal, or inject into SessionStart beyond the existing budget.",
+    "Assesses symlink refusal and lock coverage for the new local files; findings with severity, or none."
+  ],
+  "required_evidence": [
+    "findings",
+    "severity"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9kcrjn-7ui8",
+      "assignment-0mv9kcroa-ru9o",
+      "assignment-0mv9ktq2k-obv3"
+    ]
+  },
+  "id": "assignment-0mv9kyn0u-sjxe",
+  "state": "Succeeded",
+  "result": "PR8 security: no blocker; Low 1 repo-supplied local/.gitignore kept (rewrite to *); Low 2 corrupt active-intent file blocks commands even with --intent (read choice only without flag, treat undecodable as none); Low 3 planted choice selects target of mutating commands (bounded).",
+  "acceptance": {
+    "intent_revision": 3,
+    "rationale": "Source-to-sink traces for each question; lows validated by reading.",
+    "criteria_evidence": {
+      "Assesses whether committed or local files a repository supplies can redirect writes, bypass the closed-Intent refusal, or inject into SessionStart beyond the existing budget.": "No blocker; L1-L3.",
+      "Assesses symlink refusal and lock coverage for the new local files; findings with severity, or none.": "No blocker; L1-L3."
+    },
+    "required_evidence": {
+      "findings": "No blocker; L1-L3.",
+      "severity": "No blocker; L1-L3."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

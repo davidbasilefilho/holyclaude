@@ -5,9 +5,11 @@ import {
   AssignmentState,
   BindAgentInput,
   CancelInput,
+  CloseIntentInput,
   CreateIntentInput,
   FinishInput,
   FollowUpInput,
+  IntentState,
   ROUTES,
   ReserveInput,
   ResolveReconcileInput,
@@ -16,6 +18,7 @@ import {
   accept,
   bindAgent,
   cancel,
+  closeIntent,
   createAssignment,
   createIntent,
   decodeJsonStrict,
@@ -24,12 +27,17 @@ import {
   findAssignment,
   findIntent,
   followUp,
-  latestIntent,
+  intentInUse,
+  isOpenAssignment,
   projectRoot,
   reconcile,
+  readActiveIntent,
   readCloneId,
   refuseOtherClone,
+  reopenIntent,
+  requireOpen,
   reserve,
+  resolveIntent,
   resolveReconcile,
   rollbackReservation,
   routeFor,
@@ -39,6 +47,7 @@ import {
   updateIntent,
   updateState,
   type Assignment,
+  type Intent,
   type State,
   type UpdateContext,
 } from "@holyclaude/core"
@@ -46,7 +55,7 @@ import { Effect, Schema } from "effect"
 
 import { booleanFlag, listFlag, stringFlag, type FlagSpec, type Parsed } from "./args.ts"
 import { nowIso } from "./clock.ts"
-import { NoIntent, StdinMissing, Usage } from "./errors.ts"
+import { StdinMissing, Usage } from "./errors.ts"
 import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
 import { postToolUse } from "./hook/post-tool-use.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
@@ -98,6 +107,16 @@ const summaryRow = (assignment: Assignment) => ({
   objective: assignment.objective.replace(/\s+/g, " "),
 })
 
+const intentRow = (intent: Intent, state: State) => ({
+  id: intent.id,
+  state: intent.state,
+  revision: intent.revision,
+  objective: intent.objective.replace(/\s+/g, " "),
+  open_assignments: state.assignments.filter(
+    (assignment) => assignment.intent_id === intent.id && isOpenAssignment(assignment),
+  ).length,
+})
+
 const dispatchInfo = (assignment: Assignment) => {
   const route = routeFor(assignment.role)
   return {
@@ -111,12 +130,43 @@ const dispatchInfo = (assignment: Assignment) => {
   }
 }
 
+/**
+ * The Intent this clone stored with `intent use`. An unreadable or undecodable choice counts as
+ * none, as in the SessionStart hook: it must never stop a command that names its Intent.
+ */
+const storedIntent = Effect.suspend(() => readActiveIntent(stateDirPath())).pipe(
+  Effect.orElseSucceed(() => undefined),
+)
+
+/**
+ * The Intent a command acts on: the one named by `id`, else this clone's stored choice while it is
+ * open, else the only open Intent. The stored choice is read only when `id` does not settle it.
+ */
 const activeIntent = (state: State, id: string | undefined) =>
+  (id === undefined ? storedIntent : Effect.succeed(undefined)).pipe(
+    Effect.flatMap((stored) => resolveIntent(state, id, stored)),
+  )
+
+/**
+ * The one Intent id two sources name, or a usage error when they name different ones. `source` says
+ * where `named` came from, for the message.
+ */
+const agreedIntent = (
+  usage: string,
+  source: string,
+  named: string | undefined,
+  flag: string | undefined,
+) =>
   Effect.gen(function* () {
-    if (id !== undefined) return yield* findIntent(state, id)
-    const latest = latestIntent(state)
-    return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }))
+    if (named !== undefined && flag !== undefined && named !== flag)
+      return yield* usageError(
+        usage,
+        `${source} ${named} and --intent ${flag} name different Intents`,
+      )
+    return named ?? flag
   })
+
+const INTENT_FLAG = { intent: "string" } as const
 
 const read = <A, E>(use: (state: State) => Effect.Effect<A, E>) =>
   loadStateFile.pipe(Effect.flatMap(use))
@@ -193,54 +243,184 @@ const withRef = (id: string | undefined) => decodeStrict(AssignmentRef)({ assign
 
 const cmd = (command: Command): Command => command
 
+const SHOW_USAGE = "intent show [id | --intent <id>]"
+
 const intentShow = cmd({
   path: ["intent", "show"],
-  usage: "intent show [id]",
-  summary: "show the active Intent (latest, or by id)",
+  usage: SHOW_USAGE,
+  summary: "show the Intent in use, or the one named",
   root: false,
-  flags: {},
+  flags: INTENT_FLAG,
   positionals: 1,
   optional: true,
   run: (args) =>
-    read((state) => activeIntent(state, args.positionals[0])).pipe(
+    agreedIntent(SHOW_USAGE, "Argument", args.positionals[0], stringFlag(args, "intent")).pipe(
+      Effect.flatMap((id) => read((state) => activeIntent(state, id))),
       Effect.map((intent) => ({ value: intent })),
     ),
+})
+
+const INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")}]`
+
+const intentList = cmd({
+  path: ["intent", "list"],
+  usage: INTENT_LIST_USAGE,
+  summary: "list Intents with state, revision, objective and open Assignments",
+  root: false,
+  flags: { state: "string" },
+  positionals: 0,
+  run: (args) =>
+    Effect.gen(function* () {
+      const value = stringFlag(args, "state")
+      const wanted = yield* optionalChoice(IntentState, value).pipe(
+        Effect.mapError(() =>
+          usageError(
+            INTENT_LIST_USAGE,
+            `State ${value} is not one of ${IntentState.literals.join("|")}`,
+          ),
+        ),
+      )
+      return yield* read((state) =>
+        Effect.succeed({
+          value: {
+            intents: sortedById(state.intents)
+              .filter((intent) => wanted === undefined || intent.state === wanted)
+              .map((intent) => intentRow(intent, state)),
+          },
+        }),
+      )
+    }),
+})
+
+const intentUse = cmd({
+  path: ["intent", "use"],
+  usage: "intent use <id>",
+  summary: "work on this Intent in this clone; the choice stays local",
+  root: true,
+  flags: {},
+  positionals: 1,
+  run: (args) =>
+    change((state, { useIntent }) =>
+      Effect.gen(function* () {
+        const intent = yield* findIntent(state, args.positionals[0] ?? "")
+        yield* requireOpen(intent)
+        yield* useIntent(intent.id)
+        return { state, value: intentRow(intent, state) }
+      }),
+    ).pipe(Effect.map((row) => ({ value: row }))),
+})
+
+const CLOSE_USAGE = "intent close [--intent <id>] --reason <text>"
+
+const intentClose = cmd({
+  path: ["intent", "close"],
+  usage: CLOSE_USAGE,
+  summary: "close the Intent with a reason; refused while its Assignments run",
+  root: true,
+  flags: { ...INTENT_FLAG, reason: "string" },
+  positionals: 0,
+  run: (args) =>
+    Effect.gen(function* () {
+      const reason = yield* flagValue(args, "reason", CLOSE_USAGE)
+      const at = yield* nowIso
+      const intent = yield* change((state) =>
+        activeIntent(state, stringFlag(args, "intent")).pipe(
+          Effect.flatMap((target) => decodeStrict(CloseIntentInput)({ id: target.id, reason, at })),
+          Effect.flatMap((input) => closeIntent(state, input)),
+        ),
+      )
+      return { value: intent }
+    }),
+})
+
+const REOPEN_USAGE = "intent reopen [--intent <id>]"
+
+/**
+ * The Intent to reopen: the one named by `--intent`, else the only closed Intent. The Intent in use
+ * is open by definition, so it cannot name a closed one.
+ */
+const closedIntent = (state: State, id: string | undefined) =>
+  Effect.gen(function* () {
+    if (id !== undefined) return yield* findIntent(state, id)
+    const closed = sortedById(state.intents).filter((intent) => intent.state === "closed")
+    const [only] = closed
+    if (closed.length === 1 && only !== undefined) return only
+    return yield* usageError(
+      REOPEN_USAGE,
+      closed.length === 0
+        ? "No Intent is closed"
+        : `Several Intents are closed; pass --intent <id>. Closed Intents: ${closed.map((intent) => intent.id).join(", ")}`,
+    )
+  })
+
+const intentReopen = cmd({
+  path: ["intent", "reopen"],
+  usage: REOPEN_USAGE,
+  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
+  root: true,
+  flags: INTENT_FLAG,
+  positionals: 0,
+  run: (args) =>
+    change((state) =>
+      closedIntent(state, stringFlag(args, "intent")).pipe(
+        Effect.flatMap((target) => reopenIntent(state, target.id)),
+      ),
+    ).pipe(Effect.map((intent) => ({ value: intent }))),
 })
 
 const intentCreate = cmd({
   path: ["intent", "create"],
   usage: "intent create",
-  summary: "record a new Intent at revision 1",
+  summary: "record a new Intent at revision 1 and put it in use; prints the Intent it replaced",
   input: '{"objective":"...","requirements":"..."?}',
   root: true,
   flags: {},
   positionals: 0,
   run: (_args, stdin) =>
     fromStdin(CreateIntentInput, stdin, "intent create").pipe(
-      Effect.flatMap((input) => change((state) => createIntent(state, input))),
+      Effect.flatMap((input) =>
+        change((state, { useIntent }) =>
+          Effect.gen(function* () {
+            // Read under the lock, so the Intent reported as replaced is the one this write replaces.
+            const replaced = intentInUse(state, yield* storedIntent)
+            const created = yield* createIntent(state, input)
+            yield* useIntent(created.value.id)
+            return {
+              state: created.state,
+              value: { ...created.value, in_use: created.value.id, replaced: replaced?.id ?? null },
+            }
+          }),
+        ),
+      ),
       Effect.map((intent) => ({ value: intent })),
     ),
 })
 
+const UPDATE_USAGE = "intent update [--intent <id>] [--material]"
+
 const intentUpdate = cmd({
   path: ["intent", "update"],
-  usage: "intent update [--material]",
+  usage: UPDATE_USAGE,
   summary: "edit the Intent; --material bumps the revision",
   input: '{"id":"..."?,"objective":"..."?,"requirements":"..."?}',
   root: true,
-  flags: { material: "boolean" },
+  flags: { ...INTENT_FLAG, material: "boolean" },
   positionals: 0,
   run: (args, stdin) =>
     fromStdin(IntentUpdateBody, stdin, "intent update").pipe(
       Effect.flatMap((body) =>
-        change((state) =>
-          activeIntent(state, body.id).pipe(
-            Effect.flatMap((intent) =>
-              updateIntent(state, {
-                ...body,
-                id: intent.id,
-                material: booleanFlag(args, "material"),
-              }),
+        agreedIntent(UPDATE_USAGE, "JSON id", body.id, stringFlag(args, "intent")).pipe(
+          Effect.flatMap((id) =>
+            change((state) =>
+              activeIntent(state, id).pipe(
+                Effect.flatMap((intent) =>
+                  updateIntent(state, {
+                    ...body,
+                    id: intent.id,
+                    material: booleanFlag(args, "material"),
+                  }),
+                ),
+              ),
             ),
           ),
         ),
@@ -263,7 +443,7 @@ const assignmentShow = cmd({
     ),
 })
 
-const LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}]`
+const LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}] [--intent <id> | --all]`
 
 /** The `--state` filter, or a usage error naming the states that exist. */
 const stateFilter = (value: string | undefined) =>
@@ -282,21 +462,33 @@ const stateFilter = (value: string | undefined) =>
 const assignmentList = cmd({
   path: ["assignment", "list"],
   usage: LIST_USAGE,
-  summary: "list Assignments, one row each",
+  summary: "list the Assignments of the Intent in use (--intent: another, --all: every one)",
   root: false,
-  flags: { state: "string" },
+  flags: { ...INTENT_FLAG, state: "string", all: "boolean" },
   positionals: 0,
   run: (args) =>
-    stateFilter(stringFlag(args, "state")).pipe(
-      Effect.flatMap((wanted) =>
-        read((state) => {
+    Effect.gen(function* () {
+      const wanted = yield* stateFilter(stringFlag(args, "state"))
+      const everything = booleanFlag(args, "all")
+      if (everything && stringFlag(args, "intent") !== undefined)
+        return yield* usageError(LIST_USAGE, "Pick one of --intent <id> or --all")
+      return yield* read((state) =>
+        Effect.gen(function* () {
+          const scope = everything
+            ? undefined
+            : (yield* activeIntent(state, stringFlag(args, "intent"))).id
           const rows = sortedById(state.assignments)
+            .filter((assignment) => scope === undefined || assignment.intent_id === scope)
             .filter((assignment) => wanted === undefined || assignment.state === wanted)
-            .map(summaryRow)
-          return Effect.succeed({ value: { assignments: rows } })
+            .map((assignment) =>
+              everything
+                ? { intent: assignment.intent_id, ...summaryRow(assignment) }
+                : summaryRow(assignment),
+            )
+          return { value: { assignments: rows } }
         }),
-      ),
-    ),
+      )
+    }),
 })
 
 const assignmentCreate = cmd({
@@ -710,6 +902,10 @@ const hookPostToolUse = cmd({
 /** Every command, longest paths first so `reconcile resolve` wins over `reconcile`. */
 export const COMMANDS: ReadonlyArray<Command> = [
   intentShow,
+  intentList,
+  intentUse,
+  intentClose,
+  intentReopen,
   intentCreate,
   intentUpdate,
   assignmentShow,

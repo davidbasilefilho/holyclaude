@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of PR4 after repair: the two blockers and five wording items in the CI watching and Committing sections.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9h1yjx-9wo6.diff",
+    "Worktree pr4 plugin/agents/holyclaude.md"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only the listed items and contradictions they introduce."
+  ],
+  "acceptance_criteria": [
+    "B1: the watch reads reviewDecision and the summary line shows it; B2: a stop hook asking for commits does not override the commit rules or the review-before-commit order.",
+    "O1 one logical change; O2 the repository's done gates over everything staged; O3 the PreToolUse guard named; O4 one fallback trigger with the silence rule stated once in the file; O7 summary keys match fields read.",
+    "No changed line contradicts the core-rules block or another section; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9guhvv-y9si",
+      "assignment-0mv9h1yjx-9wo6",
+      "assignment-0mv9gy61n-2mkk"
+    ]
+  },
+  "id": "assignment-0mv9h46fm-i2l8",
+  "state": "Succeeded",
+  "result": "PR4 re-review: B1 B2 O1 O2 O3 met; blockers: fallback trigger conflicts with core L52; summary keys lack mapping, unknown key and failed names; SKILL verify line describes code from PR2 (stack order); reviewThreads GraphQL fragment invalid; optional: CI clause, repeated review order, short SHA, paragraph length.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Blockers verified: core L52 trigger differs; keys unmapped; GraphQL fragment lacks nodes/first; SKILL line depends on PR2 entering the stack below.",
+    "criteria_evidence": {
+      "B1: the watch reads reviewDecision and the summary line shows it; B2: a stop hook asking for commits does not override the commit rules or the review-before-commit order.": "Per-criterion verdicts with line quotes; blockers 1-4, optional list.",
+      "O1 one logical change; O2 the repository's done gates over everything staged; O3 the PreToolUse guard named; O4 one fallback trigger with the silence rule stated once in the file; O7 summary keys match fields read.": "Per-criterion verdicts with line quotes; blockers 1-4, optional list.",
+      "No changed line contradicts the core-rules block or another section; blockers separated from optional.": "Per-criterion verdicts with line quotes; blockers 1-4, optional list."
+    },
+    "required_evidence": {
+      "blockers": "Per-criterion verdicts with line quotes; blockers 1-4, optional list.",
+      "optional-findings": "Per-criterion verdicts with line quotes; blockers 1-4, optional list."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

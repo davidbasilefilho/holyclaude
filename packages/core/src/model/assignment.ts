@@ -64,6 +64,18 @@ export const Assignment = Schema.Struct({
 /** A persisted unit of delegated work. */
 export type Assignment = typeof Assignment.Type
 
+/**
+ * True while an Assignment still needs the root: it is Ready (planned, not yet reserved), Running,
+ * or it Succeeded and its evidence has not been accepted yet.
+ */
+export const isOpenAssignment = (assignment: {
+  readonly state: AssignmentState
+  readonly acceptance: unknown
+}): boolean =>
+  assignment.state === "Ready" ||
+  assignment.state === "Running" ||
+  (assignment.state === "Succeeded" && assignment.acceptance === null)
+
 /** True once an Assignment can no longer change state. */
 export const isTerminal = (assignment: { readonly state: AssignmentState }): boolean =>
   assignment.state === "Succeeded" ||

@@ -12,7 +12,13 @@ import { refuseSymlinks } from "./safety.ts"
 import { loadState, updateState } from "./store.ts"
 
 const INTENT = "intent-0001"
-const intent = { id: INTENT, objective: "o", requirements: "r", revision: 1 }
+const intent = {
+  id: INTENT,
+  objective: "o",
+  requirements: "r",
+  revision: 1,
+  state: "open" as const,
+}
 const withIntent: State = { ...emptyState, intents: [intent] }
 const assignment = {
   intent_id: INTENT,

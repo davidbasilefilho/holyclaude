@@ -42,6 +42,22 @@
   "id": "assignment-0mv9gamg7-hyu9",
   "state": "Succeeded",
   "result": "PR5 repair: size-cap decision recorded as decided for 0.2.0 with kept input bounds and rotation; claude-code HEAD wording; cloud bullets corrected; agent-setting claims qualified as local with pointer; optional fixes and dedup done; gates pass on 1.4.3 (1100 tests). README State section still describes current caps until PR7. Diff at scratchpad/diffs/assignment-0mv9gamg7-hyu9.diff.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR5 docs accepted after five review rounds; final state checked by narrow reviews and root.",
+    "criteria_evidence": {
+      "DECISIONS.md states the size-cap decision as decided for 0.2.0: content caps on stored records and local files (256 KiB, 4 MiB) and the 60-character objective clip are removed by the size-cap change in this release; bounds that guard reading external or untrusted input (hook stdin, a subagent transcript, lock and guard files) and observation-log rotation stay, named as such; no claim that nothing caps content today.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "frontend-design provenance says anthropics/claude-code's repository HEAD at verification on 2026-10-15 was 94506ff0d3bd9185f1752da36e968775021fb48f and the skill there matches, in both README and DECISIONS.md.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "README Cloud sessions: 'were the root's copy' without 'only'; the restraint remark removed; the commit-keys line excludes the managed-only keys; the stop-hook line says it flagged .holyclaude/ state in the sessions observed.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "README lines saying the plugin's agent setting makes the session start with the root agent are qualified as observed in local sessions, with a pointer to Cloud sessions.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Optional fixes: DECISIONS.md 'prompts name through' grammar; drop the unmeasured clause about long instructions; the no-bin/ line names claude.ai and Cowork; link instead of restating where README and DECISIONS.md duplicate.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Format, lint, typecheck and test pass.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    },
+    "required_evidence": {
+      "checks-run": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "changed-paths": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "diff-file": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

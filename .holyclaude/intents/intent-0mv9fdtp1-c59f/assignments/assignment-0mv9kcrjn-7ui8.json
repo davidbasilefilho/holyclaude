@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Worker.implementation",
+  "objective": "PR8 code (worktree pr8, branch release/0.2.0/feat/collaborative-intents, based on PR7): collaborative Intents in the CLI, hooks and skills.",
+  "scope": [
+    "packages/core/src and packages/cli/src with tests",
+    "plugin/scripts/holyclaude.js",
+    "plugin/skills/assignments, plugin/skills/continue-work",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md (Effect, Schema with onExcessProperty error, JSDoc).",
+    "Committed records stay free of absolute paths and machine-specific data."
+  ],
+  "acceptance_criteria": [
+    "local/ gets its own .gitignore containing * whenever the CLI creates it.",
+    "Intent records carry state open|closed with a close reason; absent state decodes as open.",
+    "intent close --reason refuses while an Assignment of that Intent is Running; intent reopen returns it to open and bumps its revision; a closed Intent never authorizes a dispatch.",
+    "intent list prints id, state, revision, objective and open-Assignment count, with --state.",
+    "intent use <id> stores the per-clone choice under local/ and refuses a closed Intent; with exactly one open Intent it is used automatically; with several open and none chosen, Intent-scoped commands fail listing the open Intents; --intent <id> overrides on any Intent-scoped command; greatest-id selection is gone.",
+    "assignment list defaults to the active Intent (with a flag or --intent for others).",
+    "SessionStart names every open Intent (id, revision, objective, open-Assignment count) and marks the one in use; rows shrink inside the budget.",
+    "continue-work asks which Intent to continue when several are open; the assignments skill documents the new commands.",
+    "README: new commands and states, local/.gitignore, collaborators need the same version because older versions reject the new fields, existing Intents read as open until closed.",
+    "Regression tests for each behavior fail on the base; format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/skills/assignments",
+      "plugin/skills/continue-work",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9kcrjn-7ui8",
+  "state": "Succeeded",
+  "result": "PR8 code: local/.gitignore *, Intent state open/closed with reason (absent=open), close refuses while Running, reopen bumps revision, closed refuses dispatch, intent list/use/close/reopen, --intent and --all, resolution flag>stored>only open, NoActiveIntent otherwise, SessionStart names open Intents and marks in-use, skills and README; 34 tests fail on base; gates pass (1190); bundle rebuilt. Choices: open count excludes Ready; assignment list fails with several open and none chosen; handoff skill stale.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

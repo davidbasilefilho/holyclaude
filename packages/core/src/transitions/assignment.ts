@@ -8,6 +8,7 @@ import {
   findAssignment,
   findIntent,
   invalidTransition,
+  requireOpen,
   type Change,
   type State,
 } from "../model/state.ts"
@@ -21,7 +22,7 @@ export type FollowUpInput = typeof FollowUpInput.Type
 /** Creates a Ready Assignment after checking ownership paths and references. */
 export const createAssignment = (state: State, draft: AssignmentDraft) =>
   Effect.gen(function* () {
-    yield* findIntent(state, draft.intent_id)
+    yield* requireOpen(yield* findIntent(state, draft.intent_id))
     const ownership_paths = yield* normalizePaths(draft.metadata.ownership_paths)
     if (draft.mutability !== "ReadOnly" && ownership_paths.length === 0)
       return yield* new InvalidRecord({

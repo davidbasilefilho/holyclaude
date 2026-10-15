@@ -1,0 +1,59 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR5 third repair (worktree pr5): move the size-cap decision out of this PR (it lands with the size-cap change) and apply the final wording fixes.",
+  "scope": [
+    "docs/DECISIONS.md",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and writing bar.",
+    "Docs only."
+  ],
+  "acceptance_criteria": [
+    "DECISIONS.md no longer has the size-cap entry (the 'No limits on content' section) or links to it; README's State and Limits stay as they describe today's code.",
+    "README T3 Code section: the agent-setting observation names plain local claude sessions, not T3 Code, and the fallback sentence is conditional.",
+    "README: the stop-hook bullet reads 'Observed in two cloud sessions: ...'; the managed-only note (deniedModels, availableModelsMatch read only from managed settings, in any session) sits in the Settings section, with the table row pointing there.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9gkf9r-rd4p",
+      "assignment-0mv9gp7u6-dtlm"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gvmzg-w5vt",
+  "state": "Succeeded",
+  "result": "PR5 third repair: size-cap entry removed from DECISIONS.md (3954->2388 bytes); T3 Code observation scoped to plain local claude sessions with conditional fallback; stop-hook bullet reads Observed in two cloud sessions; managed-only note moved above the Settings table with the row pointing to it; gates pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gvmzg-w5vt.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR5 docs accepted after five review rounds; final state checked by narrow reviews and root.",
+    "criteria_evidence": {
+      "DECISIONS.md no longer has the size-cap entry (the 'No limits on content' section) or links to it; README's State and Limits stay as they describe today's code.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "README T3 Code section: the agent-setting observation names plain local claude sessions, not T3 Code, and the fallback sentence is conditional.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "README: the stop-hook bullet reads 'Observed in two cloud sessions: ...'; the managed-only note (deniedModels, availableModelsMatch read only from managed settings, in any session) sits in the Settings section, with the table row pointing there.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Format, lint, typecheck and test pass.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    },
+    "required_evidence": {
+      "checks-run": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "changed-paths": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "diff-file": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

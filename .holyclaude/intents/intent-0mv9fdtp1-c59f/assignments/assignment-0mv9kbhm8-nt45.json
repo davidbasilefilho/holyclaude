@@ -1,0 +1,36 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.mechanical",
+  "objective": "PR6 fix (worktree pr6): add existsSync from node:fs to the architecture guard's test-file allowlist with its reason.",
+  "scope": [
+    "scripts/architecture.test.ts test allowlist"
+  ],
+  "constraints": [
+    "Add one allowlist entry with a reason; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "scripts/architecture.test.ts passes on the merged tree; the entry carries a reason (a synchronous existence check in test assertions; Bun.file().exists() is async).",
+    "Format, lint, typecheck and full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "scripts/architecture.test.ts"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9kbhm8-nt45",
+  "state": "Succeeded",
+  "result": "existsSync added to the node:fs test allowlist with its reason; architecture test 7 pass; full suite 1143 pass; fmt, lint, check clean.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

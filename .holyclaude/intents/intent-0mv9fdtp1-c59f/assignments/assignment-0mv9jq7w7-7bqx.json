@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR5 fourth repair (worktree pr5): fix the README line about which commands use the latest Intent and a T3 wording.",
+  "scope": [
+    "README.md lines 29 and 93"
+  ],
+  "constraints": [
+    "Change only these lines."
+  ],
+  "acceptance_criteria": [
+    "Line 29 says the session summary and intent show use the latest Intent while assignment list and reconcile order rows across all Intents.",
+    "Line 93 reads unambiguously: observed in plain local claude sessions; unverified in T3 Code.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jq7w7-7bqx",
+  "state": "Succeeded",
+  "result": "PR5 fourth repair: L29 latest Intent used by session summary, intent show and intent update without id; list and reconcile span all Intents (verified against code); L93 observed in plain local claude sessions, unverified in T3 Code; gates pass.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR5 docs accepted after five review rounds; final state checked by narrow reviews and root.",
+    "criteria_evidence": {
+      "Line 29 says the session summary and intent show use the latest Intent while assignment list and reconcile order rows across all Intents.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Line 93 reads unambiguously: observed in plain local claude sessions; unverified in T3 Code.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Format, lint, typecheck and test pass.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    },
+    "required_evidence": {
+      "checks-run": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "diff-file": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

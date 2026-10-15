@@ -7231,9 +7231,6 @@ var package_default = {
 class Usage extends TaggedError2("Usage") {
 }
 
-class NoIntent extends TaggedError2("NoIntent") {
-}
-
 class NotBound extends TaggedError2("NotBound") {
   get message() {
     return `Assignment ${this.id} has no bound agent`;
@@ -7320,6 +7317,24 @@ class InvalidPath extends TaggedError2("InvalidPath") {
 class StaleRevision extends TaggedError2("StaleRevision") {
   get message() {
     return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
+  }
+}
+
+class IntentClosed extends TaggedError2("IntentClosed") {
+  get message() {
+    return `Intent ${this.intent_id} is closed; \`holyclaude intent reopen --intent ${this.intent_id}\` opens it again`;
+  }
+}
+
+class IntentBusy extends TaggedError2("IntentBusy") {
+  get message() {
+    return `Intent ${this.intent_id} has Running Assignments (${this.running.join(", ")}); settle them before closing it`;
+  }
+}
+
+class NoActiveIntent extends TaggedError2("NoActiveIntent") {
+  get message() {
+    return this.open.length === 0 ? "No Intent is open; create one with `holyclaude intent create`, or reopen one with `holyclaude intent reopen --intent <id>`" : `Several Intents are open and none is in use; run \`holyclaude intent use <id>\` or pass --intent <id>. Open Intents: ${this.open.map((intent) => `${intent.id} (${intent.objective.replace(/\s+/g, " ")})`).join("; ")}`;
   }
 }
 
@@ -7484,6 +7499,13 @@ var IGNORE_RULES = [
 ].join(`
 `) + `
 `;
+var LOCAL_IGNORE_RULES = `*
+`;
+var LOCAL_IGNORE_READ_BYTES = 16;
+var ensureLocalDirectory = (directory) => {
+  const path = localFile(directory, ".gitignore");
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, LOCAL_IGNORE_READ_BYTES)), catchTag2("TooLarge", () => succeed5(undefined)), flatMap2((current) => current === LOCAL_IGNORE_RULES ? void_3 : io(path, () => Bun.write(path, LOCAL_IGNORE_RULES))), asVoid2);
+};
 var LEGACY_IGNORE_RULES = `*
 `;
 var keepLocalFilesOutOfVersionControl = (directory) => {
@@ -7491,9 +7513,8 @@ var keepLocalFilesOutOfVersionControl = (directory) => {
   return refuseSymlinks(directory, path).pipe(andThen2(readText(path, MAX_GITIGNORE_BYTES)), map4((current) => current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(path, rules))), asVoid2);
 };
 // ../core/src/lock.ts
-import { mkdir, open, rm, stat } from "fs/promises";
+import { open, rm, stat } from "fs/promises";
 import { hostname } from "os";
-import { dirname } from "path";
 
 // ../core/src/model/primitives.ts
 var Text = String4.check(isPattern2(/\S/));
@@ -7559,7 +7580,7 @@ var acquireLock = (directory, lockFile) => {
 };
 var withStateLock = (directory, use) => {
   const file = lockFile(directory);
-  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(io(directory, () => mkdir(dirname(file), { recursive: true }))), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
+  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(ensureLocalDirectory(directory)), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
 };
 // ../core/src/files.ts
 import { rename } from "fs/promises";
@@ -7707,12 +7728,16 @@ var Worker = Struct({
 var WorkersFile = Struct({ workers: ArraySchema(Worker) });
 var AgentsFile = Record(AssignmentId, Id);
 var CloneFile = Struct({ clone_id: CloneId });
+var ActiveIntentFile = Struct({ intent_id: IntentId });
 var workersPath = (directory) => localFile(directory, "workers.json");
 var agentsPath = (directory) => localFile(directory, "agents.json");
 var clonePath = (directory) => localFile(directory, "clone.json");
+var activeIntentPath = (directory) => localFile(directory, "active-intent.json");
 var readLocal = (schema, directory, path, limit) => refuseSymlinks(directory, path).pipe(andThen2(readJson(schema, path, limit)));
 var readWorkers = (directory, limit) => readLocal(WorkersFile, directory, workersPath(directory), limit).pipe(map4((file) => file?.workers ?? []));
 var readAgents = (directory, limit) => readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(map4((file) => file ?? {}));
+var readActiveIntent = (directory, limit) => readLocal(ActiveIntentFile, directory, activeIntentPath(directory), limit).pipe(map4((file) => file?.intent_id));
+var writeActiveIntent = (directory, intentId, lock) => encodeJson(ActiveIntentFile, { intent_id: intentId }).pipe(flatMap2((content) => commitFile(activeIntentPath(directory), content, lock)));
 var readCloneId = (directory) => readLocal(CloneFile, directory, clonePath(directory)).pipe(map4((file) => file?.clone_id));
 var ensureCloneId = (directory, lock) => gen2(function* () {
   const existing = yield* readCloneId(directory);
@@ -7842,14 +7867,22 @@ var Assignment = Struct({
   acceptance: NullOr(AcceptanceRecord),
   clone_id: optionalKey2(CloneId)
 });
+var isOpenAssignment = (assignment) => assignment.state === "Ready" || assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null;
 var isTerminal = (assignment) => assignment.state === "Succeeded" || assignment.state === "Failed" || assignment.state === "Cancelled";
 
 // ../core/src/model/intent.ts
+var IntentState = Literals(["open", "closed"]);
 var Intent = Struct({
   id: IntentId,
   objective: Text,
   requirements: String4,
-  revision: StoredRevision
+  revision: StoredRevision,
+  state: optionalKey2(toEncoded2(IntentState)).pipe(decodeTo2(IntentState, {
+    decode: withDefault(succeed5("open")),
+    encode: transformOptional(filter((state) => state !== "open"))
+  })),
+  close_reason: optionalKey2(Text),
+  closed_at: optionalKey2(String4)
 });
 
 // ../core/src/model/state.ts
@@ -7873,7 +7906,23 @@ var refuseOtherClone = (state, id, cloneId) => {
 };
 var invalidTransition = (assignment, action) => fail5(new InvalidTransition({ id: assignment.id, state: assignment.state, action }));
 var requireLiveRevision = (intent, given) => intent.revision < 1 ? fail5(new NoRevision({ intent_id: intent.id })) : given === intent.revision ? void_3 : fail5(new StaleRevision({ given, live: intent.revision }));
-var latestIntent = (state) => sortedById(state.intents).at(-1);
+var requireOpen = (intent) => intent.state === "open" ? void_3 : fail5(new IntentClosed({ intent_id: intent.id }));
+var openIntents = (state) => sortedById(state.intents).filter((intent) => intent.state === "open");
+var intentInUse = (state, stored) => {
+  const open = openIntents(state);
+  const chosen = open.find((intent) => intent.id === stored);
+  return chosen ?? (open.length === 1 ? open[0] : undefined);
+};
+var resolveIntent = (state, flag, stored) => gen2(function* () {
+  if (flag !== undefined)
+    return yield* findIntent(state, flag);
+  const inUse = intentInUse(state, stored);
+  if (inUse !== undefined)
+    return inUse;
+  return yield* new NoActiveIntent({
+    open: openIntents(state).map(({ id, objective }) => ({ id, objective }))
+  });
+});
 var withAssignment = (state, next) => ({
   ...state,
   assignments: state.assignments.map((assignment) => assignment.id === next.id ? next : assignment)
@@ -8063,7 +8112,10 @@ var updateState = (directory, transition) => withStateLock(directory, (lock) => 
   yield* migrateLegacy(directory, lock);
   const before = yield* loadRecordState(directory);
   const cloneId = ensureCloneId(directory, lock);
-  const { state, value } = yield* transition(before, { cloneId });
+  const { state, value } = yield* transition(before, {
+    cloneId,
+    useIntent: (intentId) => writeActiveIntent(directory, intentId, lock)
+  });
   if (state !== before)
     yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock);
   return value;
@@ -8073,7 +8125,7 @@ var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
 var FollowUpInput = Struct({ predecessor_id: Id, assignment: AssignmentDraft });
 var createAssignment = (state, draft) => gen2(function* () {
-  yield* findIntent(state, draft.intent_id);
+  yield* requireOpen(yield* findIntent(state, draft.intent_id));
   const ownership_paths = yield* normalizePaths(draft.metadata.ownership_paths);
   if (draft.mutability !== "ReadOnly" && ownership_paths.length === 0)
     return yield* new InvalidRecord({
@@ -8247,6 +8299,7 @@ var reserve = (state, input, context) => gen2(function* () {
   if (assignment.state !== "Ready")
     return yield* invalidTransition(assignment, "reserve");
   const intent = yield* findIntent(state, assignment.intent_id);
+  yield* requireOpen(intent);
   yield* requireLiveRevision(intent, assignment.intent_revision);
   const refuse = (reason, detail) => new DispatchRefused({ id: assignment.id, reason, detail });
   const route = routeFor(assignment.role);
@@ -8306,8 +8359,13 @@ var UpdateIntentInput = Struct({
   requirements: optionalKey2(String4),
   material: Boolean3
 });
+var CloseIntentInput = Struct({ id: Id, reason: Text, at: Text });
+var replaceIntent = (state, next) => ({
+  state: { ...state, intents: state.intents.map((it) => it.id === next.id ? next : it) },
+  value: next
+});
 var createIntent = (state, input) => gen2(function* () {
-  const intent = { id: yield* newId("intent"), ...input, revision: 1 };
+  const intent = { id: yield* newId("intent"), ...input, revision: 1, state: "open" };
   return { state: { ...state, intents: [...state.intents, intent] }, value: intent };
 });
 var updateIntent = (state, input) => gen2(function* () {
@@ -8318,10 +8376,27 @@ var updateIntent = (state, input) => gen2(function* () {
     requirements: input.requirements ?? current.requirements,
     revision: input.material ? current.revision + 1 : current.revision
   };
-  return {
-    state: { ...state, intents: state.intents.map((it) => it.id === next.id ? next : it) },
-    value: next
-  };
+  return replaceIntent(state, next);
+});
+var closeIntent = (state, input) => gen2(function* () {
+  const current = yield* findIntent(state, input.id);
+  if (current.state === "closed")
+    return yield* new InvalidRecord({ message: `Intent ${current.id} is already closed` });
+  const running = state.assignments.filter((row) => row.intent_id === current.id && row.state === "Running").map((row) => row.id);
+  if (running.length > 0)
+    return yield* new IntentBusy({ intent_id: current.id, running });
+  return replaceIntent(state, {
+    ...current,
+    state: "closed",
+    close_reason: input.reason,
+    closed_at: input.at
+  });
+});
+var reopenIntent = (state, id) => gen2(function* () {
+  const { close_reason: _reason, closed_at: _at, ...current } = yield* findIntent(state, id);
+  if (current.state === "open")
+    return yield* new InvalidRecord({ message: `Intent ${current.id} is already open` });
+  return replaceIntent(state, { ...current, state: "open", revision: current.revision + 1 });
 });
 // src/clock.ts
 var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
@@ -8408,8 +8483,7 @@ var subagentTranscript = (input) => {
 };
 
 // src/observations.ts
-import { appendFile, mkdir as mkdir2 } from "fs/promises";
-import { dirname as dirname2 } from "path";
+import { appendFile } from "fs/promises";
 var Text2 = String4.check(isPattern2(/\S/));
 var Observed = Struct({
   kind: Literal2("observed"),
@@ -8452,10 +8526,7 @@ var readObservations = (directory = stateDirPath()) => gen2(function* () {
 });
 var appendObservation = (record, directory = stateDirPath()) => {
   const path = observationsPath(directory);
-  return refuseSymlinks(directory, path).pipe(andThen2(tryPromise2({
-    try: () => mkdir2(dirname2(path), { recursive: true }),
-    catch: (cause) => new StateIo({ path, cause })
-  })), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
+  return refuseSymlinks(directory, path).pipe(andThen2(ensureLocalDirectory(directory)), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
     try: () => appendFile(path, `${JSON.stringify(record)}
 `),
     catch: (cause) => new StateIo({ path, cause })
@@ -10912,7 +10983,7 @@ var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
 var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
-var pointer = (cli) => `Full state: ${cli} intent show; ${cli} assignment list`;
+var pointer = (cli) => `Full state: ${cli} intent list; ${cli} assignment list --all`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
 var WHOLE = Number.POSITIVE_INFINITY;
@@ -10935,24 +11006,25 @@ var row = (assignment, textLimit) => ({
   rev: assignment.intent_revision,
   objective: clip(assignment.objective.replace(/\s+/g, " "), textLimit)
 });
-var open2 = (state) => sortedById(state.assignments).filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
-var summaryOf = (state) => {
+var open2 = (state) => sortedById(state.assignments).filter(isOpenAssignment);
+var summaryOf = (state, chosen) => {
   const rows = open2(state);
+  const intents = openIntents(state);
+  const inUse = intentInUse(state, chosen);
+  const openCounts = Map.groupBy(rows, (assignment) => assignment.intent_id);
   return {
     rows: rows.length,
-    render: (limit, textLimit) => {
-      const intent = latestIntent(state);
-      return toon({
-        intent: intent === undefined ? null : {
-          id: intent.id,
-          revision: intent.revision,
-          objective: clip(intent.objective, textLimit),
-          requirements: clip(intent.requirements, textLimit)
-        },
-        assignments: rows.slice(0, limit).map((assignment) => row(assignment, textLimit)),
-        ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
-      }).trimEnd();
-    }
+    render: (limit, textLimit) => toon({
+      intents: intents.map((intent) => ({
+        id: intent.id,
+        revision: intent.revision,
+        objective: clip(intent.objective, textLimit),
+        open_assignments: openCounts.get(intent.id)?.length ?? 0
+      })),
+      in_use: inUse === undefined ? null : { id: inUse.id, requirements: clip(inUse.requirements, textLimit) },
+      assignments: rows.slice(0, limit).map((assignment) => row(assignment, textLimit)),
+      ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
+    }).trimEnd()
   };
 };
 var brokenSummary = (message) => ({
@@ -11013,7 +11085,9 @@ var sessionStart = (stdin, { load = loadState, budget = STATE_LOAD_BUDGET } = {}
   }));
   const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "");
   const rules = runsAsMainAgent ? undefined : extractRules(yield* tryPromise2(() => file.text()), root);
-  const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(map4(summaryOf), timeoutOption2(budget), map4(getOrElse(() => brokenSummary("the state did not load within the time the hook allows it"))), catch_2((error) => succeed5(brokenSummary(error.message))));
+  const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(flatMap2((state) => readActiveIntent(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(orElseSucceed2(() => {
+    return;
+  }), map4((id) => summaryOf(state, id)))), timeoutOption2(budget), map4(getOrElse(() => brokenSummary("the state did not load within the time the hook allows it"))), catch_2((error) => succeed5(brokenSummary(error.message))));
   const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
@@ -11124,6 +11198,13 @@ var summaryRow = (assignment) => ({
   accepted: assignment.acceptance !== null,
   objective: assignment.objective.replace(/\s+/g, " ")
 });
+var intentRow = (intent, state) => ({
+  id: intent.id,
+  state: intent.state,
+  revision: intent.revision,
+  objective: intent.objective.replace(/\s+/g, " "),
+  open_assignments: state.assignments.filter((assignment) => assignment.intent_id === intent.id && isOpenAssignment(assignment)).length
+});
 var dispatchInfo = (assignment) => {
   const route = routeFor(assignment.role);
   return {
@@ -11136,12 +11217,16 @@ var dispatchInfo = (assignment) => {
     rev: assignment.intent_revision
   };
 };
-var activeIntent = (state, id) => gen2(function* () {
-  if (id !== undefined)
-    return yield* findIntent(state, id);
-  const latest = latestIntent(state);
-  return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }));
+var storedIntent = suspend2(() => readActiveIntent(stateDirPath())).pipe(orElseSucceed2(() => {
+  return;
+}));
+var activeIntent = (state, id) => (id === undefined ? storedIntent : succeed5(undefined)).pipe(flatMap2((stored) => resolveIntent(state, id, stored)));
+var agreedIntent = (usage, source, named, flag) => gen2(function* () {
+  if (named !== undefined && flag !== undefined && named !== flag)
+    return yield* usageError(usage, `${source} ${named} and --intent ${flag} name different Intents`);
+  return named ?? flag;
 });
+var INTENT_FLAG = { intent: "string" };
 var read = (use) => loadStateFile.pipe(flatMap2(use));
 var change = (transition) => suspend2(() => updateState(stateDirPath(), transition));
 var changeOwn = (id, transition) => change((state, { cloneId }) => cloneId.pipe(flatMap2((own) => refuseOtherClone(state, id, own)), andThen2(transition(state))));
@@ -11175,39 +11260,115 @@ var optionalChoice = (schema, value) => gen2(function* () {
 });
 var withRef = (id) => decodeStrict(AssignmentRef)({ assignment_id: id });
 var cmd = (command) => command;
+var SHOW_USAGE = "intent show [id | --intent <id>]";
 var intentShow = cmd({
   path: ["intent", "show"],
-  usage: "intent show [id]",
-  summary: "show the active Intent (latest, or by id)",
+  usage: SHOW_USAGE,
+  summary: "show the Intent in use, or the one named",
   root: false,
-  flags: {},
+  flags: INTENT_FLAG,
   positionals: 1,
   optional: true,
-  run: (args) => read((state) => activeIntent(state, args.positionals[0])).pipe(map4((intent) => ({ value: intent })))
+  run: (args) => agreedIntent(SHOW_USAGE, "Argument", args.positionals[0], stringFlag(args, "intent")).pipe(flatMap2((id) => read((state) => activeIntent(state, id))), map4((intent) => ({ value: intent })))
+});
+var INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")}]`;
+var intentList = cmd({
+  path: ["intent", "list"],
+  usage: INTENT_LIST_USAGE,
+  summary: "list Intents with state, revision, objective and open Assignments",
+  root: false,
+  flags: { state: "string" },
+  positionals: 0,
+  run: (args) => gen2(function* () {
+    const value = stringFlag(args, "state");
+    const wanted = yield* optionalChoice(IntentState, value).pipe(mapError2(() => usageError(INTENT_LIST_USAGE, `State ${value} is not one of ${IntentState.literals.join("|")}`)));
+    return yield* read((state) => succeed5({
+      value: {
+        intents: sortedById(state.intents).filter((intent) => wanted === undefined || intent.state === wanted).map((intent) => intentRow(intent, state))
+      }
+    }));
+  })
+});
+var intentUse = cmd({
+  path: ["intent", "use"],
+  usage: "intent use <id>",
+  summary: "work on this Intent in this clone; the choice stays local",
+  root: true,
+  flags: {},
+  positionals: 1,
+  run: (args) => change((state, { useIntent }) => gen2(function* () {
+    const intent = yield* findIntent(state, args.positionals[0] ?? "");
+    yield* requireOpen(intent);
+    yield* useIntent(intent.id);
+    return { state, value: intentRow(intent, state) };
+  })).pipe(map4((row) => ({ value: row })))
+});
+var CLOSE_USAGE = "intent close [--intent <id>] --reason <text>";
+var intentClose = cmd({
+  path: ["intent", "close"],
+  usage: CLOSE_USAGE,
+  summary: "close the Intent with a reason; refused while its Assignments run",
+  root: true,
+  flags: { ...INTENT_FLAG, reason: "string" },
+  positionals: 0,
+  run: (args) => gen2(function* () {
+    const reason = yield* flagValue(args, "reason", CLOSE_USAGE);
+    const at = yield* nowIso;
+    const intent = yield* change((state) => activeIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => decodeStrict(CloseIntentInput)({ id: target.id, reason, at })), flatMap2((input) => closeIntent(state, input))));
+    return { value: intent };
+  })
+});
+var REOPEN_USAGE = "intent reopen [--intent <id>]";
+var closedIntent = (state, id) => gen2(function* () {
+  if (id !== undefined)
+    return yield* findIntent(state, id);
+  const closed = sortedById(state.intents).filter((intent) => intent.state === "closed");
+  const [only] = closed;
+  if (closed.length === 1 && only !== undefined)
+    return only;
+  return yield* usageError(REOPEN_USAGE, closed.length === 0 ? "No Intent is closed" : `Several Intents are closed; pass --intent <id>. Closed Intents: ${closed.map((intent) => intent.id).join(", ")}`);
+});
+var intentReopen = cmd({
+  path: ["intent", "reopen"],
+  usage: REOPEN_USAGE,
+  summary: "open a closed Intent again (the only closed one, else --intent); the revision bumps",
+  root: true,
+  flags: INTENT_FLAG,
+  positionals: 0,
+  run: (args) => change((state) => closedIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => reopenIntent(state, target.id)))).pipe(map4((intent) => ({ value: intent })))
 });
 var intentCreate = cmd({
   path: ["intent", "create"],
   usage: "intent create",
-  summary: "record a new Intent at revision 1",
+  summary: "record a new Intent at revision 1 and put it in use; prints the Intent it replaced",
   input: '{"objective":"...","requirements":"..."?}',
   root: true,
   flags: {},
   positionals: 0,
-  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state) => createIntent(state, input))), map4((intent) => ({ value: intent })))
+  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state, { useIntent }) => gen2(function* () {
+    const replaced = intentInUse(state, yield* storedIntent);
+    const created = yield* createIntent(state, input);
+    yield* useIntent(created.value.id);
+    return {
+      state: created.state,
+      value: { ...created.value, in_use: created.value.id, replaced: replaced?.id ?? null }
+    };
+  }))), map4((intent) => ({ value: intent })))
 });
+var UPDATE_USAGE = "intent update [--intent <id>] [--material]";
 var intentUpdate = cmd({
   path: ["intent", "update"],
-  usage: "intent update [--material]",
+  usage: UPDATE_USAGE,
   summary: "edit the Intent; --material bumps the revision",
   input: '{"id":"..."?,"objective":"..."?,"requirements":"..."?}',
   root: true,
-  flags: { material: "boolean" },
+  flags: { ...INTENT_FLAG, material: "boolean" },
   positionals: 0,
-  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => change((state) => activeIntent(state, body.id).pipe(flatMap2((intent) => updateIntent(state, {
+  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => agreedIntent(UPDATE_USAGE, "JSON id", body.id, stringFlag(args, "intent")).pipe(flatMap2((id) => change((state) => activeIntent(state, id).pipe(flatMap2((intent) => updateIntent(state, {
     ...body,
     id: intent.id,
     material: booleanFlag(args, "material")
-  }))))), map4((intent) => ({ value: intent })))
+  }))))))), map4((intent) => ({ value: intent })))
 });
 var assignmentShow = cmd({
   path: ["assignment", "show"],
@@ -11218,7 +11379,7 @@ var assignmentShow = cmd({
   positionals: 1,
   run: (args) => withRef(args.positionals[0]).pipe(flatMap2((ref) => read((state) => findAssignment(state, ref.assignment_id))), map4((assignment) => ({ value: assignment })))
 });
-var LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}]`;
+var LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}] [--intent <id> | --all]`;
 var stateFilter = (value) => gen2(function* () {
   if (value === undefined)
     return;
@@ -11227,14 +11388,21 @@ var stateFilter = (value) => gen2(function* () {
 var assignmentList = cmd({
   path: ["assignment", "list"],
   usage: LIST_USAGE,
-  summary: "list Assignments, one row each",
+  summary: "list the Assignments of the Intent in use (--intent: another, --all: every one)",
   root: false,
-  flags: { state: "string" },
+  flags: { ...INTENT_FLAG, state: "string", all: "boolean" },
   positionals: 0,
-  run: (args) => stateFilter(stringFlag(args, "state")).pipe(flatMap2((wanted) => read((state) => {
-    const rows = sortedById(state.assignments).filter((assignment) => wanted === undefined || assignment.state === wanted).map(summaryRow);
-    return succeed5({ value: { assignments: rows } });
-  })))
+  run: (args) => gen2(function* () {
+    const wanted = yield* stateFilter(stringFlag(args, "state"));
+    const everything = booleanFlag(args, "all");
+    if (everything && stringFlag(args, "intent") !== undefined)
+      return yield* usageError(LIST_USAGE, "Pick one of --intent <id> or --all");
+    return yield* read((state) => gen2(function* () {
+      const scope = everything ? undefined : (yield* activeIntent(state, stringFlag(args, "intent"))).id;
+      const rows = sortedById(state.assignments).filter((assignment) => scope === undefined || assignment.intent_id === scope).filter((assignment) => wanted === undefined || assignment.state === wanted).map((assignment) => everything ? { intent: assignment.intent_id, ...summaryRow(assignment) } : summaryRow(assignment));
+      return { value: { assignments: rows } };
+    }));
+  })
 });
 var assignmentCreate = cmd({
   path: ["assignment", "create"],
@@ -11546,6 +11714,10 @@ var hookPostToolUse = cmd({
 });
 var COMMANDS = [
   intentShow,
+  intentList,
+  intentUse,
+  intentClose,
+  intentReopen,
   intentCreate,
   intentUpdate,
   assignmentShow,
@@ -11591,7 +11763,9 @@ var HINTS = {
   OwnedElsewhere: "Another clone reserved this Assignment. Settle it from there, or with `holyclaude reconcile resolve <id>` once you have evidence about its worker.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError: "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
-  NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
+  NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>. With none open, run `holyclaude intent create` or `holyclaude intent reopen --intent <id>`.",
+  IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
+  IntentBusy: "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>."
 };

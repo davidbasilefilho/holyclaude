@@ -35,6 +35,38 @@ export class StaleRevision extends Data.TaggedError("StaleRevision")<{
   }
 }
 
+/** The Intent is closed, so it authorizes no dispatch and cannot be the one in use. */
+export class IntentClosed extends Data.TaggedError("IntentClosed")<{
+  readonly intent_id: string
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} is closed; \`holyclaude intent reopen --intent ${this.intent_id}\` opens it again`
+  }
+}
+
+/** The Intent cannot close while Assignments of it are Running. */
+export class IntentBusy extends Data.TaggedError("IntentBusy")<{
+  readonly intent_id: string
+  readonly running: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} has Running Assignments (${this.running.join(", ")}); settle them before closing it`
+  }
+}
+
+/** No Intent was named, none is in use, and the open ones are not exactly one. */
+export class NoActiveIntent extends Data.TaggedError("NoActiveIntent")<{
+  readonly open: ReadonlyArray<{ readonly id: string; readonly objective: string }>
+}> {
+  override get message() {
+    return this.open.length === 0
+      ? "No Intent is open; create one with `holyclaude intent create`, or reopen one with `holyclaude intent reopen --intent <id>`"
+      : `Several Intents are open and none is in use; run \`holyclaude intent use <id>\` or pass --intent <id>. Open Intents: ${this.open
+          .map((intent) => `${intent.id} (${intent.objective.replace(/\s+/g, " ")})`)
+          .join("; ")}`
+  }
+}
+
 /** An Intent has no valid revision (it reads as 0), so nothing can be dispatched or accepted. */
 export class NoRevision extends Data.TaggedError("NoRevision")<{
   readonly intent_id: string

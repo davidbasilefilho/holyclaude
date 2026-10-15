@@ -1,8 +1,11 @@
 import { join } from "node:path"
 
 import {
-  latestIntent,
+  intentInUse,
+  isOpenAssignment,
   loadState,
+  openIntents,
+  readActiveIntent,
   sortedById,
   stateDirPath,
   type Assignment,
@@ -27,7 +30,7 @@ const RULES_START = "<!-- holyclaude:core-rules:start -->"
 const RULES_END = "<!-- holyclaude:core-rules:end -->"
 const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 /** The one-line pointer to the CLI, which `cli` names as the root should run it. */
-const pointer = (cli: string) => `Full state: ${cli} intent show; ${cli} assignment list`
+const pointer = (cli: string) => `Full state: ${cli} intent list; ${cli} assignment list --all`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
 
 /** The text limit of a summary that is shown whole. */
@@ -81,13 +84,8 @@ const row = (assignment: Assignment, textLimit: number) => ({
   objective: clip(assignment.objective.replace(/\s+/g, " "), textLimit),
 })
 
-/** Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
-const open = (state: State) =>
-  sortedById(state.assignments).filter(
-    (assignment) =>
-      assignment.state === "Running" ||
-      (assignment.state === "Succeeded" && assignment.acceptance === null),
-  )
+/** Ready, Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
+const open = (state: State) => sortedById(state.assignments).filter(isOpenAssignment)
 
 /** A state summary that is whole until the budget asks for fewer rows and shorter text. */
 interface Summary {
@@ -95,26 +93,33 @@ interface Summary {
   readonly render: (rows: number, textLimit: number) => string
 }
 
-const summaryOf = (state: State): Summary => {
+/**
+ * The summary of a state: every open Intent with its open Assignments counted, the requirements of
+ * the one in use (the clone's stored choice while it is open, else the only open Intent), and the
+ * Assignments that need attention.
+ */
+const summaryOf = (state: State, chosen: string | undefined): Summary => {
   const rows = open(state)
+  const intents = openIntents(state)
+  const inUse = intentInUse(state, chosen)
+  const openCounts = Map.groupBy(rows, (assignment) => assignment.intent_id)
   return {
     rows: rows.length,
-    render: (limit, textLimit) => {
-      const intent = latestIntent(state)
-      return toon({
-        intent:
-          intent === undefined
+    render: (limit, textLimit) =>
+      toon({
+        intents: intents.map((intent) => ({
+          id: intent.id,
+          revision: intent.revision,
+          objective: clip(intent.objective, textLimit),
+          open_assignments: openCounts.get(intent.id)?.length ?? 0,
+        })),
+        in_use:
+          inUse === undefined
             ? null
-            : {
-                id: intent.id,
-                revision: intent.revision,
-                objective: clip(intent.objective, textLimit),
-                requirements: clip(intent.requirements, textLimit),
-              },
+            : { id: inUse.id, requirements: clip(inUse.requirements, textLimit) },
         assignments: rows.slice(0, limit).map((assignment) => row(assignment, textLimit)),
         ...(rows.length > limit ? { more_assignments: rows.length - limit } : {}),
-      }).trimEnd()
-    },
+      }).trimEnd(),
   }
 }
 
@@ -159,12 +164,16 @@ const composeContext = (rules: string | undefined, summary: Summary, cli: string
   return `${body.join("\n\n")}${tail}`.trimStart()
 }
 
-/** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */
+/**
+ * Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. `chosen`
+ * is the id this clone stored with `intent use`.
+ */
 export const composeForState = (
   rules: string | undefined,
   state: State,
   cli = "holyclaude",
-): string => composeContext(rules, summaryOf(state), cli)
+  chosen?: string,
+): string => composeContext(rules, summaryOf(state, chosen), cli)
 
 /**
  * Pulls the text between the core-rules markers out of the root agent file. Claude Code substitutes
@@ -201,7 +210,13 @@ export const sessionStart = (
       ? undefined
       : extractRules(yield* Effect.tryPromise(() => file.text()), root)
     const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(
-      Effect.map(summaryOf),
+      Effect.flatMap((state) =>
+        // An unreadable choice leaves nothing in use; it never hides the state.
+        readActiveIntent(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(
+          Effect.orElseSucceed(() => undefined),
+          Effect.map((id) => summaryOf(state, id)),
+        ),
+      ),
       Effect.timeoutOption(budget),
       Effect.map(
         Option.getOrElse(() =>

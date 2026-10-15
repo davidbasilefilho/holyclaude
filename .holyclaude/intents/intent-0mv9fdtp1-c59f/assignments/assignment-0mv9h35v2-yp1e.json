@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow review of PR5's third repair: confirm its four items and that the docs now make no claim about code outside this tree.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gvmzg-w5vt.diff",
+    "Worktree pr5 README.md and docs/DECISIONS.md"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only the listed items and factual accuracy against code in this worktree; wording preferences elsewhere are optional at most."
+  ],
+  "acceptance_criteria": [
+    "DECISIONS.md has no size-cap entry and no text describes cap removals or the rules-whole order as done; README State and Limits match the code in this tree.",
+    "The T3 Code observation names plain local claude sessions and the fallback is conditional; the stop-hook bullet reads as observed in two cloud sessions; the managed-only note sits in the Settings section with the table row pointing to it.",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9g2wfu-rkz8",
+      "assignment-0mv9gamg7-hyu9",
+      "assignment-0mv9gkf9r-rd4p",
+      "assignment-0mv9gvmzg-w5vt"
+    ]
+  },
+  "id": "assignment-0mv9h35v2-yp1e",
+  "state": "Succeeded",
+  "result": "PR5 narrow review: criteria 2-3 met; B1 README line 29 claims assignment list and reconcile use the latest Intent (they span all Intents); optional O1-O5.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "B1 checked against commands.ts and completion.ts; criteria 2-3 met.",
+    "criteria_evidence": {
+      "DECISIONS.md has no size-cap entry and no text describes cap removals or the rules-whole order as done; README State and Limits match the code in this tree.": "Criteria verdicts with lines; B1 and O1-O5.",
+      "The T3 Code observation names plain local claude sessions and the fallback is conditional; the stop-hook bullet reads as observed in two cloud sessions; the managed-only note sits in the Settings section with the table row pointing to it.": "Criteria verdicts with lines; B1 and O1-O5.",
+      "Blockers separated from optional.": "Criteria verdicts with lines; B1 and O1-O5."
+    },
+    "required_evidence": {
+      "blockers": "Criteria verdicts with lines; B1 and O1-O5.",
+      "optional-findings": "Criteria verdicts with lines; B1 and O1-O5."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

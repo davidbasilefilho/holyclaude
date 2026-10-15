@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 sixth repair (worktree pr3): apply the user's waiver decision and own the CI-watch fallback in the core rules.",
+  "scope": [
+    "plugin/agents/holyclaude.md core-rules block lines 32, 45, 52"
+  ],
+  "constraints": [
+    "Change only these lines; writing bar; block stays under 9,000 characters."
+  ],
+  "acceptance_criteria": [
+    "L32 and L45: a user's explicit waiver of independent review is also their acceptance of the security risk, so a waived security review does not hold VCS writes; the waived review is named Unknown in the report. No other hold wording remains in the block that contradicts it.",
+    "L52: one fallback with one trigger: if Monitor or gh is unavailable, use the host's PR-activity subscription, GitHub tools or mcp__t3-code__watch_pull_request.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jq7rq-qjkt",
+  "state": "Succeeded",
+  "result": "PR3 sixth repair: L32 waiver also accepts the security risk, waived review named Unknown; L45 security review before VCS write unless the user waived independent review; L52 one fallback trigger (Monitor or gh unavailable); block 8,891->8,999; gates pass.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "L32 and L45: a user's explicit waiver of independent review is also their acceptance of the security risk, so a waived security review does not hold VCS writes; the waived review is named Unknown in the report. No other hold wording remains in the block that contradicts it.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "L52: one fallback with one trigger: if Monitor or gh is unavailable, use the host's PR-activity subscription, GitHub tools or mcp__t3-code__watch_pull_request.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

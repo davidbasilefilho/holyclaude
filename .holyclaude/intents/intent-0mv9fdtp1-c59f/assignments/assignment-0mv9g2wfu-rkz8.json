@@ -37,6 +37,20 @@
   "id": "assignment-0mv9g2wfu-rkz8",
   "state": "Succeeded",
   "result": "PR5 writer: README Cloud sessions section (documented vs observed tags), Third-party material names both upstreams and links docs/DECISIONS.md; docs/DECISIONS.md lists standing decisions with reasons and frontend-design provenance. Gates on 1.4.3: oxfmt, oxlint, bun check, bun test 1100 pass. One inferred line flagged by writer. Diff at scratchpad/diffs/assignment-0mv9g2wfu-rkz8.diff.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR5 docs accepted after five review rounds; final state checked by narrow reviews and root.",
+    "criteria_evidence": {
+      "README cloud-sessions section states: user settings (~/.claude/settings.json) are not read in cloud sessions; commit keys to the repository's .claude/settings.json (read only in single-repository sessions) or set variables on the environment; the plugin's agent setting was observed not to make the main thread the holyclaude agent in cloud sessions, so the SessionStart hook's injected core rules are the root's copy there; deniedModels and availableModelsMatch are read only from managed settings, and server-managed settings need Claude for Teams or Enterprise; a stop hook that asks for commits will flag uncommitted .holyclaude/ state, which is meant to be committed with the work.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "docs/DECISIONS.md lists each standing decision with its reason: no word/character/byte limits on content (input-safety bounds on reading external files stay, as the size-cap decision says); compact generated instructions and no plan feature; grill-me only for material choices; .holyclaude state versioned in git; one shared version across packages; no bin/ in the plugin because claude.ai and Cowork refuse plugins with it; the public-repo rule; frontend-design vendored byte-identical, verified 2026-10-15 against anthropics/skills skills/frontend-design at dbd4588f9e1033efb41dad4bef2f7947c8993d44 and anthropics/claude-code plugins/frontend-design/skills/frontend-design at 94506ff0d3bd9185f1752da36e968775021fb48f, with holyclaude-specific adjustments kept in interface-inspection and the visual agents so refreshes stay clean.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "README Third-party material names both upstream sources and points to DECISIONS.md.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "Format, lint, typecheck and test pass.": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    },
+    "required_evidence": {
+      "checks-run": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "changed-paths": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue.",
+      "diff-file": "See final README and DECISIONS.md in commit; reviews 0mv9g5n31, 0mv9gdtpk, 0mv9gp7u6, 0mv9h35v2, 0mv9jt3ue."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

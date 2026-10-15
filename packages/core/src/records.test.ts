@@ -21,6 +21,7 @@ const intent = (id: string, objective = "Share state") => ({
   objective,
   requirements: "One file per record",
   revision: 1,
+  state: "open" as const,
 })
 
 const assignment = (id: string, intentId: string, overrides: Partial<Assignment> = {}) =>
@@ -119,6 +120,20 @@ describe("round trip", () => {
     expect(loaded).toEqual(base)
   })
 
+  test("writes an open Intent without a state and a closed one with it, and both read back", async () => {
+    const closed = {
+      ...base.intents[1]!,
+      state: "closed" as const,
+      close_reason: "shipped",
+      closed_at: "2026-01-02T03:04:05.000Z",
+    }
+    await write({ ...base, intents: [base.intents[0]!, closed] })
+    const [open, shut] = await readTexts([intentPath(INTENT_A), intentPath(INTENT_B)])
+    expect(JSON.parse(open ?? "")).not.toHaveProperty("state")
+    expect(JSON.parse(shut ?? "")).toMatchObject({ state: "closed", close_reason: "shipped" })
+    expect((await load()).intents).toEqual([base.intents[0]!, closed])
+  })
+
   test("keeps the agent id and the workers, which live in local files", async () => {
     const running = assignment(FIRST, INTENT_A, { state: "Running", agent_id: "agent-7" })
     const state: State = {
@@ -176,7 +191,8 @@ describe("record files", () => {
   test("have a stable key order, a two-space indent and a trailing newline", async () => {
     await write(base)
     const text = await readFile(intentPath(INTENT_A), "utf8")
-    expect(text).toBe(`${JSON.stringify(intent(INTENT_A), null, 2)}\n`)
+    const { state: _open, ...stored } = intent(INTENT_A)
+    expect(text).toBe(`${JSON.stringify(stored, null, 2)}\n`)
     expect(text).toContain('\n  "objective"')
     expect(Object.keys(JSON.parse(text))).toEqual(["id", "objective", "requirements", "revision"])
     const record = JSON.parse(await readFile(assignmentPath(INTENT_A, FIRST), "utf8"))

@@ -1,13 +1,12 @@
-import { mkdir, open, rm, stat } from "node:fs/promises"
+import { open, rm, stat } from "node:fs/promises"
 import { hostname } from "node:os"
-import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
 
 import { decodeJsonStrict } from "./codec.ts"
 import { StateIo, StateLocked } from "./errors.ts"
-import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
-import { lockFile } from "./layout.ts"
+import { attempt, attemptTransient, hasCode, readText } from "./io.ts"
+import { ensureLocalDirectory, lockFile } from "./layout.ts"
 import { Text } from "./model/primitives.ts"
 import { refuseSymlinks } from "./safety.ts"
 
@@ -166,7 +165,8 @@ export const acquireLock = (directory: string, lockFile: string) => {
 /**
  * Runs `use` while holding the state lock of the directory, and releases the lock afterwards
  * whatever the outcome. The lock file and its guard are checked for symbolic links before anything
- * is created, and the `local/` folder that holds them is made when it is missing.
+ * is created, and the `local/` folder that holds them is made when it is missing, with its own
+ * `.gitignore`.
  */
 export const withStateLock = <A, E, R>(
   directory: string,
@@ -176,7 +176,7 @@ export const withStateLock = <A, E, R>(
   return Effect.acquireUseRelease(
     refuseSymlinks(directory, `${file}.breaking`).pipe(
       Effect.andThen(refuseSymlinks(directory, file)),
-      Effect.andThen(io(directory, () => mkdir(dirname(file), { recursive: true }))),
+      Effect.andThen(ensureLocalDirectory(directory)),
       Effect.andThen(acquireLock(directory, file)),
     ),
     use,

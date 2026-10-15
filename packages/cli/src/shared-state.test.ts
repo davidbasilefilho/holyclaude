@@ -127,10 +127,16 @@ describe("two branches that each add records", () => {
     expect((await git("merge", "--no-ff", "-m", "merge a", "branch-a")).code).toBe(0)
     expect((await git("merge", "--no-ff", "-m", "merge b", "branch-b")).code).toBe(0)
 
-    // The latest Intent is the greatest id, here the one created last.
+    // Every Intent of both branches is there, in creation order.
     expect(second > first).toBe(true)
     expect(first > base).toBe(true)
-    expect(idOf(await holyclaude(undefined, "intent", "show"))).toBe(second)
+    const listed = await holyclaude(undefined, "intent", "list")
+    expect([...listed.matchAll(/intent-[0-9a-z-]+/g)].map(([id]) => id)).toEqual([
+      base,
+      first,
+      second,
+    ])
+    expect(idOf(await holyclaude(undefined, "intent", "show", "--intent", second))).toBe(second)
   })
 })
 
@@ -169,6 +175,12 @@ describe("local files and version control", () => {
     expect(
       (await git("check-ignore", "-q", `.holyclaude/intents/${intent}/intent.json`)).code,
     ).toBe(1)
+
+    // A repository may replace the folder's .gitignore; local files stay ignored by their own.
+    await Bun.write(join(repo, ".holyclaude/.gitignore"), "# replaced by the repository\n")
+    expect(await Bun.file(join(repo, ".holyclaude/local/.gitignore")).text()).toBe("*\n")
+    for (const file of [...local, ".holyclaude/local/lock", ".holyclaude/local/clone.json"])
+      expect((await git("check-ignore", "-q", file)).code).toBe(0)
 
     for (const file of files)
       expect(await Bun.file(join(repo, file)).text()).not.toMatch(/agent-7c1f9a|roster:abc123/)

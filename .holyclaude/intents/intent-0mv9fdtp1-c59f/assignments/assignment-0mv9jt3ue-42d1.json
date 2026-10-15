@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Check PR5's fourth repair (README lines 29 and 93) against the code.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9jq7w7-7bqx.diff",
+    "Worktree pr5"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only lines 29 and 93."
+  ],
+  "acceptance_criteria": [
+    "Line 29 matches which commands use the latest Intent and which span all Intents in packages/cli/src/commands.ts and packages/core/src/transitions/completion.ts.",
+    "Line 93 is unambiguous and marks the T3 Code case unverified.",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9jq7w7-7bqx",
+      "assignment-0mv9gvmzg-w5vt",
+      "assignment-0mv9gkf9r-rd4p",
+      "assignment-0mv9gamg7-hyu9",
+      "assignment-0mv9g2wfu-rkz8"
+    ]
+  },
+  "id": "assignment-0mv9jt3ue-42d1",
+  "state": "Succeeded",
+  "result": "PR5 line check: line 93 met; B1 line 29 session summary header uses the latest Intent but its rows span all Intents; O1 verbless sentence; O2 vague order.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Verified B1 against session-start.ts rows filter.",
+    "criteria_evidence": {
+      "Line 29 matches which commands use the latest Intent and which span all Intents in packages/cli/src/commands.ts and packages/core/src/transitions/completion.ts.": "Per-criterion verdicts with code lines; B1, O1-O3.",
+      "Line 93 is unambiguous and marks the T3 Code case unverified.": "Per-criterion verdicts with code lines; B1, O1-O3.",
+      "Blockers separated from optional.": "Per-criterion verdicts with code lines; B1, O1-O3."
+    },
+    "required_evidence": {
+      "blockers": "Per-criterion verdicts with code lines; B1, O1-O3.",
+      "optional-findings": "Per-criterion verdicts with code lines; B1, O1-O3."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
