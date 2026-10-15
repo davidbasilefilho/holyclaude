@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Worker.mechanical",
+  "objective": "Fill the LICENSE copyright line with 2026 and David Basile Filho.",
+  "scope": [
+    "Main checkout the main checkout on branch ccr-dd890d7d-vpxecw (= main), LICENSE only."
+  ],
+  "constraints": [
+    "Change only the appendix copyright line; keep the rest of the Apache-2.0 text verbatim; no git writes."
+  ],
+  "acceptance_criteria": [
+    "LICENSE line 190 reads `   Copyright 2026 David Basile Filho` with its original indentation; no other byte changes.",
+    "oxfmt check passes."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "LICENSE"
+    ],
+    "symbols": [],
+    "domains": [
+      "license"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9s8b8u-z7x0",
+  "state": "Succeeded",
+  "result": "LICENSE line 190 now reads Copyright 2026 David Basile Filho; one-line diff; oxfmt check passes.",
+  "acceptance": {
+    "intent_revision": 6,
+    "rationale": "Root verified the one-line LICENSE diff.",
+    "criteria_evidence": {
+      "LICENSE line 190 reads `   Copyright 2026 David Basile Filho` with its original indentation; no other byte changes.": "verified by git diff: single line changed",
+      "oxfmt check passes.": "verified by git diff: single line changed"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt exit 0; diff saved",
+      "diff-file": "oxfmt exit 0; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

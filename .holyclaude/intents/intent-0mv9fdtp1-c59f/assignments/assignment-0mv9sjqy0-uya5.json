@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Librarian.lookup",
+  "objective": "Verify canonical links for the README's thanks section.",
+  "scope": [
+    "Official pages for Claude Code (Anthropic), T3 Code and the T3 team, oh-my-opencode and its author, OpenCode, and holycodex if public."
+  ],
+  "constraints": [
+    "Cite the page each link was confirmed on; mark anything unconfirmed."
+  ],
+  "acceptance_criteria": [
+    "Each project has a confirmed canonical URL and the team or author name as the project itself states it, or is marked unconfirmed."
+  ],
+  "required_evidence": [
+    "links"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9s8bfc-od91"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9sjqy0-uya5",
+  "state": "Succeeded",
+  "result": "Confirmed: anthropics/claude-code and code.claude.com docs (the Claude Code team); pingdotgg/t3code (no team name on repo; t3.codes unreachable); code-yeongyu/oh-my-opencode (author code-yeongyu); anomalyco/opencode (the OpenCode team); davidbasilefilho/holycodex (HolyCodex, a Codex plugin).",
+  "acceptance": {
+    "intent_revision": 6,
+    "rationale": "Links confirmed on repo pages; unconfirmed names flagged and not used.",
+    "criteria_evidence": {
+      "Each project has a confirmed canonical URL and the team or author name as the project itself states it, or is marked unconfirmed.": "per project, confirmed or flagged"
+    },
+    "required_evidence": {
+      "links": "links with sources"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

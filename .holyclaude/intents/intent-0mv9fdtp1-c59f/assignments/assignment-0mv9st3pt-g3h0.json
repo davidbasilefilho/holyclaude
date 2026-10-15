@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of the README repair for PR #28.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9srz1v-vf81.diff; README.md in the main checkout."
+  ],
+  "constraints": [
+    "Read-only; outside the changed lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "The guard claim is accurate, the .claude/ fallback steps are restored without T3, Special thanks credits the oh-my-opencode team, and the MCP sentence appears once.",
+    "Findings reported with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9srz1v-vf81"
+    ],
+    "independent_from": [
+      "assignment-0mv9srz1v-vf81",
+      "assignment-0mv9slk0p-w1qy",
+      "assignment-0mv9snxr5-ybwu"
+    ]
+  },
+  "id": "assignment-0mv9st3pt-g3h0",
+  "state": "Succeeded",
+  "result": "Items 1, 3, 4 met. Item 2 restored but carries two gaps already present on main: copied specialists lose the holyclaude: prefix, and copied hooks keep ${CLAUDE_PLUGIN_ROOT} without a replacement.",
+  "acceptance": {
+    "intent_revision": 6,
+    "rationale": "Narrow re-review; the two fallback gaps are verified as pre-existing on main (c3d2131) and restored verbatim, so not regressions; recorded as open.",
+    "criteria_evidence": {
+      "The guard claim is accurate, the .claude/ fallback steps are restored without T3, Special thanks credits the oh-my-opencode team, and the MCP sentence appears once.": "met except pre-existing fallback gaps",
+      "Findings reported with file:line.": "met except pre-existing fallback gaps"
+    },
+    "required_evidence": {
+      "findings": "findings with file:line"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

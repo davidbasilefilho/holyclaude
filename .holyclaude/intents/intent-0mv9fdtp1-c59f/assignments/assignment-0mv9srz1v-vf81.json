@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 6,
+  "role": "Worker.implementation",
+  "objective": "Repair the README restructure: accurate guard claim, restored fallback install, team wording, one no-MCP mention.",
+  "scope": [
+    "the main checkout README.md on branch ccr-dd890d7d-vpxecw (PR #28, committed)."
+  ],
+  "constraints": [
+    "README.md only; writing bar; T3 Code only in Special thanks; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The Why bullet no longer says workers cannot write history; it says specialists leave commits, pushes and PRs to the root and a guard hook refuses their git writes, a guardrail rather than a sandbox, linking Hooks and Limits.",
+    "The old `.claude/` fallback steps (root agent file in ~/.claude/agents or .claude/agents, specialists and skills in .claude/, the CLI on PATH via bun link with the path substitution, hooks in user or project settings) are restored under Install and test as a plain Claude Code fallback with no T3 framing.",
+    "Special thanks reads the oh-my-opencode team; There is no MCP server appears once.",
+    "oxfmt passes; links resolve; repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9slk0p-w1qy",
+      "assignment-0mv9snxr5-ybwu"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9srz1v-vf81",
+  "state": "Succeeded",
+  "result": "Four fixes: guard claim reworded as guardrail with Hooks/Limits links; .claude/ fallback restored under Install and test without T3; oh-my-opencode team wording; one MCP mention. oxfmt passes; T3 only in thanks; anchors resolve.",
+  "acceptance": {
+    "intent_revision": 6,
+    "rationale": "Repair verified by re-review g3h0.",
+    "criteria_evidence": {
+      "The Why bullet no longer says workers cannot write history; it says specialists leave commits, pushes and PRs to the root and a guard hook refuses their git writes, a guardrail rather than a sandbox, linking Hooks and Limits.": "verified by re-review g3h0",
+      "The old `.claude/` fallback steps (root agent file in ~/.claude/agents or .claude/agents, specialists and skills in .claude/, the CLI on PATH via bun link with the path substitution, hooks in user or project settings) are restored under Install and test as a plain Claude Code fallback with no T3 framing.": "verified by re-review g3h0",
+      "Special thanks reads the oh-my-opencode team; There is no MCP server appears once.": "verified by re-review g3h0",
+      "oxfmt passes; links resolve; repair-only diff saved.": "verified by re-review g3h0"
+    },
+    "required_evidence": {
+      "checks-run": "reported; diff saved",
+      "diff-file": "reported; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

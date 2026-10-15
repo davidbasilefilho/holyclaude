@@ -1,0 +1,39 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Fill the LICENSE copyright line with 2026 and David Basile Filho.",
+  "scope": [
+    "Main checkout the main checkout on branch ccr-dd890d7d-vpxecw (= main), LICENSE only."
+  ],
+  "constraints": [
+    "Change only the appendix copyright line; keep the rest of the Apache-2.0 text verbatim; no git writes."
+  ],
+  "acceptance_criteria": [
+    "LICENSE line 189 reads `   Copyright 2026 David Basile Filho` with its original indentation; no other byte changes.",
+    "oxfmt and full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "LICENSE"
+    ],
+    "symbols": [],
+    "domains": [
+      "license"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9s21d3-wlqb"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9s7f1l-9soq",
+  "state": "Ready",
+  "result": null,
+  "acceptance": null
+}
