@@ -13,6 +13,7 @@ const HINTS: Readonly<Record<string, string>> = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
   InvalidPath: "Use relative portable paths such as packages/cli/src.",
+  InvalidWorktree: "Give --worktree an existing directory, such as the path of a git worktree.",
   StaleRevision:
     "Reread with `holyclaude intent show`, reassess the work at the live revision, then retry.",
   NoRevision: "Set a valid revision with `holyclaude intent update --material`.",
@@ -43,6 +44,8 @@ const HINTS: Readonly<Record<string, string>> = {
   IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
   IntentBusy:
     "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
+  UnacceptedAssignments:
+    "Review and accept them with `holyclaude assignment accept <id>`, then close again. To close with work left unaccepted, add `--allow-unaccepted <reason>`.",
   NotBound:
     "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>.",

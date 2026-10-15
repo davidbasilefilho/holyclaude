@@ -39,12 +39,15 @@ export const BindAgentInput = Schema.Struct({
 export type BindAgentInput = typeof BindAgentInput.Type
 
 /**
- * Where the CLI runs: the project root, the roots a ScopedWrite path must stay inside, and the id
- * of this clone when it has one. Only Running writers of this clone count toward ownership.
+ * Where the CLI runs: the directory ownership paths are relative to (the project root, or the
+ * worktree the writer works in), the roots a ScopedWrite path must stay inside, the opaque key of
+ * that directory and the id of this clone when it has one. Only Running writers of this clone and
+ * of the same worktree key count toward ownership.
  */
 export interface DispatchContext {
   readonly projectRoot: string
   readonly writableRoots: ReadonlyArray<string>
+  readonly worktree: string
   readonly cloneId?: string | undefined
 }
 
@@ -96,13 +99,15 @@ export const reserve = (state: State, input: ReserveInput, context: DispatchCont
         other.state === "Running" &&
         // A row another clone reserved is not held against this one: git shows an overlap at merge.
         (other.clone_id === undefined || other.clone_id === context.cloneId) &&
+        // Paths of different worktrees name different files; a row without a key could be anywhere.
+        (other.worktree === undefined || other.worktree === context.worktree) &&
         other.mutability !== "ReadOnly" &&
         anyOverlap(other.metadata.ownership_paths, ownership_paths),
     )
     if (holder !== undefined)
       return yield* refuse("OwnershipConflict", `paths overlap ${holder.id}`)
 
-    return replaceAssignment(state, { ...assignment, state: "Running" })
+    return replaceAssignment(state, { ...assignment, state: "Running", worktree: context.worktree })
   })
 
 /** Attaches the spawned agent to a reservation and records it in the worker registry. */

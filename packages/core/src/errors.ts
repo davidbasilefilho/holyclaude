@@ -25,6 +25,16 @@ export class InvalidPath extends Data.TaggedError("InvalidPath")<{
   }
 }
 
+/** The worktree given to reserve is not an existing directory. */
+export class InvalidWorktree extends Data.TaggedError("InvalidWorktree")<{
+  readonly path: string
+  readonly reason: string
+}> {
+  override get message() {
+    return `Invalid worktree "${this.path}": ${this.reason}`
+  }
+}
+
 /** A revision does not equal the live Intent revision. Reread the Intent and reassess. */
 export class StaleRevision extends Data.TaggedError("StaleRevision")<{
   readonly given: number
@@ -51,6 +61,16 @@ export class IntentBusy extends Data.TaggedError("IntentBusy")<{
 }> {
   override get message() {
     return `Intent ${this.intent_id} has Running Assignments (${this.running.join(", ")}); settle them before closing it`
+  }
+}
+
+/** The Intent cannot close while Succeeded Assignments of it wait for the root's acceptance. */
+export class UnacceptedAssignments extends Data.TaggedError("UnacceptedAssignments")<{
+  readonly intent_id: string
+  readonly unaccepted: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} has Succeeded Assignments that were never accepted (${this.unaccepted.join(", ")}); accept them before closing it`
   }
 }
 

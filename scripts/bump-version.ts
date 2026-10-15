@@ -5,7 +5,7 @@ import { Console, Data, Effect, Schema } from "effect"
 
 import { bumpVersion, formatVersion, parseVersion, type InvalidVersion } from "./version.ts"
 
-/** A version file could not be read, decoded or written. */
+/** A version file or the lockfile could not be read, decoded or written. */
 export class ManifestError extends Data.TaggedError("ManifestError")<{
   readonly file: string
   readonly cause: unknown
@@ -86,6 +86,15 @@ const LOCATIONS: ReadonlyArray<Location> = [
   marketplace,
 ]
 
+/** The lockfile of a Bun workspace repository, relative to the repository root. */
+const LOCKFILE = "bun.lock"
+
+// bun.lock is JSONC that Bun rewrites on install, so the version of each workspace is replaced in
+// place and every other byte stays. A workspace entry is the only place a "name" line is directly
+// followed by a "version" line; the root workspace carries no version and the package entries are
+// arrays.
+const WORKSPACE_VERSION = /("name": "[^"]+",\n\s+"version": ")[^"]*(")/g
+
 const failWith = (file: string) =>
   Effect.mapError((cause: unknown) => new ManifestError({ file, cause }))
 
@@ -102,6 +111,24 @@ const load = (root: string, location: Location) => {
 const save = (path: string, manifest: Manifest) =>
   Effect.tryPromise(() => Bun.write(path, `${JSON.stringify(manifest, null, 2)}\n`))
 
+const loadLockfile = (root: string) => {
+  const path = join(root, LOCKFILE)
+  return Effect.tryPromise(() => Bun.file(path).text()).pipe(
+    Effect.map((text) => ({ path, text })),
+    failWith(LOCKFILE),
+  )
+}
+
+const lockfileWithVersion = (text: string, version: string) =>
+  text.search(WORKSPACE_VERSION) < 0
+    ? Effect.fail(new ManifestError({ file: LOCKFILE, cause: "no workspace version found" }))
+    : Effect.succeed(
+        text.replace(
+          WORKSPACE_VERSION,
+          (_entry, head: string, tail: string) => `${head}${version}${tail}`,
+        ),
+      )
+
 const commonVersion = (loaded: ReadonlyArray<{ location: Location; version: string }>) => {
   const [first] = loaded
   return first !== undefined && loaded.every(({ version }) => version === first.version)
@@ -116,9 +143,9 @@ const commonVersion = (loaded: ReadonlyArray<{ location: Location; version: stri
 const BumpKindArgument = Schema.Literals(["minor", "patch", "hotfix"])
 
 /**
- * Reads the six version files under `root`, refuses when they disagree, then writes the bumped
- * version to all of them. Nothing is written unless every file was read and agrees. Returns the old
- * and new version.
+ * Reads the six version files and `bun.lock` under `root`, refuses when the six disagree, then
+ * writes the bumped version to all six and to every workspace entry of `bun.lock`. Nothing is
+ * written unless every file was read and the six agree. Returns the old and new version.
  */
 export const bumpVersions = (
   root: string,
@@ -131,12 +158,15 @@ export const bumpVersions = (
     const loaded = yield* Effect.forEach(LOCATIONS, (location) => load(root, location))
     const from = yield* commonVersion(loaded)
     const to = formatVersion(bumpVersion(yield* parseVersion(from), kind))
+    const lockfile = yield* loadLockfile(root)
+    const lockText = yield* lockfileWithVersion(lockfile.text, to)
     yield* Effect.forEach(loaded, ({ location, path, manifest }) =>
       location.write(manifest, to).pipe(
         Effect.flatMap((updated) => save(path, updated)),
         failWith(location.file),
       ),
     )
+    yield* Effect.tryPromise(() => Bun.write(lockfile.path, lockText)).pipe(failWith(LOCKFILE))
     return { from, to }
   })
 

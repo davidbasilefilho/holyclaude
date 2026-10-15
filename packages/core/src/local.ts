@@ -4,7 +4,7 @@ import { commitFile, encodeJson, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
 import { AssignmentId, CloneId, IntentId, compareIds, newId } from "./model/ids.ts"
-import { Id } from "./model/primitives.ts"
+import { Id, Text } from "./model/primitives.ts"
 import type { State } from "./model/state.ts"
 import { Worker } from "./model/worker.ts"
 import { refuseSymlinks } from "./safety.ts"
@@ -15,12 +15,15 @@ import { refuseSymlinks } from "./safety.ts"
 const WorkersFile = Schema.Struct({ workers: Schema.Array(Worker) })
 /** Subagent ids keyed by Assignment id. They name agents of one session on one machine. */
 const AgentsFile = Schema.Record(AssignmentId, Id)
+/** The worktree key of each Running writer that has one, keyed by Assignment id. */
+const WorktreesFile = Schema.Record(AssignmentId, Text)
 const CloneFile = Schema.Struct({ clone_id: CloneId })
 /** The Intent this clone works on, chosen with `intent use`. */
 const ActiveIntentFile = Schema.Struct({ intent_id: IntentId })
 
 const workersPath = (directory: string) => localFile(directory, "workers.json")
 const agentsPath = (directory: string) => localFile(directory, "agents.json")
+const worktreesPath = (directory: string) => localFile(directory, "worktrees.json")
 const clonePath = (directory: string) => localFile(directory, "clone.json")
 const activeIntentPath = (directory: string) => localFile(directory, "active-intent.json")
 
@@ -43,6 +46,15 @@ export const readWorkers = (directory: string, limit?: number) =>
  */
 export const readAgents = (directory: string, limit?: number) =>
   readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(
+    Effect.map((file) => file ?? {}),
+  )
+
+/**
+ * The worktree key of each Running writer this clone reserved with one, keyed by Assignment id. A
+ * file over `limit` is TooLarge.
+ */
+export const readWorktrees = (directory: string, limit?: number) =>
+  readLocal(WorktreesFile, directory, worktreesPath(directory), limit).pipe(
     Effect.map((file) => file ?? {}),
   )
 
@@ -112,8 +124,10 @@ const sortedKeys = (agents: Readonly<Record<string, string>>) =>
   Object.fromEntries(Object.entries(agents).toSorted(([a], [b]) => compareIds(a, b)))
 
 /**
- * Writes the worker list and the agent ids when they changed. Agent ids already stored for
- * Assignments that are not in this state stay: they belong to rows on other branches.
+ * Writes the worker list, the agent ids and the worktree keys when they changed. Entries already
+ * stored for Assignments that are not in this state stay: they belong to rows on other branches. A
+ * worktree key lasts as long as its row is Running, so any other state of a row in this state
+ * releases it.
  */
 export const writeLocal = (directory: string, before: State, after: State, lock: Lock) =>
   Effect.gen(function* () {
@@ -131,4 +145,20 @@ export const writeLocal = (directory: string, before: State, after: State, lock:
     const agents = yield* encodeJson(AgentsFile, merged)
     const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored))
     if (agents !== agentsBefore) yield* commitFile(agentsFile, agents, lock)
+
+    const worktreesFile = worktreesPath(directory)
+    const keys = yield* readWorktrees(directory)
+    const inState = new Set(after.assignments.map((row) => row.id))
+    const held = after.assignments.flatMap((row) =>
+      row.state === "Running" && row.worktree !== undefined
+        ? [[row.id, row.worktree] as const]
+        : [],
+    )
+    const kept = Object.entries(keys).filter(([id]) => !inState.has(id))
+    const worktrees = yield* encodeJson(
+      WorktreesFile,
+      sortedKeys({ ...Object.fromEntries(kept), ...Object.fromEntries(held) }),
+    )
+    const worktreesBefore = yield* encodeJson(WorktreesFile, sortedKeys(keys))
+    if (worktrees !== worktreesBefore) yield* commitFile(worktreesFile, worktrees, lock)
   })

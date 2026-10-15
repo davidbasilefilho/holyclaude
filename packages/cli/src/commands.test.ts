@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, truncateSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadState, updateState, type State } from "@holyclaude/core"
+import { loadState, projectRoot, updateState, type State } from "@holyclaude/core"
 import { Effect } from "effect"
 
 import { COMMANDS } from "./commands.ts"
@@ -601,6 +601,131 @@ describe("two first reserves at once", () => {
   })
 })
 
+describe("reserve in separate worktrees of one repository", () => {
+  const ids = ["assignment-0001", "assignment-0002", "assignment-0003"]
+  let trees: string[] = []
+  const keysFile = () => join(directory, "local", "worktrees.json")
+  const reserveIn = (id: string, worktree?: string) =>
+    runCommand("assignment reserve", [id], {
+      root: ["src"],
+      ...(worktree === undefined ? {} : { worktree }),
+    })
+  const conflict = (id: string, worktree?: string) =>
+    refusal("assignment reserve", [id], {
+      root: ["src"],
+      ...(worktree === undefined ? {} : { worktree }),
+    })
+  const heldKeys = async () => (await Bun.file(keysFile()).json()) as Record<string, string>
+
+  beforeEach(async () => {
+    trees = [0, 1].map(() => mkdtempSync(join(tmpdir(), "holyclaude-tree-")))
+    // Three writers that all own src/a.ts, none reserved yet.
+    const ready = (id: string) => ({ ...reserved.assignments[0]!, id, state: "Ready" as const })
+    await Effect.runPromise(
+      updateState(directory, () =>
+        Effect.succeed({ state: { ...reserved, assignments: ids.map(ready) }, value: 0 }),
+      ),
+    )
+  })
+  afterEach(() => {
+    for (const tree of trees) rmSync(tree, { recursive: true, force: true })
+  })
+
+  test("writers with overlapping paths in one worktree conflict", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    expect(await conflict(ids[1]!, trees[0])).toMatchObject({ reason: "OwnershipConflict" })
+  })
+
+  test("writers with overlapping paths in different worktrees both run", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    const second = await reserveIn(ids[1]!, trees[1])
+    expect(second.value).toMatchObject({ id: ids[1], state: "Running" })
+    const keys = await heldKeys()
+    expect(Object.keys(keys).sort()).toEqual([ids[0]!, ids[1]!])
+    expect(keys[ids[0]!]).not.toBe(keys[ids[1]!])
+  })
+
+  test("a reserve without --worktree keys to the project root", async () => {
+    await reserveIn(ids[0]!)
+    expect((await reserveIn(ids[1]!, trees[0])).value).toMatchObject({ state: "Running" })
+    expect(await conflict(ids[2]!, projectRoot())).toMatchObject({ reason: "OwnershipConflict" })
+  })
+
+  test("--worktree makes the directory the writable root, narrowed by --root", async () => {
+    const inside = await runCommand("assignment reserve", [ids[0]!], { worktree: trees[0] })
+    expect(inside.value).toMatchObject({ state: "Running" })
+    expect(
+      await refusal("assignment reserve", [ids[1]!], { worktree: trees[1], root: ["lib"] }),
+    ).toMatchObject({ reason: "OutsideWritableRoots", detail: "src/a.ts" })
+  })
+
+  test("the key stays out of every record and survives a restart", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    const key = (await heldKeys())[ids[0]!]!
+    expect(key).toMatch(/^[0-9a-f]+$/)
+    const folder = join(directory, "intents", "intent-0001", "assignments")
+    for (const name of ids) {
+      const text = await Bun.file(join(folder, `${name}.json`)).text()
+      expect(text).not.toContain(key)
+      expect(text).not.toContain(trees[0]!)
+      expect(text).not.toContain("worktree")
+    }
+    // A fresh load, as after a restart, finds the key on the Running row.
+    const state = await Effect.runPromise(loadState(directory))
+    expect(state.assignments.find((row) => row.id === ids[0])?.worktree).toBe(key)
+  })
+
+  const releases: ReadonlyArray<readonly [string, (id: string) => Promise<unknown>]> = [
+    ["rollback", (id) => runCommand("assignment rollback", [id])],
+    [
+      "cancel",
+      (id) =>
+        runCommand("assignment bind", [id], { agent: "agent-1", fingerprint: "f" }).then(() =>
+          runCommand("assignment cancel", [id]),
+        ),
+    ],
+    [
+      "finish",
+      (id) =>
+        runCommand("assignment bind", [id], { agent: "agent-1", fingerprint: "f" }).then(() =>
+          runCommand("assignment finish", [id], { outcome: "success" }, '{"result":"done"}'),
+        ),
+    ],
+    ["reconcile resolve --fail", (id) => runCommand("reconcile resolve", [id], { fail: "gone" })],
+  ]
+  test.each(releases)("%s releases the key, so the paths are free again", async (_name, settle) => {
+    await reserveIn(ids[0]!, trees[0])
+    expect(await conflict(ids[1]!, trees[0])).toMatchObject({ reason: "OwnershipConflict" })
+    await settle(ids[0]!)
+    expect(await heldKeys()).toEqual({})
+    expect((await reserveIn(ids[1]!, trees[0])).value).toMatchObject({ state: "Running" })
+  })
+
+  test.each(["missing", "file"])(
+    "refuses a worktree that is %s and reserves nothing",
+    async (kind) => {
+      const target = join(trees[0]!, "nothing")
+      if (kind === "file") await Bun.write(target, "x")
+      expect(await refusal("assignment reserve", [ids[0]!], { worktree: target })).toMatchObject({
+        _tag: "InvalidWorktree",
+      })
+      const state = await Effect.runPromise(loadState(directory))
+      expect(state.assignments.every((row) => row.state === "Ready")).toBe(true)
+    },
+  )
+
+  test.each(["", "  "])(
+    "refuses a blank worktree %j rather than falling back to the current directory",
+    async (blank) => {
+      expect(await refusal("assignment reserve", [ids[0]!], { worktree: blank })).toMatchObject({
+        _tag: "InvalidWorktree",
+      })
+      const state = await Effect.runPromise(loadState(directory))
+      expect(state.assignments.every((row) => row.state === "Ready")).toBe(true)
+    },
+  )
+})
+
 describe("assignment verify", () => {
   let outside = ""
   beforeEach(() => {
@@ -655,5 +780,158 @@ describe("assignment verify", () => {
     truncateSync(transcript, 64 * 1024 * 1024 + 1)
     await observeTranscript(transcript)
     expect(await Effect.runPromise(Effect.flip(verify))).toMatchObject({ _tag: "TooLarge" })
+  })
+})
+
+/** Marks the Running Assignment as Succeeded, as `assignment finish` leaves it. */
+const succeed = () =>
+  Effect.runPromise(
+    updateState(directory, (state) =>
+      Effect.succeed({
+        state: {
+          ...state,
+          assignments: state.assignments.map((row) => ({ ...row, state: "Succeeded" as const })),
+        },
+        value: 0,
+      }),
+    ),
+  )
+
+const review = (revision: number, rationale = "the change touched none of its files") =>
+  JSON.stringify({
+    intent_revision: revision,
+    rationale,
+    criteria_evidence: { a: "seen" },
+    required_evidence: { e: "seen" },
+  })
+
+const bumpRevision = () => runCommand("intent update", [], { material: true }, "{}")
+
+describe("assignment accept --carry-forward", () => {
+  test("accepts work from an earlier revision at the live one, and only with the flag", async () => {
+    await succeed()
+    await bumpRevision()
+    expect(await refusal("assignment accept", ["assignment-0001"], {}, review(2))).toMatchObject({
+      _tag: "StaleRevision",
+      given: 1,
+      live: 2,
+    })
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(2),
+    )
+    expect(done.value).toMatchObject({ id: "assignment-0001", rev: 1, accepted: true })
+    const row = (await Effect.runPromise(loadState(directory))).assignments[0]!
+    expect(row.intent_revision).toBe(1)
+    expect(row.acceptance?.intent_revision).toBe(2)
+  })
+
+  test("needs a rationale, and an acceptance at the live revision", async () => {
+    await succeed()
+    await bumpRevision()
+    const flags = { "carry-forward": true }
+    expect(
+      await refusal("assignment accept", ["assignment-0001"], flags, review(2, "  ")),
+    ).toMatchObject({ _tag: "SchemaError" })
+    expect(await refusal("assignment accept", ["assignment-0001"], flags, review(1))).toMatchObject(
+      { _tag: "StaleRevision" },
+    )
+    expect((await Effect.runPromise(loadState(directory))).assignments[0]?.acceptance).toBeNull()
+  })
+
+  test("on work at the live revision the flag changes nothing", async () => {
+    await succeed()
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(1),
+    )
+    expect(done.value).toMatchObject({ accepted: true })
+  })
+})
+
+describe("intent close and unaccepted work", () => {
+  test("is refused listing the Succeeded Assignments never accepted, and --allow-unaccepted records why", async () => {
+    await succeed()
+    const error = await refusal("intent close", [], { reason: "shipped" })
+    expect(error).toMatchObject({
+      _tag: "UnacceptedAssignments",
+      unaccepted: ["assignment-0001"],
+    })
+    expect(String(error)).toContain("assignment-0001")
+    expect((await intentOf(OLDER)).state).toBe("open")
+    await runCommand("intent close", [], {
+      reason: "shipped",
+      "allow-unaccepted": "superseded by the rewrite",
+    })
+    const closed = await intentOf(OLDER)
+    expect(closed.state).toBe("closed")
+    expect(closed.close_reason).toContain("shipped")
+    expect(closed.close_reason).toContain("superseded by the rewrite")
+  })
+
+  test("an accepted Assignment does not block the close", async () => {
+    await succeed()
+    await runCommand("assignment accept", ["assignment-0001"], {}, review(1))
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await intentOf(OLDER)).close_reason).toBe("shipped")
+  })
+})
+
+describe("intent reopen and the Intent in use", () => {
+  test("puts the reopened Intent in use and says which one it replaced", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    const reopened = (await runCommand("intent reopen", [], { intent: OLDER })).value as object
+    expect(reopened).toMatchObject({ id: OLDER, in_use: OLDER, replaced: NEWER, revision: 2 })
+    expect(await Bun.file(chosenFile()).text()).toContain(OLDER)
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+
+  test("says none was replaced when no Intent was open", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("intent reopen")).value).toMatchObject({
+      in_use: OLDER,
+      replaced: null,
+    })
+  })
+})
+
+describe("reconcile and a closed Intent", () => {
+  test("flags a closed Intent that still has Ready or Running Assignments", async () => {
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            intents: state.intents.map((intent) => ({
+              ...intent,
+              state: "closed" as const,
+              close_reason: "shipped",
+              closed_at: "2026-01-02T03:04:05.000Z",
+            })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    const { value } = await runCommand("reconcile")
+    expect(value).toMatchObject({
+      closed_with_open_work: [
+        { intent: OLDER, close_reason: "shipped", assignments: [{ id: "assignment-0001" }] },
+      ],
+    })
+  })
+
+  test("says nothing about closed Intents when none has open work", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("reconcile")).value).not.toHaveProperty("closed_with_open_work")
   })
 })

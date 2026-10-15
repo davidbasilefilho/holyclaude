@@ -46,6 +46,18 @@ const row = (state: Assignment["state"], intentId = "intent-1"): Assignment => (
   acceptance: null,
 })
 
+/** A Succeeded Assignment whose evidence the root accepted. */
+const acceptedRow = (id: string): Assignment => ({
+  ...row("Succeeded"),
+  id,
+  acceptance: {
+    intent_revision: 1,
+    rationale: "r",
+    criteria_evidence: { a: "x" },
+    required_evidence: { e: "x" },
+  },
+})
+
 const stateOf = (
   intents: ReadonlyArray<Intent>,
   assignments: ReadonlyArray<Assignment> = [],
@@ -106,9 +118,38 @@ describe("closeIntent and reopenIntent", () => {
     })
     const settled = stateOf(
       [intent("intent-1"), intent("intent-2")],
-      [row("Succeeded"), row("Failed"), row("Ready"), row("Running", "intent-2")],
+      [acceptedRow("assignment-accepted"), row("Failed"), row("Ready"), row("Running", "intent-2")],
     )
     expect((await Effect.runPromise(closeIntent(settled, input))).value.state).toBe("closed")
+  })
+
+  test("close lists every Succeeded Assignment that was never accepted, and the override closes anyway", async () => {
+    const input = { id: "intent-1", reason: "done", at: AT }
+    const accepted = acceptedRow("assignment-accepted")
+    const second = { ...row("Succeeded"), id: "assignment-second" }
+    const state = stateOf([intent("intent-1")], [row("Succeeded"), second, accepted])
+    const refused = await failure(closeIntent(state, input))
+    expect(refused).toMatchObject({
+      _tag: "UnacceptedAssignments",
+      unaccepted: ["assignment-Succeeded", "assignment-second"],
+    })
+    expect(String(refused)).toContain("assignment-second")
+    const { value } = await Effect.runPromise(
+      closeIntent(state, { ...input, allow_unaccepted: "the work was dropped" }),
+    )
+    expect(value.state).toBe("closed")
+    expect(value.close_reason).toContain("done")
+    expect(value.close_reason).toContain("the work was dropped")
+    expect(value.close_reason).toContain("assignment-Succeeded")
+  })
+
+  test("the override does not lift the Running refusal, and adds nothing when all are accepted", async () => {
+    const input = { id: "intent-1", reason: "done", at: AT, allow_unaccepted: "why" }
+    expect(
+      await failure(closeIntent(stateOf([intent("intent-1")], [row("Running")]), input)),
+    ).toMatchObject({ _tag: "IntentBusy" })
+    const plain = await Effect.runPromise(closeIntent(stateOf([intent("intent-1")], []), input))
+    expect(plain.value.close_reason).toBe("done")
   })
 
   test("closing a closed Intent and reopening an open one are refused", async () => {
@@ -142,7 +183,7 @@ describe("closeIntent and reopenIntent", () => {
       reserve(
         reopened,
         { assignment_id: "assignment-Ready", capabilities: ["Write"] },
-        { projectRoot: "/p", writableRoots: ["/p"] },
+        { projectRoot: "/p", writableRoots: ["/p"], worktree: "w" },
       ),
     )
     expect(refused).toMatchObject({ _tag: "StaleRevision", given: 1, live: 2 })
@@ -182,7 +223,7 @@ describe("a closed Intent", () => {
         reserve(
           closed,
           { assignment_id: "assignment-Ready", capabilities: ["Write"] },
-          { projectRoot: "/p", writableRoots: ["/p"] },
+          { projectRoot: "/p", writableRoots: ["/p"], worktree: "w" },
         ),
       ),
     ).toMatchObject(closedError)

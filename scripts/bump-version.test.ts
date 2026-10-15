@@ -40,6 +40,36 @@ const manifest = (file: string, version: string) =>
         2,
       )}\n`
 
+const LOCKFILE = "bun.lock"
+
+/** A lockfile in Bun's style: a root workspace without a version, two with, and a package entry. */
+const lockfile = (version: string) => `{
+  "lockfileVersion": 2,
+  "workspaces": {
+    "": {
+      "name": "holyclaude",
+      "devDependencies": {
+        "effect": "^4.0.0",
+      },
+    },
+    "packages/cli": {
+      "name": "@holyclaude/cli",
+      "version": "${version}",
+      "dependencies": {
+        "effect": "^4.0.0",
+      },
+    },
+    "plugin": {
+      "name": "@holyclaude/plugin",
+      "version": "${version}",
+    },
+  },
+  "packages": {
+    "effect": ["effect@4.0.4", "", {}, "sha512-x"],
+  },
+}
+`
+
 let root = ""
 
 const read = (file: string) => readFileSync(join(root, file), "utf8")
@@ -52,6 +82,7 @@ const write = (file: string, text: string) => {
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "holyclaude-bump-"))
   for (const file of ALL_FILES) write(file, manifest(file, "0.3.2-1"))
+  write(LOCKFILE, lockfile("0.3.2-1"))
 })
 
 afterEach(() => {
@@ -72,6 +103,11 @@ describe("bumpVersions", () => {
     })
   })
 
+  test("writes the new version to every workspace entry of bun.lock and changes nothing else", async () => {
+    await Effect.runPromise(bumpVersions(root, "minor"))
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0"))
+  })
+
   test("bumps only the first plugin of the marketplace", async () => {
     await Effect.runPromise(bumpVersions(root, "patch"))
     expect(JSON.parse(read(MARKETPLACE)).plugins[1].version).toBe("9.9.9")
@@ -79,13 +115,13 @@ describe("bumpVersions", () => {
 
   test("refuses disagreeing versions, names each file and writes nothing", async () => {
     write("packages/core/package.json", manifest("packages/core/package.json", "0.3.1"))
-    const before = ALL_FILES.map(read)
+    const before = [...ALL_FILES, LOCKFILE].map(read)
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "minor")))
     expect(error).toBeInstanceOf(VersionMismatch)
     for (const file of ALL_FILES) expect(error.message).toContain(file)
     expect(error.message).toContain("packages/core/package.json 0.3.1")
     expect(error.message).toContain("package.json 0.3.2-1")
-    expect(ALL_FILES.map(read)).toEqual(before)
+    expect([...ALL_FILES, LOCKFILE].map(read)).toEqual(before)
   })
 
   test("refuses a marketplace that disagrees", async () => {
@@ -106,6 +142,24 @@ describe("bumpVersions", () => {
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
     expect(error).toBeInstanceOf(ManifestError)
     expect(error.message).toContain("plugin/package.json")
+  })
+
+  test("fails with ManifestError and writes nothing when bun.lock is missing", async () => {
+    rmSync(join(root, LOCKFILE))
+    const before = ALL_FILES.map(read)
+    const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
+    expect(error).toBeInstanceOf(ManifestError)
+    expect(error.message).toContain(LOCKFILE)
+    expect(ALL_FILES.map(read)).toEqual(before)
+  })
+
+  test("fails with ManifestError and writes nothing when bun.lock has no workspace version", async () => {
+    write(LOCKFILE, `{ "workspaces": { "": { "name": "holyclaude" } } }\n`)
+    const before = ALL_FILES.map(read)
+    const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
+    expect(error).toBeInstanceOf(ManifestError)
+    expect(error.message).toContain(LOCKFILE)
+    expect(ALL_FILES.map(read)).toEqual(before)
   })
 
   test.each([
