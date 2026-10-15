@@ -38,6 +38,25 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude.js",
+              "hook",
+              "post-tool-use"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "hooks": [

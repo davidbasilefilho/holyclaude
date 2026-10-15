@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Third, final review of PR5's docs (README Cloud sessions and related qualifiers, docs/DECISIONS.md) against the listed fixes and for accuracy.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gkf9r-rd4p.diff",
+    "Worktree pr5, base origin/main"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only the listed criteria and factual accuracy; further caps beyond those listed are handled by the size-cap PR and are not findings here."
+  ],
+  "acceptance_criteria": [
+    "The size-cap entry does not claim holyclaude caps no content, and each listed removed or kept cap matches the code it names.",
+    "Every README statement that the agent setting starts the root is marked observed in local sessions with a pointer; the stop-hook bullet is scoped to sessions observed; the managed-only note is a general caveat outside the cloud list.",
+    "Each fact has one home with links between README and DECISIONS.md, apart from cap numbers that README's State section must still describe as current behavior.",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9g2wfu-rkz8",
+      "assignment-0mv9gamg7-hyu9",
+      "assignment-0mv9gkf9r-rd4p",
+      "assignment-0mv9g5n31-5je4",
+      "assignment-0mv9gdtpk-yq5l"
+    ]
+  },
+  "id": "assignment-0mv9gp7u6-dtlm",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

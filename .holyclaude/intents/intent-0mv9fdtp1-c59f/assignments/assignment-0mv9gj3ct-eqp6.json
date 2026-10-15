@@ -1,0 +1,42 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review PR3's core rules after repair (plugin/agents/holyclaude.md core-rules block).",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gej53-g5dp.diff (full change vs origin/main)",
+    "Worktree pr3, file plugin/agents/holyclaude.md"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Each blocker from the first review is resolved: no tool the root lacks is named; a user-waived gate is reported Unknown and is not an early stop while other Pending/Unknown results are; the speak-only list allows the acknowledgement and the solo first message; no reference resolves only outside the block.",
+    "The repair's extra trims lose no rule that is not owned elsewhere (check: subagent VCS writes denied by hook, keep messages concise, leave unrelated work as it is when staging, CLI I/O format, ask when nothing else is left or the answer gates the rest).",
+    "All added behaviors from the original change are still stated; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings",
+    "trimmed-rules"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9fvep8-erji",
+      "assignment-0mv9fytyh-9ifu",
+      "assignment-0mv9gej53-g5dp",
+      "assignment-0mv9g7i48-l901"
+    ]
+  },
+  "id": "assignment-0mv9gj3ct-eqp6",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

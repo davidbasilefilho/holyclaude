@@ -1,0 +1,61 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.code",
+  "objective": "Independently review PR1 (uncommitted in worktree worktree pr1 against main): hook observations limited to holyclaude specialists and SessionStart omitting core rules when the main thread runs as the holyclaude agent.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff",
+    "Worktree worktree pr1, base origin/main",
+    "Changed paths: README.md, packages/cli/src/commands.ts, packages/cli/src/hook/{observe,subagent,session-start}.ts and their tests, pre-tool-use.test.ts, plugin/scripts/holyclaude.js"
+  ],
+  "constraints": [
+    "Read-only; leave the worktree as found.",
+    "First pass: /code-review on the uncommitted change at effort high, no --comment, no --fix.",
+    "Gates via bunx bun@1.4.3."
+  ],
+  "acceptance_criteria": [
+    "Reports /code-review invocation, finding count and each disposition.",
+    "Judges whether assignment verify still works for every specialist path (a specialist with no guarded tool calls; stop payloads with and without agent_type; resumed workers).",
+    "Judges whether the session-start regression test proves the behavior (the writer says the base fails only on signature) and whether the stdin handling degrades safely.",
+    "Checks the bundle matches a Bun 1.4.3 build and README matches behavior.",
+    "Separates blockers from optional findings with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9fvem5-zb5b"
+    ]
+  },
+  "id": "assignment-0mv9g2hya-kg0x",
+  "state": "Succeeded",
+  "result": "PR1 code review: no blockers; /code-review 7 findings dispositioned (bare holyclaude name, exists gate, prefix looseness, lost-start type-less stop drop, stdin blocking pre-existing, summary text stale, shared helper); gates green on 1.4.3 (1109 tests); bundle byte-identical to a 1.4.3 build; CLI e2e table for session-start inputs; mutation tests show session-start tests are behavior-sensitive except startsWith near-miss.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Reviewer ran gates, rebuilt bundle and compared, ran CLI end-to-end and mutation tests; dispositions reasoned.",
+    "criteria_evidence": {
+      "Reports /code-review invocation, finding count and each disposition.": "code-review worktree pr1 high, 7 findings dispositioned.",
+      "Judges whether assignment verify still works for every specialist path (a specialist with no guarded tool calls; stop payloads with and without agent_type; resumed workers).": "All paths work except lost start plus type-less stop, judged optional.",
+      "Judges whether the session-start regression test proves the behavior (the writer says the base fails only on signature) and whether the stdin handling degrades safely.": "Mutations A-C fail the tests; stdin TTY/empty/garbage/oversized fall back to rules.",
+      "Checks the bundle matches a Bun 1.4.3 build and README matches behavior.": "cmp identical; README claims hold.",
+      "Separates blockers from optional findings with evidence.": "No blockers; 5 optional."
+    },
+    "required_evidence": {
+      "code-review-run": "Skill code-review worktree pr1 high, 7 findings.",
+      "checks-run": "oxfmt, oxlint, bun check, bun test 1109, bundle cmp, CLI e2e.",
+      "blockers": "none",
+      "optional-findings": "near-miss tests, summary text, exists gate, shared helper, lost-start note."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

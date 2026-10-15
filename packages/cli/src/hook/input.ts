@@ -20,6 +20,17 @@ export interface ToolInput {
 }
 
 /**
+ * What an Agent tool call shows of the subagent it launched: the requested `subagent_type` from
+ * `tool_input`, and from `tool_response` the `agentId` and the `resolvedModel`, the model the
+ * subagent started on. A background launch and a foreground completion both carry them.
+ */
+export interface AgentLaunch {
+  readonly subagent_type: string | undefined
+  readonly agentId: string | undefined
+  readonly resolvedModel: string | undefined
+}
+
+/**
  * The fields of a hook payload the CLI reads, each undefined when absent or of another type. The
  * guard decides from `agent`, `tool_name` and `tool_input` alone; the rest only feed the
  * observation, which is best effort.
@@ -37,6 +48,8 @@ export interface HookInput {
   /** The subagent's own transcript, which a SubagentStop payload carries. */
   readonly agent_transcript_path: string | undefined
   readonly effort: typeof Effort.Type | undefined
+  /** The Agent call a PostToolUse payload reports; each field is undefined when absent. */
+  readonly launch: AgentLaunch
 }
 
 /** Reads one value as the schema's type, or undefined when it has another type. */
@@ -63,6 +76,18 @@ const toolInput = (value: unknown): ToolInput | undefined => {
  */
 const isAgentId = (value: unknown): boolean => value !== undefined && value !== null && value !== ""
 
+const fieldsOf = (value: unknown): Readonly<Record<string, unknown>> =>
+  lenient(Schema.Record(Schema.String, Schema.Unknown), value) ?? {}
+
+const agentLaunch = (envelope: Readonly<Record<string, unknown>>): AgentLaunch => {
+  const response = fieldsOf(envelope["tool_response"])
+  return {
+    subagent_type: lenient(Schema.String, fieldsOf(envelope["tool_input"])["subagent_type"]),
+    agentId: lenient(Schema.String, response["agentId"]),
+    resolvedModel: lenient(Schema.String, response["resolvedModel"]),
+  }
+}
+
 const decode = Schema.decodeUnknownEffect(Envelope)
 
 /** Decodes the JSON Claude Code writes to a hook's stdin. Fails when the text is not a JSON object. */
@@ -78,6 +103,7 @@ export const decodeHookInput = (text: string) =>
       transcript_path: lenient(Schema.String, envelope["transcript_path"]),
       agent_transcript_path: lenient(Schema.String, envelope["agent_transcript_path"]),
       effort: lenient(Effort, envelope["effort"]),
+      launch: agentLaunch(envelope),
     })),
   )
 

@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 repair (worktree worktree pr3): bring the core-rules block of plugin/agents/holyclaude.md back to at most about 8,500 characters while keeping every behavior the previous change added.",
+  "scope": [
+    "plugin/agents/holyclaude.md core-rules block (between the markers)"
+  ],
+  "constraints": [
+    "Follow the ship brief and the writing bar.",
+    "Do not move rules out of the core block into later sections unless the later section already says it; the block must stay standalone.",
+    "Do not edit the CI watching or Committing sections."
+  ],
+  "acceptance_criteria": [
+    "The core-rules block (text between the markers, as extracted) is at most about 8,500 characters, measured and reported.",
+    "Every behavior added by the previous change is still stated: solo root, user instruction wins, ask last and re-ask after resume and acknowledge new instructions, classifier denial, repairs (reproduce with repo script after second failure, read gate on head SHA before a gated action, environmental only after evidence), per-deliverable final report and hypotheses, image delivery by reading in the main thread.",
+    "No pre-existing rule is lost; any merge of two rules is listed.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "kept-behaviors",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9fvep8-erji"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9fytyh-9ifu",
+  "state": "Succeeded",
+  "result": "PR3 trim: core-rules block 9,406->8,540 chars (base 7,967) by whole-block rewrite; merges and drops listed (authority folded into intro, spawn+delegate bullets merged, fresh-worker+weak-result merged, launch-step list dropped as skill-owned, minor clauses dropped); all added behaviors kept with quotes; grill-me sentence kept verbatim for a test; gates on 1.4.3 pass (1100 tests). Diff vs main at scratchpad/diffs/assignment-0mv9fytyh-9ifu.diff.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

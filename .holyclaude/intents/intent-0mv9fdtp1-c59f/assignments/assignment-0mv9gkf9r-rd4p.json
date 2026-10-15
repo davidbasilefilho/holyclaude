@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR5 second repair (worktree pr5): make the size-cap decision exact, finish the observed qualifiers, and keep each fact in one place.",
+  "scope": [
+    "README.md",
+    "docs/DECISIONS.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and writing bar.",
+    "Docs only."
+  ],
+  "acceptance_criteria": [
+    "DECISIONS.md size-cap entry lists explicitly: removed in 0.2.0 by the size-cap change: the 256 KiB committed-record cap, the 4 MiB local-file cap and the legacy migration trim tied to it, and the 60-character objective clip wherever it appears (SessionStart summary and CLI list rows); kept as bounds on reading input: the 64 KiB CLI stdin JSON cap, the 1 MiB hook stdin and guard judged-text caps, the 64 MiB transcript read, the 4 KiB lock and guard reads, the 256 KiB .gitignore read, the 1 MiB legacy state read, and observation-log rotation; and the SessionStart context budget of 10,000 characters, inside which the state summary shrinks to fit. No claim that holyclaude caps no content.",
+    "README: the agent-setting statements (the install paragraph near the top, the T3 Code paragraph, the main-thread-agent line) are marked as observed in local sessions with a pointer to Cloud sessions; the stop-hook bullet reads as observed in the cloud sessions observed; the managed-only keys note sits outside the cloud-differences list as a general caveat, named inline.",
+    "Each fact lives in one place: DECISIONS.md keeps the decisions and their reasons and links to README sections for facts (frontend-design sources and hashes, bin/ and wrapper details, version-string rule, state layout); README links to DECISIONS.md for the reasons.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9gamg7-hyu9",
+      "assignment-0mv9gdtpk-yq5l"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gkf9r-rd4p",
+  "state": "Succeeded",
+  "result": "PR5 second repair: size-cap entry lists removed and kept caps verified against code (guard-hook-only 1 MiB stdin corrected); additional caps found (observation reads under local cap, summary 400/120/0 and state_error 300 clips, deny reason 1000 chars, CLI error 6 lines/600 chars, guard analysis bounds); README agent-setting statements qualified as observed locally, stop-hook bullet scoped, managed-only note moved out of the cloud list; facts deduplicated with links; gates pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gkf9r-rd4p.diff.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
