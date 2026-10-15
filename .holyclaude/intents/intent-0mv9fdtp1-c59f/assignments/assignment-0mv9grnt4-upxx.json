@@ -46,6 +46,23 @@
   "id": "assignment-0mv9grnt4-upxx",
   "state": "Succeeded",
   "result": "PR7 writer: removed record cap (gitignore gets own 256 KiB bound), local-file cap and legacy trim, 60-char clips, SessionStart fixed clips (fit steps WHOLE,120,0), deny-reason cut, CLI error cut; readText/readJson limit optional; kept bounds untouched; 14 regression tests fail on base; changed tests listed as contract changes; README State/Limits and model note updated; gates pass (1133 tests); bundle rebuilt. Diff at scratchpad/diffs/assignment-0mv9grnt4-upxx.diff.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 2 to 5: revisions 3-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #19, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "Removed: the 256 KiB committed-record cap on write and read; the 4 MiB local-file cap on write and read, including observation-log reads; the legacy migration trim that keeps only the newest lines at 4 MiB; the 60-character objective clip in SessionStart rows and CLI list rows; the fixed 400-character and 300-character clips in the SessionStart summary when it fits the budget (shrinking stays only as fit-to-budget steps); the 1,000-character PreToolUse deny-reason cut; the 6-line, 600-character CLI error-output cut.": "Met in #19: independent review of that head and CI green on it",
+      "Kept: 64 KiB CLI stdin JSON cap, 1 MiB guard-hook stdin and judged-text caps, 64 MiB transcript read, 4 KiB lock and guard reads, 256 KiB .gitignore read, 1 MiB legacy state read, observation-log rotation, guard analysis bounds, the 10,000-character SessionStart budget.": "Met in #19: independent review of that head and CI green on it",
+      "Regression tests show each removed cap no longer applies (for example a record over 256 KiB writes and reads back; a long objective appears whole in list rows) and fail on the base.": "Met in #19: independent review of that head and CI green on it",
+      "README State and Limits describe the new behavior and the kept bounds as input-reading bounds; README notes that the hook-recorded model is the model the agent started on.": "Met in #19: independent review of that head and CI green on it",
+      "Format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3.": "Met in #19: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #19 review",
+      "regression-tests": "Reported by the worker and confirmed by the #19 review",
+      "changed-tests": "Reported by the worker and confirmed by the #19 review",
+      "changed-paths": "Reported by the worker and confirmed by the #19 review",
+      "diff-file": "Reported by the worker and confirmed by the #19 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

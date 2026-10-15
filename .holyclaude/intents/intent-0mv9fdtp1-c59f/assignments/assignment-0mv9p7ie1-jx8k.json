@@ -1,0 +1,43 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Narrow re-review of B's empty --worktree repair.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9p4q23-5kir.diff in worktree b: packages/core/src/worktree.ts, worktree.test.ts, packages/cli/src/commands.test.ts, rebuilt bundle; read those lines and the code they touch."
+  ],
+  "constraints": [
+    "Read-only; outside the changed lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "A blank or whitespace --worktree is refused with InvalidWorktree and reserves nothing; the tests fail without the fix; bundle matches source; gates pass.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9p4q23-5kir"
+    ],
+    "independent_from": [
+      "assignment-0mv9p4q23-5kir",
+      "assignment-0mv9op2qr-40db",
+      "assignment-0mv9oy63p-zksq"
+    ]
+  },
+  "id": "assignment-0mv9p7ie1-jx8k",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -31,6 +31,17 @@
   "id": "assignment-0mv9kbhm8-nt45",
   "state": "Succeeded",
   "result": "existsSync added to the node:fs test allowlist with its reason; architecture test 7 pass; full suite 1143 pass; fmt, lint, check clean.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 2 to 5: revisions 3-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #18, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "scripts/architecture.test.ts passes on the merged tree; the entry carries a reason (a synchronous existence check in test assertions; Bun.file().exists() is async).": "Met in #18: independent review of that head and CI green on it",
+      "Format, lint, typecheck and full test pass.": "Met in #18: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #18 review",
+      "diff-file": "Reported by the worker and confirmed by the #18 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of two prose repairs: C's README bump lines and A's de-duplicated lifecycle rules.",
+  "scope": [
+    "Repair diffs scratchpad/diffs/assignment-0mv9oyxo1-y3sz.diff (worktree c README.md) and scratchpad/diffs/assignment-0mv9p0lsh-llyj-repair.diff (worktree a SKILL.md, README.md); read those diffs and the sections they touch."
+  ],
+  "constraints": [
+    "Read-only; raise anything outside the changed lines only if it is a blocker."
+  ],
+  "acceptance_criteria": [
+    "C README names bun.lock in the bump row and the refusal, matching scripts/bump-version.ts in worktree c.",
+    "In worktree a, pull-before-closing and carry-forward policy each appear once with their reason, in plugin/agents/holyclaude.md; SKILL.md keeps command shapes, README keeps behavior, and nothing needed was lost.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9oyxo1-y3sz",
+      "assignment-0mv9p0lsh-llyj"
+    ],
+    "independent_from": [
+      "assignment-0mv9oyxo1-y3sz",
+      "assignment-0mv9p0lsh-llyj",
+      "assignment-0mv9oe510-ghwq"
+    ]
+  },
+  "id": "assignment-0mv9p2ofl-7aij",
+  "state": "Succeeded",
+  "result": "Repair 1 (C README) met. Repair 2: blocker, continue-work SKILL.md:13 restates and contradicts the carry-forward policy.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Verified continue-work line contradicts holyclaude.md:111; repair dispatched.",
+    "criteria_evidence": {
+      "C README names bun.lock in the bump row and the refusal, matching scripts/bump-version.ts in worktree c.": "met, lines 347 and 354-355 against script order",
+      "In worktree a, pull-before-closing and carry-forward policy each appear once with their reason, in plugin/agents/holyclaude.md; SKILL.md keeps command shapes, README keeps behavior, and nothing needed was lost.": "gap: continue-work/SKILL.md:13; otherwise met",
+      "Blockers and optional findings reported with evidence.": "B1 and O1 with lines"
+    },
+    "required_evidence": {
+      "findings": "B1 continue-work contradiction; O1 README reason"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

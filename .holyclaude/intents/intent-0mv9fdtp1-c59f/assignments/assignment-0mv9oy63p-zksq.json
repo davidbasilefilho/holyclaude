@@ -1,0 +1,58 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Independently review fix/worktree-ownership (uncommitted in worktree b, base PR #21).",
+  "scope": [
+    "Worktree worktree b, uncommitted changes against HEAD 0638af5; full diff file scratchpad/diffs/B-full.diff."
+  ],
+  "constraints": [
+    "Read-only on the worktree; scratch copies go to the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "reserve --worktree keys overlap per worktree, defaults to the project root, combines with --root as documented, refuses a missing or non-directory path, and releases the key on every exit from Running.",
+    "No worktree key or path reaches committed records; older readers still load every record.",
+    "Tests would fail without the change; gates pass.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9op2qr-40db"
+    ],
+    "independent_from": [
+      "assignment-0mv9op2qr-40db",
+      "assignment-0mv9ovvlx-yzba"
+    ]
+  },
+  "id": "assignment-0mv9oy63p-zksq",
+  "state": "Succeeded",
+  "result": "No blockers; 8 /code-review findings dispositioned; gates pass; bundle cmp identical; e2e across two worktrees, old-CLI compatibility and keyless rows verified. Optional: empty --worktree silently keys to cwd (confirmed).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Independent review with end-to-end evidence; empty --worktree taken as a repair.",
+    "criteria_evidence": {
+      "reserve --worktree keys overlap per worktree, defaults to the project root, combines with --root as documented, refuses a missing or non-directory path, and releases the key on every exit from Running.": "met; tests and e2e",
+      "No worktree key or path reaches committed records; older readers still load every record.": "grep of records clean; older bundle loads and reserves",
+      "Tests would fail without the change; gates pass.": "new flag/field required by tests; 1227/0",
+      "Blockers and optional findings reported with evidence.": "no blockers; empty --worktree confirmed"
+    },
+    "required_evidence": {
+      "code-review-run": "/code-review worktree b high, 8 findings",
+      "checks-run": "gates, bundle cmp, e2e",
+      "findings": "no blockers"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

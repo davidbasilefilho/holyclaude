@@ -44,6 +44,22 @@
   "id": "assignment-0mv9ktq2k-obv3",
   "state": "Succeeded",
   "result": "PR8 merge resolved (README latest-Intent text replaced by active-Intent pointer; holyclaude.md incoming PR3/PR4 prose plus PR8 Intent line and writing bar); Ready counted as open with test; handoff skill covers choosing the Intent; gates pass (1199); core block 9,307; bundle rebuilt.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 3 to 5: revisions 4-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #21, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "No conflict markers remain; README keeps PR7's cap and bound text and PR8's Intent text; holyclaude.md keeps PR3/PR4's rewritten core rules, CI watching and Committing plus PR8's writing-bar markers and Intent line.": "Met in #21: independent review of that head and CI green on it",
+      "The writing bar copies stay identical across the three agent files (writing-bar test passes); core-rules block reported in characters and at most 9,400.": "Met in #21: independent review of that head and CI green on it",
+      "The open-Assignment count (list and SessionStart) includes Ready Assignments; regression test.": "Met in #21: independent review of that head and CI green on it",
+      "plugin/skills/handoff covers choosing the Intent (intent use / --intent) when several are open.": "Met in #21: independent review of that head and CI green on it",
+      "Format, lint, typecheck and full test pass; bundle rebuilt with Bun 1.4.3.": "Met in #21: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #21 review",
+      "resolution-notes": "Reported by the worker and confirmed by the #21 review",
+      "size-change": "Reported by the worker and confirmed by the #21 review",
+      "diff-file": "Reported by the worker and confirmed by the #21 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
