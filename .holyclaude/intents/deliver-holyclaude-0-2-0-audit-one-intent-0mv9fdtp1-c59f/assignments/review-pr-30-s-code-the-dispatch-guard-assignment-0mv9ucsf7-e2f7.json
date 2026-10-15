@@ -1,0 +1,58 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.code",
+  "objective": "Review PR #30's code: the dispatch guard and defaults merged with main and the 0.2.1 version.",
+  "scope": [
+    "Branch release/0.2.1/chore/version at 14bfc21 against main 1d93f92 in worktree g, excluding README and docs."
+  ],
+  "constraints": [
+    "Read-only; scratch work in the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "The dispatch guard, removed frontmatter compaction, .claude/settings.json and the 0.2.1 version merge cleanly with main's kebab agent names; no agent sets autoCompactWindow; versions read 0.2.1.",
+    "Gates, frozen install, both validate runs and bundle-equals-fresh-build pass; findings reported."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9u848y-dpjy",
+      "assignment-0mv9u4pl3-rzz3"
+    ],
+    "independent_from": [
+      "assignment-0mv9u848y-dpjy",
+      "assignment-0mv9u4pl3-rzz3",
+      "assignment-0mv9tz082-3bed",
+      "assignment-0mv9tp0jj-6dl0",
+      "assignment-0mv9t4aoo-3zns"
+    ]
+  },
+  "id": "assignment-0mv9ucsf7-e2f7",
+  "state": "Succeeded",
+  "result": "Blocker: dispatch.test.ts writes observations into the real state dir and .holyclaude/local files were committed. Optional: 1 MiB Agent payload refusal for all sessions undocumented, prefix-only guard, guard only when root is holyclaude, Task alias.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Code review of #30: test isolation blocker and committed local files taken as fixes.",
+    "criteria_evidence": {
+      "The dispatch guard, removed frontmatter compaction, .claude/settings.json and the 0.2.1 version merge cleanly with main's kebab agent names; no agent sets autoCompactWindow; versions read 0.2.1.": "see findings",
+      "Gates, frozen install, both validate runs and bundle-equals-fresh-build pass; findings reported.": "see findings"
+    },
+    "required_evidence": {
+      "code-review-run": "findings and checks reported",
+      "checks-run": "findings and checks reported",
+      "findings": "findings and checks reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

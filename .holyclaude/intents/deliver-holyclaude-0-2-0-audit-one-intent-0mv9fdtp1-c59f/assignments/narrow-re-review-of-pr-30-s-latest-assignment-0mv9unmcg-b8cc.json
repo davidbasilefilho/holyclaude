@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.code",
+  "objective": "Narrow re-review of PR #30's latest commits.",
+  "scope": [
+    "Worktree g, range 14bfc21..HEAD: setup prompt, untracked local state, Why and install rewrite, pitch, dispatch test isolation, docs notes."
+  ],
+  "constraints": [
+    "Read-only; outside the range raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "The test no longer writes to the repository state (a full test run leaves .holyclaude untouched); .holyclaude/local is not tracked; README and docs changes are accurate to the shipped code, claims are supported, links resolve, T3 Code only in Special thanks.",
+    "Gates pass; findings reported."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9uhj54-g396",
+      "assignment-0mv9ugy0s-jv9v",
+      "assignment-0mv9ujpm5-8n9p"
+    ],
+    "independent_from": [
+      "assignment-0mv9uhj54-g396",
+      "assignment-0mv9ugy0s-jv9v",
+      "assignment-0mv9ujpm5-8n9p",
+      "assignment-0mv9udbgj-dmb6",
+      "assignment-0mv9u848y-dpjy"
+    ]
+  },
+  "id": "assignment-0mv9unmcg-b8cc",
+  "state": "Succeeded",
+  "result": "No blockers in 14bfc21..dbd1a50; tests leave .holyclaude untouched; local untracked; claims and links verified; gates pass. Optional: cannot vs refused wording, verify proves vs checks, caching credit, prompt reads main, recorded() timeout.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Verified by the review chain ending in b8cc (no blockers) with CI green on dbd1a50.",
+    "criteria_evidence": {
+      "The test no longer writes to the repository state (a full test run leaves .holyclaude untouched); .holyclaude/local is not tracked; README and docs changes are accurate to the shipped code, claims are supported, links resolve, T3 Code only in Special thanks.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "Gates pass; findings reported.": "verified by reviews (latest b8cc) and CI on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "findings": "reported and confirmed by review"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

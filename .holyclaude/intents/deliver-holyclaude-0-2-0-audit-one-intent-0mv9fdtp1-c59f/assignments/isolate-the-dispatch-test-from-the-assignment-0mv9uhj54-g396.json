@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Isolate the dispatch test from the repository's state and document the guard's limits.",
+  "scope": [
+    "Worktree worktree g (PR #30): packages/cli/src/hook/dispatch.test.ts, docs/limits.md, docs/hooks.md, plugin/scripts/holyclaude.js if needed."
+  ],
+  "constraints": [
+    "No git writes; nothing under .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "dispatch.test.ts runs every case against a temporary state directory (HOLYCLAUDE_STATE_DIR or the existing test helper), so a full test run writes nothing under the repository's .holyclaude; shown by a full run leaving git status clean.",
+    "docs/limits.md notes that any Agent call payload over 1 MiB is refused, and docs/hooks.md says the dispatch guard applies only when the session's main agent is holyclaude.",
+    "fmt, lint, typecheck and full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src/hook/dispatch.test.ts",
+      "docs/limits.md",
+      "docs/hooks.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ucsf7-e2f7"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9uhj54-g396",
+  "state": "Succeeded",
+  "result": "dispatch.test.ts isolated with HOLYCLAUDE_STATE_DIR temp dirs and a wait for detached observe; before/after evidence shows no .holyclaude writes; docs/limits and docs/hooks notes added; 1340/0.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Verified by the review chain ending in b8cc (no blockers) with CI green on dbd1a50.",
+    "criteria_evidence": {
+      "dispatch.test.ts runs every case against a temporary state directory (HOLYCLAUDE_STATE_DIR or the existing test helper), so a full test run writes nothing under the repository's .holyclaude; shown by a full run leaving git status clean.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "docs/limits.md notes that any Agent call payload over 1 MiB is refused, and docs/hooks.md says the dispatch guard applies only when the session's main agent is holyclaude.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "fmt, lint, typecheck and full test pass.": "verified by reviews (latest b8cc) and CI on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "diff-file": "reported and confirmed by review"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -39,6 +39,21 @@
   "id": "assignment-0mv9u848y-dpjy",
   "state": "Succeeded",
   "result": "README rewritten pitch-first in order What, Why, How, Development, Special thanks, License; 47,691 -> 8,657 bytes; reference moved to docs/{state,hooks,settings,limits,development,cloud-sessions,claude-fallback}.md; DECISIONS links repointed; good defaults list in README; gates pass; bundle unchanged by rebuild.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Rewrite verified by review 72ab (no blockers).",
+    "criteria_evidence": {
+      "README sections in order: # holyclaude, ## What is holyclaude? (the pitch), ## Why holyclaude?, ## How does it work?, ## Development, ## Special thanks!, ## License; roughly a quarter of its current length.": "verified by review 72ab",
+      "Long reference detail moves to linked files under docs/; every applicable fact from the current README lives in README or docs; docs/DECISIONS.md links resolve.": "verified by review 72ab",
+      "The README's good-defaults list holds only what no plugin mechanism applies (autoCompactWindow 450000 for all agents, promptCacheTtl 1h for the root on API-key setups, CLAUDE_CODE_FORK_SUBAGENT=0 and the Agent deny entries as a backstop to the hook, optional read-only gh allow rules, managed deniedModels, CLAUDE_CODE_EFFORT_LEVEL and CLAUDE_CODE_SUBAGENT_MODEL_FORCE left unset); CLAUDE_CODE_SUBAGENT_MODEL and the unverified 2.1.288 claim are dropped.": "verified by review 72ab",
+      "Bundle rebuilt; fmt, lint, typecheck, full test, frozen install and both validate runs pass; diff saved.": "verified by review 72ab"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "diff-file": "reported",
+      "sizes": "reported",
+      "fact-map": "reported"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

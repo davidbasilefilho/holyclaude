@@ -8,11 +8,11 @@ The plan and its progress live in git, so the work carries on across sessions an
 
 ## Why holyclaude?
 
-- **Long sessions stay cheap.** Opus only plans, decides and accepts, while the 18 specialists run on Haiku or Sonnet at pinned effort. Prompt caching and [compaction](#good-defaults) keep long sessions affordable, and `holyclaude assignment verify` proves each worker ran on the model you paid for.
+- **Long sessions stay cheap.** Opus only plans, decides and accepts, while the 18 specialists run on Haiku or Sonnet at pinned effort. The plugin does not set prompt caching or compaction: they come from the [good defaults](#good-defaults) you set (the Sonnet specialists do ask for a one-hour cache in their own frontmatter). `holyclaude assignment verify` checks the model and effort each worker actually ran on against what was dispatched, and reports the fields it could not observe.
 - **PRs that are ready to merge.** Every change is reviewed by a specialist with no history on it, and CI is watched on the exact head commit. A PR counts as merge-ready only when the review has no open blockers and the CI gate passed, and repairs get narrow re-reviews so review loops close.
 - **Quality you can check.** Code goes through `/code-review` plus a reviewer, security-sensitive changes get a security review, fixes come with regression tests, and reports carry evidence instead of claims.
 - **Work that survives.** Intents and Assignments live in git, so work outlasts compaction, restarts and new sessions, and collaborators and clones share it.
-- **Your history stays yours.** Specialists cannot commit, push or merge (a guard hook refuses their git writes; see [limits](docs/limits.md)). The root owns the history, and merging waits for your approval.
+- **Your history stays yours.** A guard hook refuses specialists' git writes, so well-meaning workers do not commit, push or merge; it is a guardrail, not a sandbox (see [limits](docs/limits.md)). The root owns the history, and merging waits for your approval.
 
 The design reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
 

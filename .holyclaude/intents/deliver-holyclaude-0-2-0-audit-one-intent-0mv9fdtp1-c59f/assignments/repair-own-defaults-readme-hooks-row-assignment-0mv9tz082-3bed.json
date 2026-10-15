@@ -42,6 +42,19 @@
   "id": "assignment-0mv9tz082-3bed",
   "state": "Succeeded",
   "result": "README hooks row, prose and settings rows updated; root autoCompactWindow removed and test narrowed to 18 specialists; DispatchRefused field dropped; 1358/0; validate passes.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Revision 10 only removed frontmatter compaction, which a later Assignment did; the dispatch guard and README repair this work built still hold and were reviewed with no blockers.",
+    "criteria_evidence": {
+      "README hooks table row and prose list the Agent matcher and say the PreToolUse hook also refuses a holyclaude root's non-holyclaude subagent calls; the settings rows say the hook backs the Agent deny entries and the specialists already set their compaction window, so only the root needs the autoCompactWindow setting.": "verified by reviews ending in b8cc; CI green on dbd1a50",
+      "autoCompactWindow is removed from the root holyclaude.md (inert for the main-session agent); the test pins it for the 18 specialists and its comment is accurate.": "verified by reviews ending in b8cc; CI green on dbd1a50",
+      "DispatchRefused drops the unused subagentType field.": "verified by reviews ending in b8cc; CI green on dbd1a50",
+      "Bundle rebuilt; fmt, lint, typecheck, full test, validate pass; repair-only diff saved.": "verified by reviews ending in b8cc; CI green on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "diff-file": "reported and confirmed by review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

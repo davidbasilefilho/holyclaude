@@ -1,0 +1,40 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.code",
+  "objective": "Review the docs and test polish PR.",
+  "scope": [
+    "Worktree worktree j, branch release/0.2.2/fix/docs-and-test-polish against main 6e76ec7 (committed by the root)."
+  ],
+  "constraints": [
+    "Read-only; tests run so they cannot write into .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "README Why claims match the code (guard hook refuses specialist git writes, verify checks model and effort, caching and compaction from user defaults); the fallback doc is accurate to hooks.json and the agent names; recorded() fails when nothing is recorded and is stable.",
+    "Gates pass; no version change; findings reported."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9uywxc-ke6d"
+    ],
+    "independent_from": [
+      "assignment-0mv9uywxc-ke6d"
+    ]
+  },
+  "id": "assignment-0mv9v14er-h4gx",
+  "state": "Ready",
+  "result": null,
+  "acceptance": null
+}

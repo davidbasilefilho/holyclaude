@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Polish README accuracy, the dispatch test helper and the .claude fallback doc.",
+  "scope": [
+    "Worktree worktree j from main 6e76ec7: README.md, docs/claude-fallback.md, packages/cli/src/hook/dispatch.test.ts."
+  ],
+  "constraints": [
+    "Small, accurate changes; writing bar; no git writes; nothing under .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "README: specialists' git writes are refused by a guard hook (not cannot), assignment verify checks the model and effort a worker ran on, and caching and compaction are credited to the good defaults the user sets.",
+    "dispatch.test.ts: the recorded() wait fails the test on timeout (or waits for at least one record) instead of returning silently.",
+    "docs/claude-fallback.md: copied specialists lose the holyclaude: prefix that dispatch, the hooks and verify expect, and copied hooks need ${CLAUDE_PLUGIN_ROOT} replaced with the clone's plugin path.",
+    "fmt, lint, typecheck and full test pass; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "docs/claude-fallback.md",
+      "packages/cli/src/hook/dispatch.test.ts"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9unmcg-b8cc"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9uywxc-ke6d",
+  "state": "Succeeded",
+  "result": "README Why wording made accurate (refused guardrail, verify checks, caching and compaction from good defaults); recorded() waits for at least one record and fails otherwise; claude-fallback explains the missing holyclaude: prefix and the CLAUDE_PLUGIN_ROOT replacement; gates pass, dispatch test stable 6x.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
