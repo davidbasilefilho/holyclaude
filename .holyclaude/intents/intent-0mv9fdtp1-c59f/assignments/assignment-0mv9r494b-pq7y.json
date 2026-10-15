@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.operations",
+  "objective": "Bump the rebuilt version branch to 0.2.0 with the repository script.",
+  "scope": [
+    "Worktree worktree pr10 at the merge of PR #21, #20 and #23-#27."
+  ],
+  "constraints": [
+    "No git writes; only the version script and the build."
+  ],
+  "acceptance_criteria": [
+    "bump-version minor moves 0.1.0 to 0.2.0 in the six version files and the bun.lock workspace entries; bundle rebuilt.",
+    "fmt, lint, typecheck, full test, frozen install and both plugin validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "package.json",
+      "packages/cli/package.json",
+      "packages/core/package.json",
+      "plugin/package.json",
+      "plugin/.claude-plugin/plugin.json",
+      ".claude-plugin/marketplace.json",
+      "bun.lock",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9r494b-pq7y",
+  "state": "Succeeded",
+  "result": "0.1.0 -> 0.2.0 in six files and bun.lock workspaces; bundle one-line version change; all gates, frozen install and both validate runs pass (1299/0).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Bump evidence verified; independent review of #22 follows.",
+    "criteria_evidence": {
+      "bump-version minor moves 0.1.0 to 0.2.0 in the six version files and the bun.lock workspace entries; bundle rebuilt.": "versions listed; gates exit 0",
+      "fmt, lint, typecheck, full test, frozen install and both plugin validate --strict runs pass.": "versions listed; gates exit 0"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "changed-paths": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

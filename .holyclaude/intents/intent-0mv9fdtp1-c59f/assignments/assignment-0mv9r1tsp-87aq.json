@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.operations",
+  "objective": "Finish the version-branch merge tree: apply the test fix, rebuild the bundle once, run the gates.",
+  "scope": [
+    "Worktree worktree pr10, mid-merge of feat/named-records."
+  ],
+  "constraints": [
+    "No git writes (patch with `patch -p1`, not git apply); no other edits."
+  ],
+  "acceptance_criteria": [
+    "The test patch is applied; the bundle is rebuilt once with Bun 1.4.3 and has no conflict markers.",
+    "fmt, lint, typecheck, full test and both plugin validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src/commands.test.ts",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9qyjzm-aped"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9r1tsp-87aq",
+  "state": "Succeeded",
+  "result": "Patch applied; bundle rebuilt (272 modules, no markers); fmt, lint, typecheck, 1299/0, both validate --strict pass; no markers in tree.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Operations evidence verified; merge tree complete.",
+    "criteria_evidence": {
+      "The test patch is applied; the bundle is rebuilt once with Bun 1.4.3 and has no conflict markers.": "all commands exit 0 as reported",
+      "fmt, lint, typecheck, full test and both plugin validate --strict runs pass.": "all commands exit 0 as reported"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "changed-paths": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
