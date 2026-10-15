@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Worker.implementation",
+  "objective": "Repair own-defaults: README hooks row, root compaction removed, unused error field dropped.",
+  "scope": [
+    "Worktree worktree i (uncommitted change present): README.md, plugin/agents/holyclaude.md, scripts/agent-names.test.ts, packages/cli/src/hook/dispatch.ts and its test, plugin/scripts/holyclaude.js."
+  ],
+  "constraints": [
+    "Minimal; core-rules block untouched; no git writes."
+  ],
+  "acceptance_criteria": [
+    "README hooks table row and prose list the Agent matcher and say the PreToolUse hook also refuses a holyclaude root's non-holyclaude subagent calls; the settings rows say the hook backs the Agent deny entries and the specialists already set their compaction window, so only the root needs the autoCompactWindow setting.",
+    "autoCompactWindow is removed from the root holyclaude.md (inert for the main-session agent); the test pins it for the 18 specialists and its comment is accurate.",
+    "DispatchRefused drops the unused subagentType field.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test, validate pass; repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "plugin/agents/holyclaude.md",
+      "scripts/agent-names.test.ts",
+      "packages/cli/src/hook",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tp0jj-6dl0",
+      "assignment-0mv9tsvwz-23hv"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9tz082-3bed",
+  "state": "Succeeded",
+  "result": "README hooks row, prose and settings rows updated; root autoCompactWindow removed and test narrowed to 18 specialists; DispatchRefused field dropped; 1358/0; validate passes.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

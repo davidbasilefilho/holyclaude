@@ -1,0 +1,42 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Reviewer.code",
+  "objective": "Narrow re-review of the own-defaults repair.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9tz082-3bed.diff in worktree i."
+  ],
+  "constraints": [
+    "Read-only; outside the repair lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "README hooks and settings text match the shipped hook and frontmatter; the root no longer sets autoCompactWindow and the test pins the 18 specialists; the unused field is gone; gates pass and the bundle matches a fresh build.",
+    "Findings reported."
+  ],
+  "required_evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tz082-3bed"
+    ],
+    "independent_from": [
+      "assignment-0mv9tz082-3bed",
+      "assignment-0mv9tp0jj-6dl0",
+      "assignment-0mv9tsvwz-23hv"
+    ]
+  },
+  "id": "assignment-0mv9u1bp1-ql2q",
+  "state": "Failed",
+  "result": "container restart; scope changed by the owner's compaction decision",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

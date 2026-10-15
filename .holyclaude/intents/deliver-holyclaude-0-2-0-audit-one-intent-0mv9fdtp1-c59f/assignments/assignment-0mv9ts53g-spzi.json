@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Worker.mechanical",
+  "objective": "Add the project settings file with empty commit and PR attribution.",
+  "scope": [
+    "Worktree worktree i: .claude/settings.json (new)."
+  ],
+  "constraints": [
+    "Only that file; no git writes."
+  ],
+  "acceptance_criteria": [
+    "worktree i/.claude/settings.json holds exactly {\"attribution\": {\"commit\": \"\", \"pr\": \"\"}}, formatted by oxfmt; oxfmt check passes."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      ".claude/settings.json"
+    ],
+    "symbols": [],
+    "domains": [
+      "config"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ts53g-spzi",
+  "state": "Succeeded",
+  "result": ".claude/settings.json created with empty commit and pr attribution; oxfmt passes.",
+  "acceptance": {
+    "intent_revision": 9,
+    "rationale": "Root read the file: exactly the owner-dictated JSON.",
+    "criteria_evidence": {
+      "worktree i/.claude/settings.json holds exactly {\"attribution\": {\"commit\": \"\", \"pr\": \"\"}}, formatted by oxfmt; oxfmt check passes.": "verified by reading the file"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt exit 0; diff saved",
+      "diff-file": "oxfmt exit 0; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

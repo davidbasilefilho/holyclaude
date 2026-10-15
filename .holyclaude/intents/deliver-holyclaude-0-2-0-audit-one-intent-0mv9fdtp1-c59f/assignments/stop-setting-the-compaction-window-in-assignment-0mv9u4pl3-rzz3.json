@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Stop setting the compaction window in agent frontmatter; document it as a default and set it for this repository.",
+  "scope": [
+    "Worktree worktree i (uncommitted own-defaults change present): plugin/agents, scripts/agent-names.test.ts, README.md, .claude/settings.json."
+  ],
+  "constraints": [
+    "Keep the dispatch guard and everything else as is; core-rules block untouched; no git writes."
+  ],
+  "acceptance_criteria": [
+    "No agent file in plugin/agents sets autoCompactWindow, and the frontmatter pin test is removed or turned into nothing that requires it.",
+    "README lists autoCompactWindow 450000 (or CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000) as a good default for all agents, root and specialists, with no claim that the plugin sets it.",
+    ".claude/settings.json holds the attribution setting and \"autoCompactWindow\": 450000.",
+    "fmt, lint, typecheck, full test and both validate --strict runs pass; repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents",
+      "scripts/agent-names.test.ts",
+      "README.md",
+      ".claude/settings.json"
+    ],
+    "symbols": [],
+    "domains": [
+      "config"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tz082-3bed"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9u4pl3-rzz3",
+  "state": "Succeeded",
+  "result": "autoCompactWindow removed from all agents and its test; README states it as a user default for all agents; .claude/settings.json has attribution and autoCompactWindow 450000; gates and validate pass.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

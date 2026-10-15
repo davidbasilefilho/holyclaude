@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 8,
+  "role": "Librarian.research",
+  "objective": "Verify which Claude Code settings a plugin can ship and which holyclaude defaults users must set themselves.",
+  "scope": [
+    "Current official Claude Code documentation (plugins reference, settings, environment variables, subagents, model config, CHANGELOG) as of October 2026."
+  ],
+  "constraints": [
+    "Cite the doc page for each claim; separate documented facts from inference."
+  ],
+  "acceptance_criteria": [
+    "States exactly which keys a plugin's settings.json (or other plugin files) can set, and for each candidate default (autoCompactWindow or CLAUDE_CODE_AUTO_COMPACT_WINDOW, CLAUDE_CODE_FORK_SUBAGENT, permissions deny of fork and built-in agents, promptCacheTtl, subagentPromptCacheTtl, deniedModels, CLAUDE_CODE_EFFORT_LEVEL, CLAUDE_CODE_SUBAGENT_MODEL, gh allow rules) whether a plugin can apply it, with the source.",
+    "Checks the facts in the current README section (the value range and precedence of autoCompactWindow, managed-only keys, cache TTL keys) and lists any that are wrong or outdated."
+  ],
+  "required_evidence": [
+    "sources",
+    "answers"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9tkw08-hzog",
+  "state": "Succeeded",
+  "result": "Plugin settings.json honors only agent and subagentStatusLine (confirmed). Plugin agent frontmatter supports autoCompactWindow, model, effort, tools, experimental.cacheTtl. CLAUDE_ENV_FILE reaches only Bash, so fork mode, root cache TTL and root compaction are not hook-settable. A PreToolUse hook on Agent can deny by tool_input.subagent_type (fork, general-purpose, Explore, Plan; verify empirically). deniedModels managed-only. CLAUDE_CODE_SUBAGENT_MODEL redundant. Version 2.1.288 for per-model autoCompactWindow unverified.",
+  "acceptance": {
+    "intent_revision": 8,
+    "rationale": "Cited doc answers; unverified items flagged and to be tested.",
+    "criteria_evidence": {
+      "States exactly which keys a plugin's settings.json (or other plugin files) can set, and for each candidate default (autoCompactWindow or CLAUDE_CODE_AUTO_COMPACT_WINDOW, CLAUDE_CODE_FORK_SUBAGENT, permissions deny of fork and built-in agents, promptCacheTtl, subagentPromptCacheTtl, deniedModels, CLAUDE_CODE_EFFORT_LEVEL, CLAUDE_CODE_SUBAGENT_MODEL, gh allow rules) whether a plugin can apply it, with the source.": "answered with doc sources and limits",
+      "Checks the facts in the current README section (the value range and precedence of autoCompactWindow, managed-only keys, cache TTL keys) and lists any that are wrong or outdated.": "answered with doc sources and limits"
+    },
+    "required_evidence": {
+      "sources": "sources and answers reported",
+      "answers": "sources and answers reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -34,7 +34,20 @@
     ]
   },
   "id": "assignment-0mv9teu4g-znxc",
-  "state": "Ready",
-  "result": null,
-  "acceptance": null
+  "state": "Succeeded",
+  "result": "No blockers; gates, validate, bundle identical; 27 tests fail on base. Optional: legacy dotted agent type in verify, allowlist drift test, test weak spots.",
+  "acceptance": {
+    "intent_revision": 8,
+    "rationale": "Independent review: no blockers.",
+    "criteria_evidence": {
+      "Every specialist name is valid for claude.ai and equals its file name; dispatch, routes, verify and hooks agree on holyclaude:<kebab>; role values in records unchanged; no holyclaude:<Role.task> remains.": "met with base run, grep and validate",
+      "Tests would fail without the change; gates, validate and bundle-equals-fresh-build pass; findings reported.": "met with base run, grep and validate"
+    },
+    "required_evidence": {
+      "code-review-run": "invocation, checks and findings",
+      "checks-run": "invocation, checks and findings",
+      "findings": "invocation, checks and findings"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
 }

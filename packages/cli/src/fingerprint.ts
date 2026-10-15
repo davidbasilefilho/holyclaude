@@ -7,6 +7,16 @@ import { Effect } from "effect"
 export const PLUGIN_NAME = "holyclaude"
 
 /**
+ * The `agent_type` a hook payload shows when the main thread runs as the holyclaude agent: the
+ * plugin-qualified name, or the bare one. That agent's system prompt already carries the core
+ * rules.
+ */
+export const ROOT_AGENT_TYPES: ReadonlyArray<string> = [
+  `${PLUGIN_NAME}:${PLUGIN_NAME}`,
+  PLUGIN_NAME,
+]
+
+/**
  * The `subagent_type` of a role's specialist: the plugin name and the agent file's name, so
  * `Worker.implementation` is `holyclaude:worker-implementation`. The agent name is limited to
  * letters, digits and hyphens, which a role identifier is not.
