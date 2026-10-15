@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Reviewer.security",
+  "objective": "Independent Reviewer.security review of holyclaude's own defaults (dispatch guard and frontmatter compaction).",
+  "scope": [
+    "Uncommitted changes in worktree i against main 1d93f92; diff scratchpad/diffs/assignment-0mv9tp0jj-6dl0.diff."
+  ],
+  "constraints": [
+    "Read-only; scratch work in the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "The PreToolUse dispatch guard denies only a holyclaude root's own Agent calls to non-holyclaude types and leaves other sessions, subagents and tools untouched; it cannot be bypassed by payload shape and fails safe on malformed input; frontmatter compaction is set in all agents.",
+    "Tests would fail without the change; gates pass; findings reported."
+  ],
+  "required_evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tp0jj-6dl0"
+    ],
+    "independent_from": [
+      "assignment-0mv9tp0jj-6dl0"
+    ]
+  },
+  "id": "assignment-0mv9tsw2f-8qmi",
+  "state": "Succeeded",
+  "result": "No validated vulnerability; malformed input fail-closed on the deny branch, hook crash fails open by design; matcher change does not weaken the write guard; prefix match acceptable behind the root tools allowlist. Open: live confirmation that main-thread payloads carry agent_type and tool name Agent.",
+  "acceptance": {
+    "intent_revision": 9,
+    "rationale": "Security review: no vulnerability; live payload shape open.",
+    "criteria_evidence": {
+      "The PreToolUse dispatch guard denies only a holyclaude root's own Agent calls to non-holyclaude types and leaves other sessions, subagents and tools untouched; it cannot be bypassed by payload shape and fails safe on malformed input; frontmatter compaction is set in all agents.": "traced and cleared with file:line",
+      "Tests would fail without the change; gates pass; findings reported.": "traced and cleared with file:line"
+    },
+    "required_evidence": {
+      "findings": "findings; checks none (no shell)",
+      "checks-run": "findings; checks none (no shell)"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -40,6 +40,21 @@
   "id": "assignment-0mv9ta70t-f783",
   "state": "Succeeded",
   "result": "18 agents renamed to kebab; agentType(role) derives holyclaude:<route.agent>; routes prints subagent_type; verify expects kebab; prompts, skill, README updated; agent-names test (18 fail before); 1321/0; validate passes; core block size unchanged.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 8,
+    "rationale": "Verified by review znxc.",
+    "criteria_evidence": {
+      "Every specialist agent's frontmatter name equals its kebab file name (explorer-lookup ... worker-visual); dispatch, routes, hooks, verify and select use holyclaude:<kebab> as the agent type.": "verified by review znxc",
+      "The root prompt's tools list, specialist table and skills reference the new agent types; no `holyclaude:<Role.task>` agent type remains anywhere.": "verified by review znxc",
+      "A test fails when any plugin agent name breaks the claude.ai rule (letters, digits, hyphens; alphanumeric at both ends).": "verified by review znxc",
+      "Bundle rebuilt; fmt, lint, typecheck, full test and both validate --strict runs pass.": "verified by review znxc"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "changed-paths": "reported",
+      "diff-file": "reported",
+      "tests-added": "reported"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

@@ -12,15 +12,15 @@ The root asks the user questions only where a choice changes requirements, behav
 
 ## `.holyclaude` state is versioned in git
 
-Intents and Assignments are committed, so a team or several clones share them through version control and a record survives a lost machine. What stays out of version control is listed in [the README's State section](../README.md#state).
+Intents and Assignments are committed, so a team or several clones share them through version control and a record survives a lost machine. What stays out of version control is listed in [the State page](state.md).
 
 ## One shared version across packages
 
-Every package and manifest carries the same version, so a single number leaves no question of which package matches which release, and it is the number Claude Code compares to see a plugin update. The version-string rule, the six places and the bump tasks are in [the README's Development section](../README.md#development).
+Every package and manifest carries the same version, so a single number leaves no question of which package matches which release, and it is the number Claude Code compares to see a plugin update. The version-string rule, the six places and the bump tasks are in [the Development page](development.md#versions).
 
 ## No `bin/` in the plugin
 
-claude.ai and Cowork refuse to install a plugin that has a `bin/` directory, which is what would put a command on `PATH`. Without one the plugin installs everywhere. [The README](../README.md#on-windows) describes how the `holyclaude` command is reached instead.
+claude.ai and Cowork refuse to install a plugin that has a `bin/` directory, which is what would put a command on `PATH`. Without one the plugin installs everywhere. [The hooks page](hooks.md#on-windows) describes how the `holyclaude` command is reached instead.
 
 ## Nothing from audited third-party repositories
 
@@ -28,4 +28,4 @@ holyclaude is public. Code, paths, product names and quotes from any third-party
 
 ## `frontend-design` is vendored byte-identical
 
-The vendored `frontend-design` skill stays a copy of the upstream skill, so a refresh from upstream replaces the directory cleanly. holyclaude-specific adjustments live in `interface-inspection` and in the visual agents, never in the vendored copy. The [README](../README.md#third-party-material) names the sources, paths and verified commits.
+The vendored `frontend-design` skill stays a copy of the upstream skill, so a refresh from upstream replaces the directory cleanly. holyclaude-specific adjustments live in `interface-inspection` and in the visual agents, never in the vendored copy. The [Development page](development.md#third-party-material) names the sources, paths and verified commits.

@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Reviewer.code",
+  "objective": "Independent Reviewer.code review of holyclaude's own defaults (dispatch guard and frontmatter compaction).",
+  "scope": [
+    "Uncommitted changes in worktree i against main 1d93f92; diff scratchpad/diffs/assignment-0mv9tp0jj-6dl0.diff."
+  ],
+  "constraints": [
+    "Read-only; scratch work in the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "The PreToolUse dispatch guard denies only a holyclaude root's own Agent calls to non-holyclaude types and leaves other sessions, subagents and tools untouched; it cannot be bypassed by payload shape and fails safe on malformed input; frontmatter compaction is set in all agents.",
+    "Tests would fail without the change; gates pass; findings reported."
+  ],
+  "required_evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tp0jj-6dl0"
+    ],
+    "independent_from": [
+      "assignment-0mv9tp0jj-6dl0"
+    ]
+  },
+  "id": "assignment-0mv9tsvwz-23hv",
+  "state": "Succeeded",
+  "result": "Blocker: README hooks table and prose stale for the Agent matcher and dispatch guard. Decision: root autoCompactWindow is inert (main-session agent). Optional: unused subagentType field, Task alias, test placement. Gates, bundle, hand-run payloads pass.",
+  "acceptance": {
+    "intent_revision": 9,
+    "rationale": "Code review: README blocker and root-frontmatter decision taken as a repair.",
+    "criteria_evidence": {
+      "The PreToolUse dispatch guard denies only a holyclaude root's own Agent calls to non-holyclaude types and leaves other sessions, subagents and tools untouched; it cannot be bypassed by payload shape and fails safe on malformed input; frontmatter compaction is set in all agents.": "see findings",
+      "Tests would fail without the change; gates pass; findings reported.": "see findings"
+    },
+    "required_evidence": {
+      "findings": "findings and checks reported",
+      "checks-run": "findings and checks reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

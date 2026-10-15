@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Rewrite the README as a short pitch-first page with reference detail moved to docs/, and rebuild the bundle.",
+  "scope": [
+    "Worktree worktree g, branch release/0.2.1/chore/version (PR #30) after merging main and the own-defaults branch: README.md, docs/, plugin/scripts/holyclaude.js."
+  ],
+  "constraints": [
+    "Writing bar; no applicable fact lost; T3 Code only in Special thanks; no git writes; nothing under .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "README sections in order: # holyclaude, ## What is holyclaude? (the pitch), ## Why holyclaude?, ## How does it work?, ## Development, ## Special thanks!, ## License; roughly a quarter of its current length.",
+    "Long reference detail moves to linked files under docs/; every applicable fact from the current README lives in README or docs; docs/DECISIONS.md links resolve.",
+    "The README's good-defaults list holds only what no plugin mechanism applies (autoCompactWindow 450000 for all agents, promptCacheTtl 1h for the root on API-key setups, CLAUDE_CODE_FORK_SUBAGENT=0 and the Agent deny entries as a backstop to the hook, optional read-only gh allow rules, managed deniedModels, CLAUDE_CODE_EFFORT_LEVEL and CLAUDE_CODE_SUBAGENT_MODEL_FORCE left unset); CLAUDE_CODE_SUBAGENT_MODEL and the unverified 2.1.288 claim are dropped.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test, frozen install and both validate runs pass; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "sizes",
+    "fact-map"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "docs",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9u848y-dpjy",
+  "state": "Succeeded",
+  "result": "README rewritten pitch-first in order What, Why, How, Development, Special thanks, License; 47,691 -> 8,657 bytes; reference moved to docs/{state,hooks,settings,limits,development,cloud-sessions,claude-fallback}.md; DECISIONS links repointed; good defaults list in README; gates pass; bundle unchanged by rebuild.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

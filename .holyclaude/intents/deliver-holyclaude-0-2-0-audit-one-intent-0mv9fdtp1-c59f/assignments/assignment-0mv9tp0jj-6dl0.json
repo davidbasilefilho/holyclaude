@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 9,
+  "role": "Worker.implementation",
+  "objective": "Apply holyclaude's own defaults through plugin mechanisms: compaction window in frontmatter and a hook that blocks non-holyclaude subagents.",
+  "scope": [
+    "Worktree worktree i, branch release/0.2.1/feat/own-defaults from main 1d93f92: plugin/agents, plugin/hooks, packages/cli/src/hook, plugin/scripts/holyclaude.js, scripts tests."
+  ],
+  "constraints": [
+    "Effect, Schema, Bun rules from AGENTS.md; README is not yours (a later PR rewrites it); no git writes."
+  ],
+  "acceptance_criteria": [
+    "Every agent file (root and 18 specialists) sets autoCompactWindow: 450000 in frontmatter; a test pins it.",
+    "In sessions whose root agent is holyclaude, the PreToolUse hook denies an Agent call whose subagent_type is fork, general-purpose, Explore, Plan, missing, or anything not starting with holyclaude:, with a reason naming the allowed specialists; holyclaude: specialists pass; sessions with another root are untouched; tests cover each case.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test and both validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents",
+      "plugin/hooks",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "scripts"
+    ],
+    "symbols": [],
+    "domains": [
+      "hooks"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9tkw08-hzog"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9tp0jj-6dl0",
+  "state": "Succeeded",
+  "result": "autoCompactWindow 450000 in all 19 agents with a pinning test; PreToolUse guardDispatch denies a holyclaude root main-thread Agent call unless subagent_type starts with holyclaude:; ROOT_AGENT_TYPES shared; matcher gains Agent; 1359/0; validate passes; README rows 75, 78, 84-108 now stale.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
