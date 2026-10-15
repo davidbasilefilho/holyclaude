@@ -1,0 +1,66 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Second repair of feat/named-records: bounded id-suffix check, backslash names, claim pre-pass and reader retries.",
+  "scope": [
+    "Worktree worktree e (uncommitted E change present)."
+  ],
+  "constraints": [
+    "Never run against a live .holyclaude; no schema change; no git writes."
+  ],
+  "acceptance_criteria": [
+    "otherIdEnding cannot do quadratic work: it only tests suffixes that start with a record kind prefix and are no longer than the longest loaded id, or refuses names over 255 bytes first; a regression test with a long hyphenated legacy id completes quickly.",
+    "Directory or file names containing a backslash are refused at load (folder and name come from the real path components); test.",
+    "persist runs every claim before its first move or write, so a claim failure writes nothing; and it checks unchanged records' names against newly introduced ids; tests.",
+    "A lock-free load retries once on the own-folder mismatch caused by a concurrent folder rename, as for a vanished file; test.",
+    "moveFolder maps a Windows EPERM onto a non-empty destination to the same guided error; the fold map adds ı and ħ.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9px0f1-rx09",
+      "assignment-0mv9q56tw-wmn1",
+      "assignment-0mv9q5702-xrti"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9qe4bg-omr1",
+  "state": "Succeeded",
+  "result": "Second E repair: 255-char name cap and kind-prefixed suffixes in otherIdEnding (1 MB id 11.8s -> 0.3s), backslash names refused with folder/name from real path components, plan-then-execute persist with all claims first, unchanged names checked against new ids, Raced retry for own-folder mismatch, EPERM on non-empty destination guided, fold ı ħ. 1274/0; bundle rebuilt.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "E verified by code review pntf, security review 6xw4 and narrow code/security re-reviews wmn1, xrti, cokb, 2ghh; final passes have no blockers.",
+    "criteria_evidence": {
+      "otherIdEnding cannot do quadratic work: it only tests suffixes that start with a record kind prefix and are no longer than the longest loaded id, or refuses names over 255 bytes first; a regression test with a long hyphenated legacy id completes quickly.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Directory or file names containing a backslash are refused at load (folder and name come from the real path components); test.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "persist runs every claim before its first move or write, so a claim failure writes nothing; and it checks unchanged records' names against newly introduced ids; tests.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "A lock-free load retries once on the own-folder mismatch caused by a concurrent folder rename, as for a vanished file; test.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "moveFolder maps a Windows EPERM onto a non-empty destination to the same guided error; the fold map adds ı and ħ.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Bundle rebuilt; fmt, lint, typecheck, full test pass.": "verified by the review chain ending in cokb and 2ghh (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; confirmed by reviews",
+      "diff-file": "reported by the writer; confirmed by reviews",
+      "tests-added": "reported by the writer; confirmed by reviews"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

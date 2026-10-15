@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Narrow Reviewer.code re-review of E's second repair.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9qe4bg-omr1-repair.diff in worktree e; read it and the code it touches."
+  ],
+  "constraints": [
+    "Read-only; never run against a live .holyclaude; outside the repair lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "The six items are fixed without new defects: bounded id-suffix check, backslash refusal, claims before writes, unchanged-name check, raced retry, EPERM mapping and folds; F1 stays unreachable.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9qe4bg-omr1"
+    ],
+    "independent_from": [
+      "assignment-0mv9qe4bg-omr1",
+      "assignment-0mv9px0f1-rx09",
+      "assignment-0mv9pb5se-y5pd",
+      "assignment-0mv9pnsje-pntf",
+      "assignment-0mv9pnspx-6xw4",
+      "assignment-0mv9q56tw-wmn1",
+      "assignment-0mv9q5702-xrti"
+    ]
+  },
+  "id": "assignment-0mv9qmm0s-cokb",
+  "state": "Succeeded",
+  "result": "No blockers; gates pass (1274), bundle identical, 7 new tests fail pre-repair. Optional: 255 cap ignores temp suffix (reproduced at 212-252 chars), ID_STARTS hard-coded.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Narrow code re-review: no blockers; optional items recorded as open.",
+    "criteria_evidence": {
+      "The six items are fixed without new defects: bounded id-suffix check, backslash refusal, claims before writes, unchanged-name check, raced retry, EPERM mapping and folds; F1 stays unreachable.": "met per review with pre-repair run and bundle cmp",
+      "Blockers and optional findings reported with evidence.": "met per review with pre-repair run and bundle cmp"
+    },
+    "required_evidence": {
+      "findings": "findings and checks reported",
+      "checks-run": "findings and checks reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

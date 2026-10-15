@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.integration",
+  "objective": "Resolve the named-records merge conflicts in the rebuilt version branch.",
+  "scope": [
+    "Worktree worktree pr10, mid-merge of origin/release/0.2.0/feat/named-records into release/0.2.0/chore/version (which already merged stack-rules, locked-tools, worktree-ownership and review-and-cloud onto PR #21). Unmerged: README.md and packages/core/src/records.ts."
+  ],
+  "constraints": [
+    "Keep both sides' behavior; no new features; leave the bundle and .holyclaude records to the root; no git writes (do not commit or abort the merge)."
+  ],
+  "acceptance_criteria": [
+    "records.ts keeps fix/worktree-ownership's worktree key handling (local worktrees.json, AssignmentRecord omitting worktree) and feat/named-records' slugged naming, path-holder checks and retries; README keeps both sides' text.",
+    "No conflict markers remain; fmt, lint, typecheck and full test pass on the merged tree (bundle excluded)."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "resolution"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "packages/core/src"
+    ],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9qe4bg-omr1",
+      "assignment-0mv9op2qr-40db"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9qyjzm-aped",
+  "state": "Succeeded",
+  "result": "records.ts and README resolved keeping worktree keys inside named-records structure; no markers; gates pass except one #25 test hard-coding the pre-slug file name (patch provided, 1299/0 with it).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Resolution reviewed by me against both sides; the semantic test conflict is fixed with the provided patch in the next step.",
+    "criteria_evidence": {
+      "records.ts keeps fix/worktree-ownership's worktree key handling (local worktrees.json, AssignmentRecord omitting worktree) and feat/named-records' slugged naming, path-holder checks and retries; README keeps both sides' text.": "no markers; gates pass with the patch (1299/0)",
+      "No conflict markers remain; fmt, lint, typecheck and full test pass on the merged tree (bundle excluded).": "no markers; gates pass with the patch (1299/0)"
+    },
+    "required_evidence": {
+      "checks-run": "reported per hunk",
+      "resolution": "reported per hunk"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
