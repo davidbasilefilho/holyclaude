@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import { MAX_GITIGNORE_BYTES } from "./codec.ts"
 import { io, readText } from "./io.ts"
 import { refuseSymlinks } from "./safety.ts"
+import { slugOf } from "./slug.ts"
 
 const STORE_DIRECTORY = ".holyclaude"
 const LOCAL_DIRECTORY = "local"
@@ -19,13 +20,58 @@ export const projectRoot = (env: NodeJS.ProcessEnv = process.env): string =>
 export const stateDirPath = (env: NodeJS.ProcessEnv = process.env): string =>
   env["HOLYCLAUDE_STATE_DIR"] || join(projectRoot(env), STORE_DIRECTORY)
 
-/** The file of an Intent: `intents/<intent-id>/intent.json`. */
-export const intentFile = (directory: string, intentId: string): string =>
-  join(directory, "intents", intentId, "intent.json")
+/**
+ * The name of a record's directory or file: its objective's slug, a hyphen and its id, or the id
+ * alone when the objective has no slug. The id is the key and always ends the name.
+ */
+export const recordName = (objective: string, id: string): string => {
+  const slug = slugOf(objective)
+  return slug === "" ? id : `${slug}-${id}`
+}
 
-/** The file of an Assignment: `intents/<intent-id>/assignments/<assignment-id>.json`. */
-export const assignmentFile = (directory: string, intentId: string, id: string): string =>
-  join(directory, "intents", intentId, "assignments", `${id}.json`)
+/** Whether a directory or file name (without `.json`) ends in the id, or is exactly the id. */
+export const nameEndsInId = (name: string, id: string): boolean =>
+  name === id || name.endsWith(`-${id}`)
+
+/** Most characters in a directory or file name, which every file system enforces in bytes or fewer. */
+export const MAX_NAME_LENGTH = 255
+
+/** What every id starts with after the hyphen that joins it to a slug. */
+const ID_STARTS = ["-intent-", "-assignment-"]
+
+/**
+ * The id of another record that the name ends in as well, if any: `name` ends in `id`, but a name
+ * that also ends in a second id could be read as that record's, so neither can own it. Only
+ * suffixes that begin like an id are tried, and the name is at most {@link MAX_NAME_LENGTH}
+ * characters: a caller refuses a longer one first, so the work here stays small whatever the ids
+ * are.
+ */
+export const otherIdEnding = (name: string, id: string, ids: ReadonlySet<string>) => {
+  for (let at = name.indexOf("-"); at !== -1; at = name.indexOf("-", at + 1)) {
+    if (!ID_STARTS.some((start) => name.startsWith(start, at))) continue
+    const suffix = name.slice(at + 1)
+    if (suffix !== id && ids.has(suffix)) return suffix
+  }
+  return name !== id && ids.has(name) ? name : undefined
+}
+
+/** The directory of an Intent: `intents/<slug>-<intent-id>`. */
+export const intentFolder = (
+  directory: string,
+  intent: { readonly id: string; readonly objective: string },
+): string => join(directory, "intents", recordName(intent.objective, intent.id))
+
+/** The file of an Intent: `intent.json` in its directory. */
+export const intentFile = (
+  directory: string,
+  intent: { readonly id: string; readonly objective: string },
+): string => join(intentFolder(directory, intent), "intent.json")
+
+/** The file of an Assignment: `assignments/<slug>-<assignment-id>.json` in its Intent's directory. */
+export const assignmentFile = (
+  folder: string,
+  assignment: { readonly id: string; readonly objective: string },
+): string => join(folder, "assignments", `${recordName(assignment.objective, assignment.id)}.json`)
 
 /** A machine-local file. Everything under `local/` stays out of version control. */
 export const localFile = (directory: string, name: string): string =>

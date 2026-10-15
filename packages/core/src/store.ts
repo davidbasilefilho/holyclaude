@@ -5,21 +5,29 @@ import { mergeLegacy, migrateLegacy, readLegacy } from "./legacy.ts"
 import { ensureCloneId, stampClone, writeActiveIntent } from "./local.ts"
 import { withStateLock } from "./lock.ts"
 import type { Change, State } from "./model/state.ts"
-import { loadRecordState, persist } from "./records.ts"
+import { loadRecords, persist, type Stored } from "./records.ts"
 
 /**
- * Reads and validates the project state without locking: one file per record, plus the local worker
- * list and agent ids. A directory with nothing in it is the empty state. A state file of an earlier
- * version that is still waiting to be migrated is read together with the record files. Files are
- * read whole unless a `limit` is given; a hook that reads a project's state without owning it
- * passes one, and a file over it fails the load as TooLarge.
+ * Reads and validates the project state without locking, and says which file holds each record (by
+ * record id; a record still waiting in an earlier version's file has none yet): one file per
+ * record, plus the local worker list and agent ids. A directory with nothing in it is the empty
+ * state. A state file of an earlier version that is still waiting to be migrated is read together
+ * with the record files. Files are read whole unless a `limit` is given; a hook that reads a
+ * project's state without owning it passes one, and a file over it fails the load as TooLarge.
  */
-export const loadState = (directory: string, limit?: number) =>
+export const loadStored = (directory: string, limit?: number) =>
   Effect.gen(function* () {
     const legacy = yield* readLegacy(directory)
-    const existing = yield* loadRecordState(directory, limit)
-    return legacy === undefined ? existing : mergeLegacy(legacy, existing)
+    const existing = yield* loadRecords(directory, limit)
+    return {
+      state: legacy === undefined ? existing.state : mergeLegacy(legacy, existing.state),
+      files: existing.files,
+    } satisfies Stored
   })
+
+/** The project state, read as {@link loadStored} does, without the file of each record. */
+export const loadState = (directory: string, limit?: number) =>
+  loadStored(directory, limit).pipe(Effect.map(({ state }) => state))
 
 /** What a transition can ask the store for while it holds the lock. */
 export interface UpdateContext {
@@ -48,14 +56,14 @@ export const updateState = <A, E>(
       // covers an earlier version's files too, so it is safe in front of a migration.
       yield* keepLocalFilesOutOfVersionControl(directory)
       yield* migrateLegacy(directory, lock)
-      const before = yield* loadRecordState(directory)
+      const before = yield* loadRecords(directory)
       const cloneId = ensureCloneId(directory, lock)
-      const { state, value } = yield* transition(before, {
+      const { state, value } = yield* transition(before.state, {
         cloneId,
         useIntent: (intentId) => writeActiveIntent(directory, intentId, lock),
       })
-      if (state !== before)
-        yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock)
+      if (state !== before.state)
+        yield* persist(directory, before, yield* stampClone(cloneId, before.state, state), lock)
       return value
     }),
   )

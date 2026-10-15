@@ -100,8 +100,9 @@ describe("two branches that each add records", () => {
     expect(mergedA.out + mergedB.out).not.toContain("CONFLICT")
 
     const files = await trackedFiles()
-    for (const id of [first, second])
-      expect(files).toContain(`.holyclaude/intents/${intent}/assignments/${id}.json`)
+    const folder = `.holyclaude/intents/share-state-${intent}`
+    expect(files).toContain(`${folder}/assignments/look-at-the-store-${first}.json`)
+    expect(files).toContain(`${folder}/assignments/look-at-the-hooks-${second}.json`)
 
     expect(await listedIds()).toEqual([first, second].toSorted())
     await holyclaude(undefined, "assignment", "show", first)
@@ -131,12 +132,33 @@ describe("two branches that each add records", () => {
     expect(second > first).toBe(true)
     expect(first > base).toBe(true)
     const listed = await holyclaude(undefined, "intent", "list")
-    expect([...listed.matchAll(/intent-[0-9a-z-]+/g)].map(([id]) => id)).toEqual([
-      base,
-      first,
-      second,
-    ])
+    // Each row names its Intent twice, by id and in its path.
+    const ids = new Set([...listed.matchAll(/intent-[0-9a-z]{9}-[0-9a-z]{4}/g)].map(([id]) => id))
+    expect([...ids]).toEqual([base, first, second])
     expect(idOf(await holyclaude(undefined, "intent", "show", "--intent", second))).toBe(second)
+  })
+})
+
+describe("a changed objective", () => {
+  test("renames the directory in one move, which git sees as a rename of every record in it", async () => {
+    const intent = await createIntent("Share state")
+    const assignment = await createAssignment(intent, "Look at the store")
+    await commit("base")
+
+    await holyclaude({ objective: "Share state, in Portuguese: ação" }, "intent", "update")
+    expect((await git("add", "-A")).code).toBe(0)
+
+    const before = `.holyclaude/intents/share-state-${intent}`
+    const after = `.holyclaude/intents/share-state-in-portuguese-acao-${intent}`
+    const status = (await git("status", "--porcelain")).out.split("\n")
+    expect(status).toContain(
+      `R  ${before}/assignments/look-at-the-store-${assignment}.json -> ${after}/assignments/look-at-the-store-${assignment}.json`,
+    )
+    expect(
+      status.some((line) => line.startsWith(`R`) && line.endsWith(`${after}/intent.json`)),
+    ).toBe(true)
+    expect(await trackedFiles()).not.toContain(`${before}/intent.json`)
+    await holyclaude(undefined, "assignment", "show", assignment)
   })
 })
 
@@ -160,8 +182,8 @@ describe("local files and version control", () => {
     const files = await trackedFiles()
     expect(files.toSorted()).toEqual([
       ".holyclaude/.gitignore",
-      `.holyclaude/intents/${intent}/assignments/${assignment}.json`,
-      `.holyclaude/intents/${intent}/intent.json`,
+      `.holyclaude/intents/share-state-${intent}/assignments/look-at-the-store-${assignment}.json`,
+      `.holyclaude/intents/share-state-${intent}/intent.json`,
     ])
 
     const local = [".holyclaude/local/agents.json", ".holyclaude/local/workers.json"]
@@ -173,7 +195,8 @@ describe("local files and version control", () => {
     expect((await git("check-ignore", "-q", ".holyclaude/state.json.migrated")).code).toBe(0)
     expect((await git("check-ignore", "-q", ".holyclaude/intents/x/a.json.1.abc.tmp")).code).toBe(0)
     expect(
-      (await git("check-ignore", "-q", `.holyclaude/intents/${intent}/intent.json`)).code,
+      (await git("check-ignore", "-q", `.holyclaude/intents/share-state-${intent}/intent.json`))
+        .code,
     ).toBe(1)
 
     // A repository may replace the folder's .gitignore; local files stay ignored by their own.

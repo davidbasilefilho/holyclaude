@@ -48,6 +48,24 @@
   "id": "assignment-0mv9px0f1-rx09",
   "state": "Succeeded",
   "result": "E repair: path-holder map in persist refuses writes onto another id path, load rejects names ending in two loaded ids, slug on 512-unit prefix and only for new or changed Intents, Assignment must sit in its Intent loaded folder, stale destination folder fails as CorruptRecord with guidance, lock-free load retries once on Vanished, seven-letter fold map, docs. 1267/0; 11 new tests fail on old code.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "E verified by code review pntf, security review 6xw4 and narrow code/security re-reviews wmn1, xrti, cokb, 2ghh; final passes have no blockers.",
+    "criteria_evidence": {
+      "Security F1: persist never moves or writes a record onto a path held by a different id (loaded or written earlier in the run); it fails with CorruptRecord naming both, and a regression test with ids assignment-store-<V> vs V and objective Review assignment store proves it; names ending in two loaded ids are rejected at load.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Security F2: slugOf works on a bounded prefix of the objective (e.g. first 512 code units) and unchanged records skip slugging cost where practical.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Security F3: an Assignment must sit in the folder of the Intent it belongs to (the loaded Intent's own folder), not any folder whose name ends in its intent_id; test.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "A directory rename whose destination exists fails with an error naming the stale folder and how to resolve it, instead of a raw ENOTEMPTY; test.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "A lock-free load retries once when a record disappears mid-read; test.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Slug folds ø ł ß æ đ œ þ via a small map; tests.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "SKILL.md intent list columns include path; README layout line no longer says intents/<id>/.": "verified by the review chain ending in cokb and 2ghh (no blockers)",
+      "Bundle rebuilt; fmt, lint, typecheck, full test pass.": "verified by the review chain ending in cokb and 2ghh (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; confirmed by reviews",
+      "diff-file": "reported by the writer; confirmed by reviews",
+      "tests-added": "reported by the writer; confirmed by reviews"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

@@ -48,7 +48,7 @@ The `assignments` skill has each command in launch order; a verify mismatch is a
 
 ## VCS, CI and authorization
 
-- Subagents leave git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, thread replies, remote repository creation) to you. Stage only the authorized Assignments' paths and their Intent's records (`.holyclaude/intents/<intent-id>/`).
+- Subagents leave git and gh writes (commit, branch, tag, push, rebase, merge, PR create or update, thread replies, remote repository creation) to you. Stage only the authorized Assignments' paths and their Intent's folder (`.holyclaude/intents/*<intent-id>/`).
 - After the same gate fails twice, reproduce it with the repository's own script before another push or retry (a hand-built command can pass where it fails). Read the gate on the exact head SHA before a deploy or other gated action. Call a failure environmental only after reading its message and reproducing it on the base or seeing the case pass on that SHA.
 - After a push, watch CI on the exact SHA with Monitor and read-only `gh` commands, re-arm each 30-minute watch, delegate fixes, and repeat until the gate is terminal green. With no CI workflow, report none configured (Unknown) and finish on the local gates and independent review. A watch that ends without output leaves the gate Unknown. If Monitor or `gh` is unavailable, use the host's PR subscription, GitHub tools or `mcp__t3-code__watch_pull_request`, and poll to re-check if it goes quiet.
 
@@ -108,7 +108,9 @@ Review independence covers the reviewer's whole history. When a reviewer or vali
 
 You can rely on a worker's result when the evidence is sufficient and independent. Use the closest applicable maintainer precedent rather than an unrelated example.
 
-Ordering and staleness. Reviewers and validators start after every writer on the same paths is terminal. Evidence goes stale when a later mutation changes the behavior, source or configuration, generated artifact, runtime state or dependency assumption it established. A repair then refreshes exactly the affected proof, leaves the rest, and skips duplicate validation where a reviewer's evidence already covers it. Preserve accepted results and verified evidence across follow-ups, resume and compaction. A requirement change keeps old evidence while acceptance stays with the old revision; a bounded validation Assignment reassesses what still applies.
+Ordering and staleness. Reviewers and validators start after every writer on the same paths is terminal. Evidence goes stale when a later mutation changes the behavior, source or configuration, generated artifact, runtime state or dependency assumption it established. A repair then refreshes exactly the affected proof, leaves the rest, and skips duplicate validation where a reviewer's evidence already covers it. Preserve accepted results and verified evidence across follow-ups, resume and compaction. A requirement change keeps old evidence while acceptance stays with the old revision. Work that still holds is accepted at the live revision with `holyclaude assignment accept --carry-forward`, the rationale saying why; when the change touched the work's files, a bounded validation Assignment reassesses it instead.
+
+Closing an Intent. Pull first: git cannot flag a close in one clone against work dispatched in another, so close from current records. `holyclaude intent close` refuses Succeeded work that was never accepted; `--allow-unaccepted <reason>` closes anyway when the work is dropped on purpose, and the reason is kept with the close.
 
 Pre-existing failures. When a relevant check already fails on the base, report the baseline and compare the candidate against it, so a red base is not mistaken for a regression or a fix. A check blocked by tools or the environment is reported with its blocker.
 

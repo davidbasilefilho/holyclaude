@@ -4,6 +4,7 @@ import { Conflict, InsufficientEvidence } from "../errors.ts"
 import { AcceptanceRecord } from "../model/acceptance.ts"
 import { isTerminal, type Assignment } from "../model/assignment.ts"
 import { sortedById } from "../model/ids.ts"
+import type { Intent } from "../model/intent.ts"
 import { Id, Text } from "../model/primitives.ts"
 import {
   findAssignment,
@@ -34,8 +35,15 @@ export const CancelInput = Schema.Struct({
 /** Decoded input of cancel. */
 export type CancelInput = typeof CancelInput.Type
 
-/** Input of accept: the root's evidence review. */
-export const AcceptInput = Schema.Struct({ assignment_id: Id, acceptance: AcceptanceRecord })
+/**
+ * Input of accept: the root's evidence review. `carry_forward` lets an Assignment made for an
+ * earlier revision be accepted at the live one.
+ */
+export const AcceptInput = Schema.Struct({
+  assignment_id: Id,
+  acceptance: AcceptanceRecord,
+  carry_forward: Schema.optionalKey(Schema.Boolean),
+})
 /** Decoded input of accept. */
 export type AcceptInput = typeof AcceptInput.Type
 
@@ -100,9 +108,11 @@ const sameAcceptance = (a: AcceptanceRecord, b: AcceptanceRecord) =>
   sameEvidence(a.required_evidence, b.required_evidence)
 
 /**
- * Records the root's acceptance of a Succeeded Assignment. The record must carry the Assignment's
- * revision, which must be the live one, and cover exactly the declared labels. An identical repeat
- * changes nothing; a different record is refused.
+ * Records the root's acceptance of a Succeeded Assignment. The record must carry the live revision
+ * and cover exactly the declared labels, and so must the Assignment, unless `carry_forward` accepts
+ * one made for an earlier revision: the record then shows the carry-forward as an acceptance
+ * revision above the Assignment's. On an Assignment at the live revision the flag changes nothing.
+ * An identical repeat changes nothing; a different record is refused.
  */
 export const accept = (state: State, input: AcceptInput) =>
   Effect.gen(function* () {
@@ -114,7 +124,8 @@ export const accept = (state: State, input: AcceptInput) =>
         : yield* new Conflict({ id: assignment.id, what: "acceptance" })
     if (assignment.state !== "Succeeded") return yield* invalidTransition(assignment, "accept")
     const intent = yield* findIntent(state, assignment.intent_id)
-    yield* requireLiveRevision(intent, assignment.intent_revision)
+    if (!(input.carry_forward === true && assignment.intent_revision < intent.revision))
+      yield* requireLiveRevision(intent, assignment.intent_revision)
     yield* requireLiveRevision(intent, acceptance.intent_revision)
 
     const problems = [
@@ -154,6 +165,33 @@ export const reconcile = (state: State, cloneId: string | undefined): RunningRow
     elsewhere: running.filter(isElsewhere),
   }
 }
+
+/** A closed Intent that still has Ready or Running Assignments. */
+export interface ClosedWithOpenWork {
+  readonly intent: Intent
+  /** Its Ready and Running Assignments, by id. */
+  readonly assignments: ReadonlyArray<Assignment>
+}
+
+/**
+ * Lists closed Intents that still have Ready or Running Assignments, by Intent id. Version control
+ * cannot catch a close made in one clone against work dispatched in another, so reconcile shows it.
+ * Changes nothing.
+ */
+export const closedWithOpenWork = (state: State): ReadonlyArray<ClosedWithOpenWork> =>
+  sortedById(state.intents)
+    .filter((intent) => intent.state === "closed")
+    .map((intent) => ({
+      intent,
+      assignments: sortedById(
+        state.assignments.filter(
+          (assignment) =>
+            assignment.intent_id === intent.id &&
+            (assignment.state === "Ready" || assignment.state === "Running"),
+        ),
+      ),
+    }))
+    .filter(({ assignments }) => assignments.length > 0)
 
 /** Settles one Running row after reconcile: mark it Failed with a reason, or keep it reserved. */
 export const resolveReconcile = (state: State, input: ResolveReconcileInput) =>

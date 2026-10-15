@@ -9,7 +9,7 @@ import { io, readText } from "./io.ts"
 import { legacyFile, legacyLockFiles, migratedFile, previousObservationsFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
 import { State, validateState } from "./model/state.ts"
-import { loadRecordState, persist, recordTexts } from "./records.ts"
+import { loadRecords, persist, recordTexts } from "./records.ts"
 import { refuseSymlinks } from "./safety.ts"
 
 /**
@@ -96,17 +96,18 @@ export const migrateLegacy = (directory: string, lock: Lock) =>
       kept !== (yield* readText(legacyFile(directory), MAX_LEGACY_STATE_BYTES))
     )
       return yield* new MigratedFileInTheWay({ path: migrated })
-    const existing = yield* loadRecordState(directory)
-    const incoming = yield* recordTexts(directory, legacy)
-    for (const [path, text] of yield* recordTexts(directory, existing)) {
-      const old = incoming.get(path)
-      if (old !== undefined && old !== text)
+    const existing = yield* loadRecords(directory)
+    const incoming = yield* recordTexts(legacy)
+    const stored = yield* recordTexts(existing.state)
+    for (const [id, path] of existing.files) {
+      const old = incoming.get(id)
+      if (old !== undefined && old !== stored.get(id))
         return yield* new CorruptRecord({
           path,
           reason: `it disagrees with ${legacyFile(directory)}; move one of them away`,
         })
     }
-    yield* persist(directory, existing, mergeLegacy(legacy, existing), lock)
+    yield* persist(directory, existing, mergeLegacy(legacy, existing.state), lock)
     yield* moveObservations(directory, lock)
     if (kept === undefined) yield* moveFile(legacyFile(directory), migrated, lock)
     else yield* removeFile(legacyFile(directory), lock)

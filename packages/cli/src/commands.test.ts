@@ -87,11 +87,11 @@ const runCommand = (path: string, positionals: string[] = [], flags = {}, stdin 
 
 /** Adds a Running row as another clone left it, by writing its record the way a merge brings it. */
 const addRowFrom = async (clone: string | undefined) => {
-  const folder = join(directory, "intents", "intent-0001", "assignments")
-  const record = await Bun.file(join(folder, "assignment-0001.json")).json()
+  const folder = join(directory, "intents", "o-intent-0001", "assignments")
+  const record = await Bun.file(join(folder, "o-assignment-0001.json")).json()
   const { clone_id: _own, ...unstamped } = record
   await Bun.write(
-    join(folder, "assignment-0002.json"),
+    join(folder, "o-assignment-0002.json"),
     JSON.stringify({
       ...unstamped,
       id: "assignment-0002",
@@ -222,8 +222,22 @@ describe("intent list", () => {
     await addNewerIntent()
     const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
     expect(rows.intents).toEqual([
-      { id: OLDER, state: "open", revision: 1, objective: "o", open_assignments: 1 },
-      { id: NEWER, state: "open", revision: 1, objective: "newer goal", open_assignments: 1 },
+      {
+        id: OLDER,
+        state: "open",
+        revision: 1,
+        objective: "o",
+        open_assignments: 1,
+        path: join(directory, "intents", `o-${OLDER}`),
+      },
+      {
+        id: NEWER,
+        state: "open",
+        revision: 1,
+        objective: "newer goal",
+        open_assignments: 1,
+        path: join(directory, "intents", `newer-goal-${NEWER}`),
+      },
     ])
     await runCommand("intent close", [], { intent: NEWER, reason: "done" })
     const closed = (await runCommand("intent list", [], { state: "closed" })).value
@@ -236,6 +250,22 @@ describe("intent list", () => {
     const error = await refusal("intent list", [], { state: "paused" })
     expect(error).toMatchObject({ _tag: "Usage" })
     expect(String(error)).toContain("open|closed")
+  })
+})
+
+describe("intent list inside a project", () => {
+  const previousRoot = process.env["CLAUDE_PROJECT_DIR"]
+  beforeEach(() => {
+    process.env["CLAUDE_PROJECT_DIR"] = directory
+  })
+  afterEach(() => {
+    if (previousRoot === undefined) delete process.env["CLAUDE_PROJECT_DIR"]
+    else process.env["CLAUDE_PROJECT_DIR"] = previousRoot
+  })
+
+  test("shows the path relative to the project when the state directory is inside it", async () => {
+    const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
+    expect(rows.intents).toEqual([expect.objectContaining({ path: join("intents", `o-${OLDER}`) })])
   })
 })
 
@@ -485,11 +515,11 @@ describe("assignment list scope", () => {
 
 describe("reserve and rows running elsewhere", () => {
   const readyRow = async (id: string, path: string) => {
-    const folder = join(directory, "intents", "intent-0001", "assignments")
-    const record = await Bun.file(join(folder, "assignment-0001.json")).json()
+    const folder = join(directory, "intents", "o-intent-0001", "assignments")
+    const record = await Bun.file(join(folder, "o-assignment-0001.json")).json()
     const { clone_id: _own, ...unstamped } = record
     await Bun.write(
-      join(folder, `${id}.json`),
+      join(folder, `o-${id}.json`),
       JSON.stringify({
         ...unstamped,
         id,
@@ -663,9 +693,12 @@ describe("reserve in separate worktrees of one repository", () => {
     await reserveIn(ids[0]!, trees[0])
     const key = (await heldKeys())[ids[0]!]!
     expect(key).toMatch(/^[0-9a-f]+$/)
-    const folder = join(directory, "intents", "intent-0001", "assignments")
-    for (const name of ids) {
-      const text = await Bun.file(join(folder, `${name}.json`)).text()
+    const files = await Array.fromAsync(
+      new Bun.Glob("intents/*/assignments/*.json").scan({ cwd: directory }),
+    )
+    expect(files).toHaveLength(ids.length)
+    for (const file of files) {
+      const text = await Bun.file(join(directory, file)).text()
       expect(text).not.toContain(key)
       expect(text).not.toContain(trees[0]!)
       expect(text).not.toContain("worktree")
@@ -780,5 +813,158 @@ describe("assignment verify", () => {
     truncateSync(transcript, 64 * 1024 * 1024 + 1)
     await observeTranscript(transcript)
     expect(await Effect.runPromise(Effect.flip(verify))).toMatchObject({ _tag: "TooLarge" })
+  })
+})
+
+/** Marks the Running Assignment as Succeeded, as `assignment finish` leaves it. */
+const succeed = () =>
+  Effect.runPromise(
+    updateState(directory, (state) =>
+      Effect.succeed({
+        state: {
+          ...state,
+          assignments: state.assignments.map((row) => ({ ...row, state: "Succeeded" as const })),
+        },
+        value: 0,
+      }),
+    ),
+  )
+
+const review = (revision: number, rationale = "the change touched none of its files") =>
+  JSON.stringify({
+    intent_revision: revision,
+    rationale,
+    criteria_evidence: { a: "seen" },
+    required_evidence: { e: "seen" },
+  })
+
+const bumpRevision = () => runCommand("intent update", [], { material: true }, "{}")
+
+describe("assignment accept --carry-forward", () => {
+  test("accepts work from an earlier revision at the live one, and only with the flag", async () => {
+    await succeed()
+    await bumpRevision()
+    expect(await refusal("assignment accept", ["assignment-0001"], {}, review(2))).toMatchObject({
+      _tag: "StaleRevision",
+      given: 1,
+      live: 2,
+    })
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(2),
+    )
+    expect(done.value).toMatchObject({ id: "assignment-0001", rev: 1, accepted: true })
+    const row = (await Effect.runPromise(loadState(directory))).assignments[0]!
+    expect(row.intent_revision).toBe(1)
+    expect(row.acceptance?.intent_revision).toBe(2)
+  })
+
+  test("needs a rationale, and an acceptance at the live revision", async () => {
+    await succeed()
+    await bumpRevision()
+    const flags = { "carry-forward": true }
+    expect(
+      await refusal("assignment accept", ["assignment-0001"], flags, review(2, "  ")),
+    ).toMatchObject({ _tag: "SchemaError" })
+    expect(await refusal("assignment accept", ["assignment-0001"], flags, review(1))).toMatchObject(
+      { _tag: "StaleRevision" },
+    )
+    expect((await Effect.runPromise(loadState(directory))).assignments[0]?.acceptance).toBeNull()
+  })
+
+  test("on work at the live revision the flag changes nothing", async () => {
+    await succeed()
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(1),
+    )
+    expect(done.value).toMatchObject({ accepted: true })
+  })
+})
+
+describe("intent close and unaccepted work", () => {
+  test("is refused listing the Succeeded Assignments never accepted, and --allow-unaccepted records why", async () => {
+    await succeed()
+    const error = await refusal("intent close", [], { reason: "shipped" })
+    expect(error).toMatchObject({
+      _tag: "UnacceptedAssignments",
+      unaccepted: ["assignment-0001"],
+    })
+    expect(String(error)).toContain("assignment-0001")
+    expect((await intentOf(OLDER)).state).toBe("open")
+    await runCommand("intent close", [], {
+      reason: "shipped",
+      "allow-unaccepted": "superseded by the rewrite",
+    })
+    const closed = await intentOf(OLDER)
+    expect(closed.state).toBe("closed")
+    expect(closed.close_reason).toContain("shipped")
+    expect(closed.close_reason).toContain("superseded by the rewrite")
+  })
+
+  test("an accepted Assignment does not block the close", async () => {
+    await succeed()
+    await runCommand("assignment accept", ["assignment-0001"], {}, review(1))
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await intentOf(OLDER)).close_reason).toBe("shipped")
+  })
+})
+
+describe("intent reopen and the Intent in use", () => {
+  test("puts the reopened Intent in use and says which one it replaced", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    const reopened = (await runCommand("intent reopen", [], { intent: OLDER })).value as object
+    expect(reopened).toMatchObject({ id: OLDER, in_use: OLDER, replaced: NEWER, revision: 2 })
+    expect(await Bun.file(chosenFile()).text()).toContain(OLDER)
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+
+  test("says none was replaced when no Intent was open", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("intent reopen")).value).toMatchObject({
+      in_use: OLDER,
+      replaced: null,
+    })
+  })
+})
+
+describe("reconcile and a closed Intent", () => {
+  test("flags a closed Intent that still has Ready or Running Assignments", async () => {
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            intents: state.intents.map((intent) => ({
+              ...intent,
+              state: "closed" as const,
+              close_reason: "shipped",
+              closed_at: "2026-01-02T03:04:05.000Z",
+            })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    const { value } = await runCommand("reconcile")
+    expect(value).toMatchObject({
+      closed_with_open_work: [
+        { intent: OLDER, close_reason: "shipped", assignments: [{ id: "assignment-0001" }] },
+      ],
+    })
+  })
+
+  test("says nothing about closed Intents when none has open work", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("reconcile")).value).not.toHaveProperty("closed_with_open_work")
   })
 })

@@ -19,6 +19,8 @@ const intent = {
   revision: 1,
   state: "open" as const,
 }
+// The name an Intent with objective "o" is stored under.
+const FOLDER = `o-${INTENT}`
 const withIntent: State = { ...emptyState, intents: [intent] }
 const assignment = {
   intent_id: INTENT,
@@ -159,7 +161,7 @@ describe("a link under the state directory", () => {
 
   test("as an assignments/ directory is refused before any write", async () => {
     await write(withIntent)
-    await linkDirectory(outside, join(directory, "intents", INTENT, "assignments"))
+    await linkDirectory(outside, join(directory, "intents", FOLDER, "assignments"))
     expect(await failure(update({ ...withIntent, assignments: [assignment] }))).toMatchObject({
       _tag: "SymlinkRefused",
     })
@@ -168,7 +170,7 @@ describe("a link under the state directory", () => {
 
   test("as intents/<id> is refused for a read, which a glob would skip without a word", async () => {
     await write({ ...withIntent, assignments: [assignment] })
-    const folder = join(directory, "intents", INTENT)
+    const folder = join(directory, "intents", FOLDER)
     await cp(folder, outside, { recursive: true })
     await rm(folder, { recursive: true })
     await linkDirectory(outside, folder)
@@ -180,7 +182,7 @@ describe("a link under the state directory", () => {
 
   test("as an assignments/ directory is refused for a read, even when it holds no record", async () => {
     await write(withIntent)
-    const folder = join(directory, "intents", INTENT, "assignments")
+    const folder = join(directory, "intents", FOLDER, "assignments")
     await linkDirectory(outside, folder)
     expect(await failure(loadState(directory))).toMatchObject({
       _tag: "SymlinkRefused",
@@ -190,9 +192,9 @@ describe("a link under the state directory", () => {
 
   test("at the path a record is to be written is refused, and nothing lands behind it", async () => {
     await write(withIntent)
-    const folder = join(directory, "intents", INTENT, "assignments")
+    const folder = join(directory, "intents", FOLDER, "assignments")
     await mkdir(folder)
-    await linkDirectory(outside, join(folder, "assignment-0001.json"))
+    await linkDirectory(outside, join(folder, "x-assignment-0001.json"))
     expect(await failure(update({ ...withIntent, assignments: [assignment] }))).toMatchObject({
       _tag: "SymlinkRefused",
     })
@@ -228,7 +230,7 @@ describe("a link under the state directory", () => {
       await write(withIntent)
       const target = join(outside, "target.json")
       await writeFile(target, "{}")
-      const record = join(directory, "intents", INTENT, "intent.json")
+      const record = join(directory, "intents", FOLDER, "intent.json")
       await rm(record)
       await symlink(target, record, "file")
       expect(await failure(loadState(directory))).toMatchObject({ _tag: "SymlinkRefused" })

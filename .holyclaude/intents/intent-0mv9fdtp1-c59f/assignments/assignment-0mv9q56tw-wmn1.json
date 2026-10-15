@@ -36,8 +36,19 @@
     ]
   },
   "id": "assignment-0mv9q56tw-wmn1",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "No blockers in the repair; F1-F3 fixed; gates pass, bundle same, 11 tests fail pre-repair. Optional: folder-mismatch race not retried, unchanged names not checked against new ids, claim failure after a folder move, Windows EPERM mapping, more fold letters.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Narrow code re-review with pre-repair run; optional items folded into the second repair with the security findings.",
+    "criteria_evidence": {
+      "The repair fixes the security findings F1-F3 and the code-review items without new defects; F1 cannot be reached by any crafted id, name or objective, including within one persist run and through legacy migration.": "met; optional findings listed",
+      "Blockers and optional findings reported with evidence.": "met; optional findings listed"
+    },
+    "required_evidence": {
+      "findings": "findings and checks reported",
+      "checks-run": "findings and checks reported"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

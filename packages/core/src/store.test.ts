@@ -84,7 +84,7 @@ const files = async () =>
   (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true })))
     .map((name) => name.replaceAll("\\", "/"))
     .sort()
-const INTENT_FILE = "intents/intent-1/intent.json"
+const INTENT_FILE = "intents/o-intent-1/intent.json"
 
 const breaks = () => Effect.runPromise(breakStaleLock(lockFile))
 
@@ -267,12 +267,28 @@ describe("transient Windows errors", () => {
   })
 
   test("the commit rename is retried after EPERM and EBUSY", async () => {
-    for (const code of ["EPERM", "EBUSY"]) {
+    // The objectives differ but share a slug, so the second commit rewrites the file in place.
+    for (const [code, objective] of [
+      ["EPERM", "o"],
+      ["EBUSY", "o."],
+    ] as const) {
       Object.assign(injected.rename, { failures: 2, calls: 0, code })
-      expect(await commit(code)).toBe("ok")
+      expect(await commit(objective)).toBe("ok")
       expect(injected.rename.calls).toBe(3)
     }
     expect(await files()).toEqual([".gitignore", INTENT_FILE, "local/.gitignore"])
+  })
+
+  test("the rename of a directory to its new name is retried too", async () => {
+    await commit()
+    Object.assign(injected.rename, { failures: 2, calls: 0, code: "EBUSY" })
+    expect(await commit("renamed")).toBe("ok")
+    expect(injected.rename.calls).toBe(4)
+    expect(await files()).toEqual([
+      ".gitignore",
+      "intents/renamed-intent-1/intent.json",
+      "local/.gitignore",
+    ])
   })
 
   test("a rename that keeps failing gives up with StateIo and cleans up", async () => {
@@ -284,6 +300,32 @@ describe("transient Windows errors", () => {
     expect(injected.rename.calls).toBeGreaterThan(1)
     expect(injected.rename.calls).toBeLessThan(10)
     expect(await files()).toEqual([".gitignore", "local/.gitignore"])
+  })
+
+  test("an Intent folder moving onto a folder with something in it is guided even when Windows says EPERM", async () => {
+    await commit()
+    await Bun.write(join(directory, "intents", "renamed-intent-1", "notes.txt"), "left by a merge")
+    injected.rename.failures = 1000
+    const failure = await Effect.runPromise(
+      updateState(directory, (state) => Effect.succeed(withIntent(state, "renamed"))).pipe(
+        Effect.flip,
+      ),
+    )
+    expect(failure).toMatchObject({
+      _tag: "CorruptRecord",
+      path: join(directory, "intents", "renamed-intent-1"),
+    })
+  })
+
+  test("EPERM onto a destination that holds nothing stays StateIo", async () => {
+    await commit()
+    injected.rename.failures = 1000
+    const failure = await Effect.runPromise(
+      updateState(directory, (state) => Effect.succeed(withIntent(state, "renamed"))).pipe(
+        Effect.flip,
+      ),
+    )
+    expect(failure._tag).toBe("StateIo")
   })
 
   test("any other code is not retried", async () => {
