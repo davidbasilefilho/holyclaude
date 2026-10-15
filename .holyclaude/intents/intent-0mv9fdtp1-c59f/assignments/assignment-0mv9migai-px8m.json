@@ -1,0 +1,61 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Reviewer.code",
+  "objective": "Review PR8's repair (uncommitted in worktree pr8 against 258ab95).",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9m5uvj-g08f.diff",
+    "Worktree pr8"
+  ],
+  "constraints": [
+    "Read-only.",
+    "First pass /code-review on the uncommitted change at effort high, no --comment, no --fix.",
+    "Gates via bunx bun@1.4.3."
+  ],
+  "acceptance_criteria": [
+    "Reports /code-review invocation, finding count and dispositions.",
+    "Judges the repair: create sets in use and reports the replaced one; open Intents omit state on disk while old and closed records decode; local/.gitignore re-assertion and its read bound; stored choice ignored with --intent and when unreadable; reopen resolution; conflicting-target usage errors; pointer and hints.",
+    "Bundle byte-identical to a Bun 1.4.3 build; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "bundle-check",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9m5uvj-g08f",
+      "assignment-0mv9kcrjn-7ui8",
+      "assignment-0mv9ktq2k-obv3",
+      "assignment-0mv9kymvp-4hvr"
+    ]
+  },
+  "id": "assignment-0mv9migai-px8m",
+  "state": "Succeeded",
+  "result": "PR8 repair review: no blockers; gates green (1210); base-written records decode; create-in-use under lock; bundle identical; optional: continue-work step 2 phrasing, choice written before persist, reopen not set in use, in_use duplicates id, README lacks 16-byte .gitignore bound and symlinked choice now reads as none.",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "Reviewer ran gates, verified decode of base records and bundle identity.",
+    "criteria_evidence": {
+      "Reports /code-review invocation, finding count and dispositions.": "No blockers; optional 1-5.",
+      "Judges the repair: create sets in use and reports the replaced one; open Intents omit state on disk while old and closed records decode; local/.gitignore re-assertion and its read bound; stored choice ignored with --intent and when unreadable; reopen resolution; conflicting-target usage errors; pointer and hints.": "No blockers; optional 1-5.",
+      "Bundle byte-identical to a Bun 1.4.3 build; blockers separated from optional.": "No blockers; optional 1-5."
+    },
+    "required_evidence": {
+      "code-review-run": "No blockers; optional 1-5.",
+      "checks-run": "No blockers; optional 1-5.",
+      "bundle-check": "No blockers; optional 1-5.",
+      "blockers": "No blockers; optional 1-5.",
+      "optional-findings": "No blockers; optional 1-5."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

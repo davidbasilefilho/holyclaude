@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.mechanical",
+  "objective": "Apply three specified text replacements to README.md lines 29 and 93 in worktree pr5.",
+  "scope": [
+    "README.md lines 29 and 93"
+  ],
+  "constraints": [
+    "Replace exactly the given fragments; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "The three replacements are applied verbatim.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jurl1-1ylc",
+  "state": "Succeeded",
+  "result": "Three README replacements applied verbatim; gates pass (1100).",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Reviewer's own fix text, verified against session-start.ts; root checked.",
+    "criteria_evidence": {
+      "The three replacements are applied verbatim.": "Replacements verbatim; gates pass.",
+      "Format, lint, typecheck and test pass.": "Replacements verbatim; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Replacements verbatim; gates pass.",
+      "diff-file": "Replacements verbatim; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

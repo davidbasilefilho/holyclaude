@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Worker.implementation",
+  "objective": "Stack-rules PR (worktree pr9, branch release/0.2.0/docs/stack-rules, based on PR4): apply the two approved edits to plugin/agents/holyclaude.md.",
+  "scope": [
+    "plugin/agents/holyclaude.md: Branches and pull requests stacked-PR paragraph; one CI watching bullet"
+  ],
+  "constraints": [
+    "Use the approved text verbatim (given in the prompt); change nothing else."
+  ],
+  "acceptance_criteria": [
+    "Both edits applied verbatim; the rest of the paragraph and the branch-name rules unchanged.",
+    "Format, lint, typecheck and test pass; size before and after reported."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9miggj-3wpj",
+  "state": "Succeeded",
+  "result": "Stack-rules edits applied verbatim; gates pass (1136); +938 bytes.",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "User-approved text applied verbatim and checked by grep; artifact review blockers resolved by the corrected text the user approved.",
+    "criteria_evidence": {
+      "Both edits applied verbatim; the rest of the paragraph and the branch-name rules unchanged.": "Gates pass 1136; text verified.",
+      "Format, lint, typecheck and test pass; size before and after reported.": "Gates pass 1136; text verified."
+    },
+    "required_evidence": {
+      "checks-run": "Gates pass 1136; text verified.",
+      "size-change": "Gates pass 1136; text verified.",
+      "diff-file": "Gates pass 1136; text verified."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

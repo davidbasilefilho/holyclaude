@@ -1,0 +1,42 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Worker.implementation",
+  "objective": "PR8 prose (worktree pr8): one writing bar in three agents with a drift test, and the root rule for choosing an Intent at session start.",
+  "scope": [
+    "plugin/agents (holyclaude.md, worker-implementation.md, reviewer-artifact.md)",
+    "scripts/writing-bar.test.ts (new)"
+  ],
+  "constraints": [
+    "Follow the writing bar; core-rules block stays at or below 9,300 characters."
+  ],
+  "acceptance_criteria": [
+    "The writing bar text is identical in holyclaude.md, worker-implementation.md and reviewer-artifact.md between shared markers, and scripts/writing-bar.test.ts fails if any copy differs or a marker is missing.",
+    "The root no longer quotes the bar in instruction-text Assignments; it names the expected size relative to the text replaced.",
+    "One core-rules line: at session start, when several Intents are open and none is in use, ask the user which one and run holyclaude intent use.",
+    "Format, lint, typecheck and test pass; the drift test shown red on a deliberate difference and green on the tree."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "red-green-proof",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents",
+      "scripts/writing-bar.test.ts"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9kcroa-ru9o",
+  "state": "Succeeded",
+  "result": "PR8 prose: shared writing bar between markers in holyclaude.md, worker-implementation.md, reviewer-artifact.md; scripts/writing-bar.test.ts 5 tests red on a word change and a missing marker, green on tree; root no longer quotes the bar, names expected size; core-rules line on choosing an Intent at session start (+212); gates pass (1153). Edited the pre-PR3 holyclaude.md (PR8 base predates PR3/PR4 merge-up).",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

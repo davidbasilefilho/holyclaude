@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 3,
+  "role": "Worker.implementation",
+  "objective": "PR8 repair (worktree pr8 at 258ab95): apply the user's two decisions and the review findings.",
+  "scope": [
+    "packages/core/src, packages/cli/src with tests",
+    "plugin/scripts/holyclaude.js",
+    "plugin/skills/handoff, continue-work, assignments",
+    "plugin/agents (reviewer-artifact.md line 16 and the shared bar wording only)",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md."
+  ],
+  "acceptance_criteria": [
+    "intent create sets the new Intent in use on this clone and prints which Intent is now in use and which one it replaced.",
+    "Open Intents omit the state field on disk; only a closed Intent writes state, close_reason and closed_at.",
+    "An existing local/.gitignore is rewritten to * unless it already is.",
+    "activeIntent reads the stored choice only when no --intent is given and treats an unreadable choice as none.",
+    "intent reopen resolves among closed Intents (or requires --intent, documented).",
+    "Conflicting targets (--intent with a positional id or a JSON id) are a usage error.",
+    "SessionStart pointer names assignment list --all; stale open() JSDoc fixed; NoActiveIntent hint covers zero open Intents.",
+    "Handoff no longer suggests intent use and adds intent list to its gather list; continue-work asks only when several are open and none is in use; assignments skill has an intent use bullet and notes positional and JSON id precedence; README notes active-intent.json is replaced, not appended, and the zero-open message; reviewer-artifact line names obsolescence; bar wording 'so no copy of a rule can drift from the original' in all three copies.",
+    "Regression tests for each behavior change fail before and pass after; gates pass; bundle rebuilt with Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/skills",
+      "plugin/agents",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ktq2k-obv3"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9m5uvj-g08f",
+  "state": "Succeeded",
+  "result": "PR8 repair: create sets in use and reports in_use/replaced; open Intents omit state on disk; local/.gitignore re-asserted; stored choice read only without --intent, unreadable counts as none; reopen resolves the only closed Intent; conflicting targets are usage errors; pointer names --all; hints and prose fixes; 13 regression tests fail on 258ab95; gates pass (1210); bundle rebuilt.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

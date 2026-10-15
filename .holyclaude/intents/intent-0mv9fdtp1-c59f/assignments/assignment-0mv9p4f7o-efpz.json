@@ -1,0 +1,46 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Repair docs/review-and-cloud: fix the six review blockers and the agreed optional findings.",
+  "scope": [
+    "Worktree worktree d: plugin/agents/holyclaude.md, plugin/agents/reviewer-artifact.md, plugin/skills/assignments/SKILL.md, README.md."
+  ],
+  "constraints": [
+    "Prose only; writing bar; replace rather than stack; core-rules block may change only on its CI line (line ~53) to match the watch; no caps; no git writes."
+  ],
+  "acceptance_criteria": [
+    "B1-B6 fixed as specified in the brief.",
+    "O1-O6 and O8 fixed as specified.",
+    "fmt and full test pass; wc -c before and after per file; a repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "sizes"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md",
+      "plugin/agents/reviewer-artifact.md",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ovvqm-sdcy",
+      "assignment-0mv9oyxib-7ssj"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9p4f7o-efpz",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

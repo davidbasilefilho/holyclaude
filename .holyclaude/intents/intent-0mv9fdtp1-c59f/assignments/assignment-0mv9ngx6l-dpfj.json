@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Reviewer.code",
+  "objective": "Independent review of PR #22 (version 0.2.0): release/0.2.0/feat/collaborative-intents...release/0.2.0/chore/version, worktree pr10.",
+  "scope": [
+    "The version bump commit and the stack-rules merge commit on release/0.2.0/chore/version, against base release/0.2.0/feat/collaborative-intents."
+  ],
+  "constraints": [
+    "Read-only on the repository; rebuild outputs go to the scratchpad only."
+  ],
+  "acceptance_criteria": [
+    "Every version string in the repository that names the shipped version reads 0.2.0, with none left at 0.1.0 except history (changelog, tests that pin legacy records, docs about older versions).",
+    "The committed bundle is byte-identical to a fresh build with Bun 1.4.3 from the branch head.",
+    "The stack-rules merge brings in exactly #20's change with no conflict residue.",
+    "Blockers and optional findings are reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9n2f15-mf6d"
+    ],
+    "independent_from": [
+      "assignment-0mv9n2f15-mf6d"
+    ]
+  },
+  "id": "assignment-0mv9ngx6l-dpfj",
+  "state": "Succeeded",
+  "result": "One blocker: bun.lock workspace entries (lines 20,32,39) still 0.1.0; bump-version.ts does not touch bun.lock. Bundle byte-identical to fresh 1.4.3 build. Stack-rules merge equals #20 exactly. Optional: test fixture cache paths at 0.1.0.",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "Root confirmed stale lockfile lines; reviewer ran /code-review, rebuild+cmp, merge-diff comparison, and frozen vs non-frozen installs in a scratch copy.",
+    "criteria_evidence": {
+      "Every version string in the repository that names the shipped version reads 0.2.0, with none left at 0.1.0 except history (changelog, tests that pin legacy records, docs about older versions).": "Fails on bun.lock workspace entries; repair dispatched",
+      "The committed bundle is byte-identical to a fresh build with Bun 1.4.3 from the branch head.": "cmp exit 0",
+      "The stack-rules merge brings in exactly #20's change with no conflict residue.": "diffs identical but for index hashes and offsets; no markers",
+      "Blockers and optional findings are reported with evidence.": "1 blocker, 3 optional, each with lines and commands"
+    },
+    "required_evidence": {
+      "code-review-run": "/code-review base...head high, 4 findings dispositioned",
+      "checks-run": "grep, rebuild+cmp, merge diff, frozen/non-frozen install",
+      "findings": "blocker bun.lock; optionals listed"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

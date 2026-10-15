@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review PR4's rewritten CI watching and Committing sections and the assignments skill's verify bullet.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9guhvv-y9si.diff",
+    "Worktree pr4: plugin/agents/holyclaude.md, plugin/skills/assignments/SKILL.md"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge against the listed criteria, the writing bar and consistency with the core-rules block; the size of the core-rules block is out of scope."
+  ],
+  "acceptance_criteria": [
+    "CI watching states: one tested watch command, one summary line per state change, reads of head SHA, checks, mergeable, mergeStateStatus and unresolved review threads, a fallback when gh is unavailable, and keeps the existing aggregation rules.",
+    "Committing states: one intent per commit, staged diff read, gates over everything staged incl. state records, stop hook does not override these, temporary files outside the worktree, existing hash-object guidance kept.",
+    "The verify bullet matches the behavior (hook resolvedModel when recorded, transcript otherwise, model_source).",
+    "No contradiction with the core-rules block; no audited-repository specifics; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9guhvv-y9si"
+    ]
+  },
+  "id": "assignment-0mv9gy61n-2mkk",
+  "state": "Succeeded",
+  "result": "PR4 review: blockers B1 watch read dropped reviewDecision while reviews must be re-read, B2 stop-hook sentence has no referent; optional O1-O8 (intent term, gates set, hook referent, fallback owner, size/procedure, command location, key names, lower-PR dependency).",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Each criterion quoted against the changed lines; B1 verified in the diff (reviewDecision removed), B2 wording checked.",
+    "criteria_evidence": {
+      "CI watching states: one tested watch command, one summary line per state change, reads of head SHA, checks, mergeable, mergeStateStatus and unresolved review threads, a fallback when gh is unavailable, and keeps the existing aggregation rules.": "Met except the review read (B1).",
+      "Committing states: one intent per commit, staged diff read, gates over everything staged incl. state records, stop hook does not override these, temporary files outside the worktree, existing hash-object guidance kept.": "Met except the stop-hook referent (B2).",
+      "The verify bullet matches the behavior (hook resolvedModel when recorded, transcript otherwise, model_source).": "Met; code lands in a lower PR (O8).",
+      "No contradiction with the core-rules block; no audited-repository specifics; blockers separated from optional.": "None found; O4 fallback overlap; B1, B2 and O1-O8."
+    },
+    "required_evidence": {
+      "blockers": "B1, B2.",
+      "optional-findings": "O1-O8."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,58 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 third repair (worktree pr3): fix the re-review's two conflicts with later sections and tighten wording, without growing the core-rules block.",
+  "scope": [
+    "plugin/agents/holyclaude.md core-rules block"
+  ],
+  "constraints": [
+    "Follow the ship brief and writing bar.",
+    "Core-rules block at or below 8,532 characters.",
+    "Do not edit the CI watching or Committing sections or the frontmatter."
+  ],
+  "acceptance_criteria": [
+    "BL-2: the inline sizing rule also allows a split when the user asks.",
+    "BL-3: the finish rule no longer makes a repository without CI unable to finish: a Pending or Unknown result counted as Passed, or a waived gate counted as Passed, is an early stop, and each Unknown result is named in the final report.",
+    "O-1: one phrase for a run where the user forbids subagents, used in both places; O-2: 'the same bar' replaced by a phrase with a referent in the block; O-3: git and gh ownership stated once in the block.",
+    "Size reported; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9gej53-g5dp",
+      "assignment-0mv9gj3ct-eqp6"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gr739-iw3i",
+  "state": "Succeeded",
+  "result": "PR3 third repair: BL-2 sizing rule allows a user-requested split; BL-3 Unknown named in final report, counting Pending/Unknown as Passed is an early stop; solo run phrase unified with a referent; git/gh ownership stated once; block 8,532->8,517; gates pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gr739-iw3i.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "BL-2: the inline sizing rule also allows a split when the user asks.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "BL-3: the finish rule no longer makes a repository without CI unable to finish: a Pending or Unknown result counted as Passed, or a waived gate counted as Passed, is an early stop, and each Unknown result is named in the final report.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "O-1: one phrase for a run where the user forbids subagents, used in both places; O-2: 'the same bar' replaced by a phrase with a referent in the block; O-3: git and gh ownership stated once in the block.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Size reported; format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "size-change": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

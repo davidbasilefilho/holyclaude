@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Refuse an empty --worktree value in assignment reserve.",
+  "scope": [
+    "Worktree worktree b: packages/cli/src, packages/core/src, plugin/scripts/holyclaude.js."
+  ],
+  "constraints": [
+    "Minimal fix with a regression test; no git writes."
+  ],
+  "acceptance_criteria": [
+    "assignment reserve --worktree \"\" (or whitespace) is refused with InvalidWorktree and reserves nothing; a regression test fails without the fix.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src",
+      "packages/core/src",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9op2qr-40db",
+      "assignment-0mv9oy63p-zksq"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9p4q23-5kir",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

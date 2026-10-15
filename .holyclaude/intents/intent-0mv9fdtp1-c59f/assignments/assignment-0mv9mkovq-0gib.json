@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Reviewer.artifact",
+  "objective": "Review the stack-rules PR: two edits to the root prompt's Branches and pull requests and CI watching sections.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9miggj-3wpj.diff",
+    "Worktree pr9 plugin/agents/holyclaude.md"
+  ],
+  "constraints": [
+    "Read-only.",
+    "The text was approved by the user verbatim; findings are contradictions, rules it breaks, or wrong references, not wording preferences."
+  ],
+  "acceptance_criteria": [
+    "The edits contradict no other line of the file (core rules, Committing, CI watching, Sizing work, the rest of Branches) and keep the existing stacked-PR and branch-name rules.",
+    "Named specialists and tooling exist (Worker.mechanical, Worker.operations, the build task, the holyclaude CLI).",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9miggj-3wpj"
+    ]
+  },
+  "id": "assignment-0mv9mkovq-0gib",
+  "state": "Succeeded",
+  "result": "Stack-rules review: B1 local-gate skip vs exact-SHA CI watch; B2 workers cannot run state-changing CLI; optional O1-O6. User approved corrected text.",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "Both blockers verified against lines 51-52 and commands.ts root flags; user approved the corrected text.",
+    "criteria_evidence": {
+      "The edits contradict no other line of the file (core rules, Committing, CI watching, Sizing work, the rest of Branches) and keep the existing stacked-PR and branch-name rules.": "B1, B2; O1-O6.",
+      "Named specialists and tooling exist (Worker.mechanical, Worker.operations, the build task, the holyclaude CLI).": "B1, B2; O1-O6.",
+      "Blockers separated from optional.": "B1, B2; O1-O6."
+    },
+    "required_evidence": {
+      "blockers": "B1, B2; O1-O6.",
+      "optional-findings": "B1, B2; O1-O6."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

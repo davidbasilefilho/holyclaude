@@ -1,0 +1,60 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Final re-review of PR3's core rules after the third repair, limited to the repaired lines and their consistency with the rest of the file.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gr739-iw3i.diff",
+    "Worktree pr3, plugin/agents/holyclaude.md"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Judge only the listed items and any contradiction they introduce; the block's size against the SessionStart budget is handled by a hook change lower in the stack and is not a finding."
+  ],
+  "acceptance_criteria": [
+    "The inline sizing rule matches the Sizing work section, including a user-requested split.",
+    "The finish rule lets a repository without CI finish (Unknown named in the final report) while counting Pending or Unknown as Passed stays an early stop; waived gates are covered.",
+    "'solo run' is defined once and used consistently; the acceptance bar for a solo run has a referent in the block.",
+    "Git and gh ownership is stated exactly once in the block and still states that subagents leave VCS writes to the root.",
+    "Blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9fvep8-erji",
+      "assignment-0mv9fytyh-9ifu",
+      "assignment-0mv9gej53-g5dp",
+      "assignment-0mv9gr739-iw3i",
+      "assignment-0mv9g7i48-l901",
+      "assignment-0mv9gj3ct-eqp6"
+    ]
+  },
+  "id": "assignment-0mv9gu6z7-nkn0",
+  "state": "Succeeded",
+  "result": "PR3 final re-review: sizing, solo-run term and ownership met; blockers B1 CI-watch line blocks no-CI finish, B2 user-waived gate not named in final report outside a solo run, B3 solo-run checks undefined inside the block, B4 finish requires review a solo run lacks; optional O1-O5.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Each blocker quotes the conflicting lines (28, 32, 52, 138); verified against fcc0954.",
+    "criteria_evidence": {
+      "The inline sizing rule matches the Sizing work section, including a user-requested split.": "Met (lines 39 and 153).",
+      "The finish rule lets a repository without CI finish (Unknown named in the final report) while counting Pending or Unknown as Passed stays an early stop; waived gates are covered.": "Line 32 met; B1 line 52 and B2 gaps.",
+      "'solo run' is defined once and used consistently; the acceptance bar for a solo run has a referent in the block.": "Term met; B3 bar referent, B4 contradiction.",
+      "Git and gh ownership is stated exactly once in the block and still states that subagents leave VCS writes to the root.": "Met; O5 subagent half implicit.",
+      "Blockers separated from optional.": "B1-B4; O1-O5."
+    },
+    "required_evidence": {
+      "blockers": "B1-B4.",
+      "optional-findings": "O1-O5."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

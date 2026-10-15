@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR4 repair (worktree pr4): fix the review's two blockers and the selected wording findings in the CI watching and Committing sections.",
+  "scope": [
+    "plugin/agents/holyclaude.md CI watching and Committing sections"
+  ],
+  "constraints": [
+    "Follow the writing bar; change only the named lines; do not grow the sections.",
+    "Do not edit the core-rules block."
+  ],
+  "acceptance_criteria": [
+    "B1: the watch read includes the review decision (reviewDecision) and the summary line shows it.",
+    "B2: a stop hook asking for commits does not override the commit rules or the review-before-commit order.",
+    "O1: 'one intent' replaced with 'one logical change'; O2: the gates run over everything staged are the repository's own done gates (format, lint, typecheck); O3: the guardrail sentence names the PreToolUse guard and the unclear 'for the hook' clause is gone; O4: one fallback with one trigger (Monitor or gh unavailable: the host's PR-activity subscription, GitHub tools or the T3 watch tool), the silence rule stated once; O7: summary-line keys match the fields read.",
+    "Size before and after reported; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9guhvv-y9si",
+      "assignment-0mv9gy61n-2mkk"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9h1yjx-9wo6",
+  "state": "Succeeded",
+  "result": "PR4 repair: B1 watch reads reviewDecision and shows review=; B2 stop hook does not override commit rules or review-before-commit; O1 one logical change; O2 repository done gates over everything staged; O3 PreToolUse guard named, unclear clause dropped; O4 one fallback trigger, silence repeat dropped; O7 summary keys aligned; net size 0; gates pass. Diff at scratchpad/diffs/assignment-0mv9h1yjx-9wo6.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR4 prose accepted after three review rounds; final exact-text fixes are the last reviewer's own findings, root checked the diff.",
+    "criteria_evidence": {
+      "B1: the watch read includes the review decision (reviewDecision) and the summary line shows it.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "B2: a stop hook asking for commits does not override the commit rules or the review-before-commit order.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "O1: 'one intent' replaced with 'one logical change'; O2: the gates run over everything staged are the repository's own done gates (format, lint, typecheck); O3: the guardrail sentence names the PreToolUse guard and the unclear 'for the hook' clause is gone; O4: one fallback with one trigger (Monitor or gh unavailable: the host's PR-activity subscription, GitHub tools or the T3 watch tool), the silence rule stated once; O7: summary-line keys match the fields read.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "Size before and after reported; format, lint, typecheck and test pass.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "size-change": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "diff-file": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

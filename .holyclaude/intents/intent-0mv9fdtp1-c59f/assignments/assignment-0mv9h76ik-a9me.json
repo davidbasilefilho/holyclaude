@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR7 repair (worktree pr7): fix the review's row blocker and the security review's medium findings without reintroducing content caps, and remove the 64 KiB CLI stdin cap.",
+  "scope": [
+    "packages/core/src and packages/cli/src as named in the prompt, with tests",
+    "plugin/scripts/holyclaude.js",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md.",
+    "Bounds added may only limit reading untrusted input inside hooks; no cap on what holyclaude writes or what the CLI accepts."
+  ],
+  "acceptance_criteria": [
+    "B1: a long Assignment objective keeps its SessionStart row (id, agent_id) by clipping row text inside the fit-to-budget steps, with a gentler ladder than whole-then-120; a regression test fails on the current change.",
+    "F1: observe checks the holyclaude agent type before reading the observations log; observation generations are read as a bounded tail (dropping a partial first line) so a huge repo-supplied log cannot stall a hook; the PreToolUse deny verdict is emitted without waiting on observation recording.",
+    "F2: validateState duplicate and membership checks are linear (Set-based); SessionStart reads state with a generous bound (64 MiB) and degrades to rules plus a state error instead of hanging.",
+    "F4: legacy log migration moves the file when the target is absent and appends without loading both whole otherwise.",
+    "The 64 KiB CLI stdin JSON cap is removed; hook stdin bounds stay.",
+    "README describes these behaviors; regression tests fail on the base and pass after; format, lint, typecheck and test pass; bundle rebuilt with Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9grnt4-upxx",
+      "assignment-0mv9h0shy-le7o",
+      "assignment-0mv9h0smw-dmg4"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9h76ik-a9me",
+  "state": "Succeeded",
+  "result": "PR7 repair: B1 rows kept via text ladder WHOLE,2000,400,120,0; F1 type check before read, 4 MiB tail read, verdict not waiting; F2 Set-based validateState, 64 MiB SessionStart read bound; F4 rename or streamed prepend; 64 KiB CLI stdin cap removed; 12 regression tests fail before; gates pass (1147); bundle rebuilt. Diff at scratchpad/diffs/assignment-0mv9h76ik-a9me.diff.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

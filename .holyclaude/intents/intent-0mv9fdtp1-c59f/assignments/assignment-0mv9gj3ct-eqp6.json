@@ -35,8 +35,21 @@
     ]
   },
   "id": "assignment-0mv9gj3ct-eqp6",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "PR3 re-review: B1, B2, B3, B5 resolved; trimmed clauses all safe; blockers BL-1 block size vs cap (resolved in-stack by PR2 composition change), BL-2 inline sizing rule omits or the user asks, BL-3 finish rule blocks repositories without CI; optional O-1 to O-9.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Quotes each resolved line; BL-2 and BL-3 verified against the later sections; BL-1 checked against the old bundle in the worktree and resolved by PR2 below in the stack.",
+    "criteria_evidence": {
+      "Each blocker from the first review is resolved: no tool the root lacks is named; a user-waived gate is reported Unknown and is not an early stop while other Pending/Unknown results are; the speak-only list allows the acknowledgement and the solo first message; no reference resolves only outside the block.": "B1, B2, B3, B5 met with quoted lines.",
+      "The repair's extra trims lose no rule that is not owned elsewhere (check: subagent VCS writes denied by hook, keep messages concise, leave unrelated work as it is when staging, CLI I/O format, ask when nothing else is left or the answer gates the rest).": "trimmed-rules: all safe with owners cited.",
+      "All added behaviors from the original change are still stated; blockers separated from optional.": "Behaviors 1-7 met; BL-1 to BL-3 and O-1 to O-9."
+    },
+    "required_evidence": {
+      "blockers": "BL-1 to BL-3.",
+      "optional-findings": "O-1 to O-9.",
+      "trimmed-rules": "Five clauses judged."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

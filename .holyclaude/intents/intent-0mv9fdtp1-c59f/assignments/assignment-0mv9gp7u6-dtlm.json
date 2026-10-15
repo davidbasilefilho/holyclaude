@@ -37,8 +37,21 @@
     ]
   },
   "id": "assignment-0mv9gp7u6-dtlm",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "PR5 final review: C2 and C3 met; C1 gap: B1 entry claims no content caps while the 64 KiB CLI stdin cap and the guard 1 MiB stdin refuse author text and SessionStart clips; B2 removals and rules-whole order described as done but not in this tree (land with the size-cap PR); optional O1-O9; cap value table matches code.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Value table checked against code; B1 and B2 verified (decision text precedes the implementing PR).",
+    "criteria_evidence": {
+      "The size-cap entry does not claim holyclaude caps no content, and each listed removed or kept cap matches the code it names.": "B1, B2; kept values match code.",
+      "Every README statement that the agent setting starts the root is marked observed in local sessions with a pointer; the stop-hook bullet is scoped to sessions observed; the managed-only note is a general caveat outside the cloud list.": "C2 met with O1-O4 wording notes.",
+      "Each fact has one home with links between README and DECISIONS.md, apart from cap numbers that README's State section must still describe as current behavior.": "C3 met, O6-O8 duplication notes.",
+      "Blockers separated from optional.": "B1, B2; O1-O9."
+    },
+    "required_evidence": {
+      "blockers": "B1, B2.",
+      "optional-findings": "O1-O9."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

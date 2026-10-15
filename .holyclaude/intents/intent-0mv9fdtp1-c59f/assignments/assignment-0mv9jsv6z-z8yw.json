@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR4 second repair (worktree pr4): fix the re-review's blockers in the CI watching section.",
+  "scope": [
+    "plugin/agents/holyclaude.md CI watching section"
+  ],
+  "constraints": [
+    "Change only the CI watching section; writing bar; no net growth."
+  ],
+  "acceptance_criteria": [
+    "The CI watching fallback sentence is removed (the core rules own the fallback and its trigger).",
+    "The summary line's keys are mapped to the fields read, include unknown=, and either carry failed check names or the sentence no longer claims them.",
+    "The review-threads read is a valid GraphQL query (pullRequest(number:){reviewThreads(first:100){nodes{isResolved}}}) with its 100-thread page noted.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9h1yjx-9wo6"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jsv6z-z8yw",
+  "state": "Succeeded",
+  "result": "PR4 second repair: fallback sentence removed (core owns it); summary keys mapped, unknown= added, counts only with names from gh pr checks, full SHA; valid GraphQL query with variables for the first 100 threads; section +100 chars; gates pass.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR4 prose accepted after three review rounds; final exact-text fixes are the last reviewer's own findings, root checked the diff.",
+    "criteria_evidence": {
+      "The CI watching fallback sentence is removed (the core rules own the fallback and its trigger).": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "The summary line's keys are mapped to the fields read, include unknown=, and either carry failed check names or the sentence no longer claims them.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "The review-threads read is a valid GraphQL query (pullRequest(number:){reviewThreads(first:100){nodes{isResolved}}}) with its 100-thread page noted.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "diff-file": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

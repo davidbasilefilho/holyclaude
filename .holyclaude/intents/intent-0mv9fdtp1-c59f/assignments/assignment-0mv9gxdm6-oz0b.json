@@ -1,0 +1,61 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 fourth repair (worktree pr3, on fcc0954): apply exactly the four blocker fixes and one optional fix from the final re-review.",
+  "scope": [
+    "plugin/agents/holyclaude.md core-rules block"
+  ],
+  "constraints": [
+    "Follow the writing bar; change only the lines named.",
+    "Do not edit sections outside the core-rules block or the frontmatter."
+  ],
+  "acceptance_criteria": [
+    "B1: the CI-watch line says that with no CI workflow there is no gate to watch: report it as none configured (Unknown) and finish on the local gates and review.",
+    "B2: the finish rule names each Unknown result and each user-waived gate in the final report.",
+    "B3: the solo-run bar names its checks inside the block (the repository's local gates and the regression tests the change needs).",
+    "B4: the finish rule accepts reviewable work that has had review or whose review the user waived and that is named Unknown.",
+    "O5: the git and gh ownership line says subagents leave these writes to the root.",
+    "Size reported; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9gr739-iw3i",
+      "assignment-0mv9gu6z7-nkn0"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gxdm6-oz0b",
+  "state": "Succeeded",
+  "result": "PR3 fourth repair: B1 no-CI line on the CI watch, B2 and B4 finish rule names Unknown and waived gates and accepts waived review named Unknown, B3 solo-run bar names local gates and regression tests, O5 subagents leave VCS writes to the root; 4 lines changed; block 8,591->8,901 with markers; gates pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gxdm6-oz0b.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR3 core rules accepted after seven review rounds; final waiver text reflects the user's decision and the last check's valid finding; root checked the diff.",
+    "criteria_evidence": {
+      "B1: the CI-watch line says that with no CI workflow there is no gate to watch: report it as none configured (Unknown) and finish on the local gates and review.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B2: the finish rule names each Unknown result and each user-waived gate in the final report.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B3: the solo-run bar names its checks inside the block (the repository's local gates and the regression tests the change needs).": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "B4: the finish rule accepts reviewable work that has had review or whose review the user waived and that is named Unknown.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "O5: the git and gh ownership line says subagents leave these writes to the root.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "Size reported; format, lint, typecheck and test pass.": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "size-change": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass.",
+      "diff-file": "Reviews 0mv9g7i48, 0mv9gj3ct, 0mv9gu6z7, 0mv9h03nx, 0mv9h5wt9, 0mv9jsv25; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.mechanical",
+  "objective": "Apply three specified text replacements to the CI watching section of plugin/agents/holyclaude.md in worktree pr4.",
+  "scope": [
+    "plugin/agents/holyclaude.md lines 130, 133, 134"
+  ],
+  "constraints": [
+    "Replace exactly the given fragments; change nothing else."
+  ],
+  "acceptance_criteria": [
+    "The three replacements are applied verbatim.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9jznbb-2sny",
+  "state": "Succeeded",
+  "result": "Three CI-watching replacements applied verbatim; gates pass (glob timing flake reran alone green).",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "PR4 prose accepted after three review rounds; final exact-text fixes are the last reviewer's own findings, root checked the diff.",
+    "criteria_evidence": {
+      "The three replacements are applied verbatim.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "Format, lint, typecheck and test pass.": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    },
+    "required_evidence": {
+      "checks-run": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass.",
+      "diff-file": "Reviews 0mv9gy61n, 0mv9h46fm, 0mv9jvi5y; gates pass."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

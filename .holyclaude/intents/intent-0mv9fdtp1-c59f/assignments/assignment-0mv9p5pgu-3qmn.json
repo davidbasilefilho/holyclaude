@@ -1,0 +1,40 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Point continue-work's revision-move sentence at the root prompt's carry-forward policy.",
+  "scope": [
+    "Worktree worktree a, plugin/skills/continue-work/SKILL.md only."
+  ],
+  "constraints": [
+    "One sentence; no git writes."
+  ],
+  "acceptance_criteria": [
+    "continue-work/SKILL.md line 13's sentence about a moved Intent revision is replaced by a pointer: where the revision moved since work finished, follow the root prompt's carry-forward policy (accept with --carry-forward when the work still holds, a validation Assignment when the change touched its files).",
+    "oxfmt and the full test suite pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/skills/continue-work/SKILL.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "intent-lifecycle"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9p0lsh-llyj"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9p5pgu-3qmn",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

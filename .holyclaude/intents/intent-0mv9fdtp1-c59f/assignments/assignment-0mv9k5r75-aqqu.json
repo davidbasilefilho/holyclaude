@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.validation",
+  "objective": "Run the repository's gates on three merged heads: worktree pr4 at 27291b9, pr5 at 0545ac2, pr6 at f266feb.",
+  "scope": [
+    "Worktrees pr4, pr5, pr6 at the named commits"
+  ],
+  "constraints": [
+    "Read-only on source; run checks only."
+  ],
+  "acceptance_criteria": [
+    "For each head: oxfmt --check, oxlint, bun check and bun test (Bun 1.4.3) with exit codes and counts; pr6 also runs both claude plugin validate --strict commands from its CI step.",
+    "For each head the bundle build matches the committed bundle (cmp)."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "bundle-check"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9k5r75-aqqu",
+  "state": "Succeeded",
+  "result": "pr4 27291b9 and pr5 0545ac2: all gates pass (1136), bundles identical; pr6 f266feb: architecture test fails deterministically on existsSync from node:fs in three hook test files inherited from PR1; validate --strict passes; bundle identical.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Exact SHAs, commands, exit codes; failure reproduced standalone.",
+    "criteria_evidence": {
+      "For each head: oxfmt --check, oxlint, bun check and bun test (Bun 1.4.3) with exit codes and counts; pr6 also runs both claude plugin validate --strict commands from its CI step.": "pr4, pr5 green; pr6 one deterministic failure.",
+      "For each head the bundle build matches the committed bundle (cmp).": "pr4, pr5 green; pr6 one deterministic failure."
+    },
+    "required_evidence": {
+      "checks-run": "pr4, pr5 green; pr6 one deterministic failure.",
+      "bundle-check": "pr4, pr5 green; pr6 one deterministic failure."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
