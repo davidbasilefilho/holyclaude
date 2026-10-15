@@ -19,11 +19,20 @@ run = "bun run oxlint"
 
 [tasks.typecheck]
 description = "Type-check the repository"
-run = "bun check"
+# `--check` is Bun 1.4.3's built-in type check (older Bun prints help and exits 0); a bare `bun check` would run the `check` script.
+run = "bun --check"
 
 [tasks.test]
 description = "Run the test suite"
 run = "bun test"
+
+[tasks.check]
+description = "Run lint:readonly, fmt:readonly and typecheck"
+run = [{ task = "lint:readonly" }, { task = "fmt:readonly" }, { task = "typecheck" }]
+
+[tasks."check:fix"]
+description = "Run lint, fmt and typecheck, writing fixes"
+run = [{ task = "lint" }, { task = "fmt" }, { task = "typecheck" }]
 
 [tasks.build]
 description = "Bundle the CLI into plugin/scripts/holyclaude.js"

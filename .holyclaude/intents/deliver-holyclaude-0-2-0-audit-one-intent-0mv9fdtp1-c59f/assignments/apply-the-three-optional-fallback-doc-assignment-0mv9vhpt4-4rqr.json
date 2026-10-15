@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.implementation",
+  "objective": "Apply the three optional fallback-doc clarifications.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "Three short clauses or sentences; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The doc says dropping Agent from the copied matcher also drops the check that keeps the root to holyclaude specialists, so the copied root's dispatch restraint rests on its instructions.",
+    "The SessionStart skip gives its reason in place.",
+    "The colon rule is qualified as claude.ai's agent-name rule, with the local loader unverified.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vhpt4-4rqr",
+  "state": "Succeeded",
+  "result": "Three clarifications added to docs/claude-fallback.md lines 32-33, 35-38, 43; oxfmt exit 0; diff at scratchpad/4rqr.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Report gives the three edits with line ranges matching the criteria; independent re-review follows.",
+    "criteria_evidence": {
+      "The doc says dropping Agent from the copied matcher also drops the check that keeps the root to holyclaude specialists, so the copied root's dispatch restraint rests on its instructions.": "Reported at docs/claude-fallback.md 32-33, 35-38, 43",
+      "The SessionStart skip gives its reason in place.": "Reported at docs/claude-fallback.md 32-33, 35-38, 43",
+      "The colon rule is qualified as claude.ai's agent-name rule, with the local loader unverified.": "Reported at docs/claude-fallback.md 32-33, 35-38, 43",
+      "oxfmt passes; diff saved.": "Reported at docs/claude-fallback.md 32-33, 35-38, 43"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0; diff at scratchpad/4rqr.diff",
+      "diff-file": "oxfmt --check exit 0; diff at scratchpad/4rqr.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Replace the fallback doc's naming paragraph with the corrected text.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "Apply the given text, wrapped at about 100 columns; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The paragraph starting 'Copied agents and skills are named' carries the specified text, wrapped to match the page.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vntdi-6hpe"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vsncz-zmna",
+  "state": "Succeeded",
+  "result": "Replaced the naming paragraph with the specified text, wrapped at 100 columns; oxfmt exit 0; diff at scratchpad/zmna.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Read the file: the paragraph carries the specified text; independent re-review follows.",
+    "criteria_evidence": {
+      "The paragraph starting 'Copied agents and skills are named' carries the specified text, wrapped to match the page.": "Verified in docs/claude-fallback.md",
+      "oxfmt passes; diff saved.": "Verified in docs/claude-fallback.md"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0; diff at scratchpad/zmna.diff",
+      "diff-file": "oxfmt --check exit 0; diff at scratchpad/zmna.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -39,6 +39,19 @@
   "id": "assignment-0mv9uywxc-ke6d",
   "state": "Succeeded",
   "result": "README Why wording made accurate (refused guardrail, verify checks, caching and compaction from good defaults); recorded() waits for at least one record and fails otherwise; claude-fallback explains the missing holyclaude: prefix and the CLAUDE_PLUGIN_ROOT replacement; gates pass, dispatch test stable 6x.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Carried forward from revision 10 to 11: revision 11 adds tooling and README scope that a separate Assignment owns and changes no requirement this work was judged against.",
+    "criteria_evidence": {
+      "README: specialists' git writes are refused by a guard hook (not cannot), assignment verify checks the model and effort a worker ran on, and caching and compaction are credited to the good defaults the user sets.": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n.",
+      "dispatch.test.ts: the recorded() wait fails the test on timeout (or waits for at least one record) instead of returning silently.": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n.",
+      "docs/claude-fallback.md: copied specialists lose the holyclaude: prefix that dispatch, the hooks and verify expect, and copied hooks need ${CLAUDE_PLUGIN_ROOT} replaced with the clone's plugin path.": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n.",
+      "fmt, lint, typecheck and full test pass; diff saved.": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n."
+    },
+    "required_evidence": {
+      "checks-run": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n.",
+      "diff-file": "Reviewed in assignment-0mv9v14er-h4gx; its only blocker B1 was repaired by assignment-0mv9v5ern-rrvy and re-reviewed clean in assignment-0mv9vb910-e55n."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

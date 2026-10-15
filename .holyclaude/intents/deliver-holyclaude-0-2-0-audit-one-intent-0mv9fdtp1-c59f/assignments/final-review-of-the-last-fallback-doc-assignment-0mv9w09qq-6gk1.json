@@ -1,0 +1,61 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.artifact",
+  "objective": "Final review of the last fallback-doc split and two wording fixes.",
+  "scope": [
+    "worktree j/docs/claude-fallback.md lines 31-52 (diff at scratchpad/nzay.diff); README.md line 11 and the mise.toml typecheck comment (diff at scratchpad/3ody.diff)."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Reports whether the changed text is accurate and complete against the repo, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vyriv-nzay",
+      "assignment-0mv9vy30a-3ody"
+    ],
+    "independent_from": [
+      "assignment-0mv9vyriv-nzay",
+      "assignment-0mv9vy30a-3ody",
+      "assignment-0mv9vu4um-auef",
+      "assignment-0mv9vsncz-zmna",
+      "assignment-0mv9vntdi-6hpe",
+      "assignment-0mv9vluej-607k",
+      "assignment-0mv9vir6o-6l5d",
+      "assignment-0mv9vhpt4-4rqr",
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx",
+      "assignment-0mv9vcmyt-txx8",
+      "assignment-0mv9vii2v-0mi4"
+    ]
+  },
+  "id": "assignment-0mv9w09qq-6gk1",
+  "state": "Succeeded",
+  "result": "No blockers. Optional: skill re-check conflict, fork is not a built-in type, recording rule restated, compaction wording, Opus wording, skill-name rule unverified.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Claims checked with file:line; no blockers.",
+    "criteria_evidence": {
+      "Reports whether the changed text is accurate and complete against the repo, with blockers substantiated.": "Findings with file:line"
+    },
+    "required_evidence": {
+      "findings": "findings present"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

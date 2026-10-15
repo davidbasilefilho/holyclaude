@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.code",
+  "objective": "Review the check tasks and README tidy change.",
+  "scope": [
+    "Uncommitted change in worktree j saved at scratchpad/txx8.diff: mise.toml, package.json, README.md, docs/development.md, docs/settings.md."
+  ],
+  "constraints": [
+    "Read-only; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Reports blockers and optional findings with evidence, covering whether bun --check is Bun 1.4.3's real type check and fails on type errors, whether CI's mise run typecheck still works, whether the new scripts and tasks behave as the README states, and README/docs accuracy."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "tooling",
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vcmyt-txx8"
+    ],
+    "independent_from": [
+      "assignment-0mv9vcmyt-txx8"
+    ]
+  },
+  "id": "assignment-0mv9vii2v-0mi4",
+  "state": "Succeeded",
+  "result": "No blockers. /code-review ran (6 findings, triaged: 3 rejected with evidence, 3 optional). bun --check verified as the 1.4.3 type check (exit 1 on TS2322); CI mise tasks and AGENTS.md gates pass. Optionals: version note in mise comment, README:11 phrasing, routes.test comment.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Evidence is concrete (commands with exit codes, deliberate type-error runs in a copy, CI tasks run locally); the rejected /code-review claim is explained by Bun 1.4.2 on PATH.",
+    "criteria_evidence": {
+      "Reports blockers and optional findings with evidence, covering whether bun --check is Bun 1.4.3's real type check and fails on type errors, whether CI's mise run typecheck still works, whether the new scripts and tasks behave as the README states, and README/docs accuracy.": "Reviewed with commands and exit codes"
+    },
+    "required_evidence": {
+      "code-review-run": "code-review-run, findings and checks-run present",
+      "findings": "code-review-run, findings and checks-run present",
+      "checks-run": "code-review-run, findings and checks-run present"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

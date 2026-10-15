@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Apply the final review's accuracy wording fixes.",
+  "scope": [
+    "Worktree worktree j: docs/claude-fallback.md paragraph B and README.md line 11."
+  ],
+  "constraints": [
+    "Apply the given text; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The two specified sentences carry the given text.",
+    "fmt:readonly passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9w09qq-6gk1"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9w469h-etox",
+  "state": "Succeeded",
+  "result": "Two sentences replaced as specified; fmt:readonly exit 0; diff at scratchpad/etox.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Report confirms the two sentences by search; narrow review follows.",
+    "criteria_evidence": {
+      "The two specified sentences carry the given text.": "Reported with search evidence",
+      "fmt:readonly passes; diff saved.": "Reported with search evidence"
+    },
+    "required_evidence": {
+      "checks-run": "fmt:readonly exit 0; diff saved",
+      "diff-file": "fmt:readonly exit 0; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

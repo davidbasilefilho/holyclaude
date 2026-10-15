@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Apply two specified wording fixes from the tooling review.",
+  "scope": [
+    "Worktree worktree j: README.md line 11 and the typecheck comment in mise.toml."
+  ],
+  "constraints": [
+    "Apply the given text; no git writes."
+  ],
+  "acceptance_criteria": [
+    "README.md line 11 and the mise.toml typecheck comment carry the specified text.",
+    "bun run fmt:readonly passes under the pinned Bun; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md",
+      "mise.toml"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs",
+      "tooling"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vii2v-0mi4"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vy30a-3ody",
+  "state": "Succeeded",
+  "result": "README line 11 and mise typecheck comment replaced with the specified text; fmt:readonly exit 0; diff at scratchpad/3ody.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Both lines carry the specified text (grep); a final review covers them.",
+    "criteria_evidence": {
+      "README.md line 11 and the mise.toml typecheck comment carry the specified text.": "Verified by grep in README.md and mise.toml",
+      "bun run fmt:readonly passes under the pinned Bun; diff saved.": "Verified by grep in README.md and mise.toml"
+    },
+    "required_evidence": {
+      "checks-run": "fmt:readonly exit 0; diff at scratchpad/3ody.diff",
+      "diff-file": "fmt:readonly exit 0; diff at scratchpad/3ody.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

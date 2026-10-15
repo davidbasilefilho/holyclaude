@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review the three fallback-doc clarifications.",
+  "scope": [
+    "worktree j/docs/claude-fallback.md lines 31-45 (edits at 32-33, 35-38, 43); full diff incl. the reviewed earlier repair at scratchpad/4rqr.diff."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Reports whether the three edits are accurate against dispatch.ts, session-start.ts and scripts/agent-names.test.ts and read clearly, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vhpt4-4rqr"
+    ],
+    "independent_from": [
+      "assignment-0mv9vhpt4-4rqr",
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx"
+    ]
+  },
+  "id": "assignment-0mv9vir6o-6l5d",
+  "state": "Succeeded",
+  "result": "Two blockers: the guard refuses only unprefixed types, and the doc never says which dispatch name the copied route uses (root and CLI use holyclaude:<name>). Optionals: exhaustive refused list, fork/effort precision, colon derivation, pointer, wrapping.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Read the doc lines 31-46 myself: both blockers hold (prefixed dispatch passes the guard but names no copied agent; dispatch name is unstated).",
+    "criteria_evidence": {
+      "Reports whether the three edits are accurate against dispatch.ts, session-start.ts and scripts/agent-names.test.ts and read clearly, with blockers substantiated.": "Findings with file:line evidence, checked against the doc"
+    },
+    "required_evidence": {
+      "findings": "findings verified"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

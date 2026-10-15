@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Split and tighten the fallback naming paragraph with the specified text.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "Apply the given text, wrapped at about 100 columns; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The paragraph starting 'Copied agents and skills are named' is replaced by the two specified paragraphs, wrapped to match the page.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vu4um-auef"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vyriv-nzay",
+  "state": "Succeeded",
+  "result": "Naming paragraph split into the two specified paragraphs; oxfmt exit 0; diff at scratchpad/nzay.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Report confirms the specified text and wrapping; final review follows.",
+    "criteria_evidence": {
+      "The paragraph starting 'Copied agents and skills are named' is replaced by the two specified paragraphs, wrapped to match the page.": "Reported and diff saved",
+      "oxfmt passes; diff saved.": "Reported and diff saved"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0; diff at scratchpad/nzay.diff",
+      "diff-file": "oxfmt --check exit 0; diff at scratchpad/nzay.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
