@@ -72,6 +72,12 @@ More: [state](docs/state.md), [hooks](docs/hooks.md), [settings](docs/settings.m
 
 A plugin's `settings.json` honors only `agent` and `subagentStatusLine`, and a hook cannot change the session's environment or settings, so these are yours to set in the scope where you run the root. The reasons and the compaction mechanism are in [settings](docs/settings.md).
 
+If you want these defaults, paste this prompt into Claude Code after installing the plugin.
+
+```text
+Read https://raw.githubusercontent.com/davidbasilefilho/holyclaude/main/README.md and apply its "Good defaults" section to my Claude Code environment. Put each setting in the settings scope where I run the holyclaude root, keep the permission deny entries out of settings that other agents use, skip managed-only keys unless I manage this organization, and show me every change before you write it.
+```
+
 - `"autoCompactWindow": 450000` (or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`): compacts the root and every specialist at 450,000 tokens.
 - `"promptCacheTtl": "1h"`: keeps the root cached on API-key setups, where the default is five minutes; it carries a higher cache-write cost.
 - `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }` and `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`: a backstop to the `PreToolUse` hook, which already refuses these calls when the root is holyclaude. Forks inherit the Opus model and built-in agent types ignore the pinned specialists. Keep the deny entries out of sessions that use other agents.
