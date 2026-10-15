@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Replace the fallback doc's verify sentence with the specified text.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "Apply the given text; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The sentence starting 'Because the hooks record only' carries the specified text, wrapped to match.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9w5g93-the0"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9w7dgg-f9no",
+  "state": "Succeeded",
+  "result": "Verify sentence replaced verbatim; oxfmt exit 0; diff at scratchpad/f9no.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Joined-text comparison reported identical; narrow check follows.",
+    "criteria_evidence": {
+      "The sentence starting 'Because the hooks record only' carries the specified text, wrapped to match.": "Reported",
+      "oxfmt passes; diff saved.": "Reported"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt exit 0; diff saved",
+      "diff-file": "oxfmt exit 0; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

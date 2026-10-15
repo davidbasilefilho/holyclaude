@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Tighten the README pitch so it states outcomes and does not repeat Why.",
+  "scope": [
+    "Worktree worktree g, README.md: the What section and one link in Good defaults."
+  ],
+  "constraints": [
+    "Writing bar; claims the repo supports; no git writes."
+  ],
+  "acceptance_criteria": [
+    "What is a short outcome-first pitch (a few lines) that does not repeat the Why bullets point by point.",
+    "The Good defaults deny entry links the /code-review caveat in docs/settings.md.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ugy0s-jv9v"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ujpm5-8n9p",
+  "state": "Succeeded",
+  "result": "Pitch now two outcome lines; deny entry links the /code-review caveat; oxfmt passes; README 8120 -> 7728.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Verified by the review chain ending in b8cc (no blockers) with CI green on dbd1a50.",
+    "criteria_evidence": {
+      "What is a short outcome-first pitch (a few lines) that does not repeat the Why bullets point by point.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "The Good defaults deny entry links the /code-review caveat in docs/settings.md.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "oxfmt passes; diff saved.": "verified by reviews (latest b8cc) and CI on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "diff-file": "reported and confirmed by review"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

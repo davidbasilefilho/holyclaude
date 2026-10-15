@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.artifact",
+  "objective": "Review the rewritten README and the new docs files in PR #30.",
+  "scope": [
+    "Worktree g at 14bfc21: README.md, docs/*.md; old README at scratchpad/readme-g-before.md; diff scratchpad/diffs/assignment-0mv9u848y-dpjy.diff."
+  ],
+  "constraints": [
+    "Read-only; first review."
+  ],
+  "acceptance_criteria": [
+    "README order and pitch match the owner's request, it is far shorter, the good-defaults list is exactly the agreed set with reasons, T3 Code only in Special thanks, License correct.",
+    "Every applicable fact of the old README is in README or docs, nothing contradicts the shipped hooks, settings and frontmatter, and all links resolve.",
+    "Findings with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9u848y-dpjy"
+    ],
+    "independent_from": [
+      "assignment-0mv9u848y-dpjy",
+      "assignment-0mv9u4pl3-rzz3",
+      "assignment-0mv9tz082-3bed",
+      "assignment-0mv9tp0jj-6dl0"
+    ]
+  },
+  "id": "assignment-0mv9ucs8l-72ab",
+  "state": "Succeeded",
+  "result": "No blockers on README and docs; coverage and links verified. Optional: duplicated reasons in Good defaults, deny caveat unlinked, pitch and Why overlap, prompt valid after merge, long moved paragraphs.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "First review: no blockers; O2 and O3 taken in a final pass.",
+    "criteria_evidence": {
+      "README order and pitch match the owner's request, it is far shorter, the good-defaults list is exactly the agreed set with reasons, T3 Code only in Special thanks, License correct.": "met with file:line",
+      "Every applicable fact of the old README is in README or docs, nothing contradicts the shipped hooks, settings and frontmatter, and all links resolve.": "met with file:line",
+      "Findings with file:line.": "met with file:line"
+    },
+    "required_evidence": {
+      "findings": "findings reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

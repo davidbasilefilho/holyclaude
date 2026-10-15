@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Rewrite the README's Why section as the reasons to use holyclaude.",
+  "scope": [
+    "Worktree worktree g (PR #30), README.md section ## Why holyclaude? only."
+  ],
+  "constraints": [
+    "Only claims the repository supports; writing bar; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Why answers why someone should use holyclaude, benefit first with the mechanism as support: efficiency and cost, mergeability, quality, continuity across sessions and clones, and safety of the repository history.",
+    "Design-rationale wording moves out or stays only as links; the section stays short; oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9u848y-dpjy"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ugy0s-jv9v",
+  "state": "Succeeded",
+  "result": "Why rewritten as five benefit-first bullets; install leads with marketplace; Run from a clone moved to docs/development.md; links resolve; oxfmt passes; README 9162 -> 8120.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Verified by the review chain ending in b8cc (no blockers) with CI green on dbd1a50.",
+    "criteria_evidence": {
+      "Why answers why someone should use holyclaude, benefit first with the mechanism as support: efficiency and cost, mergeability, quality, continuity across sessions and clones, and safety of the repository history.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "Design-rationale wording moves out or stays only as links; the section stays short; oxfmt passes; diff saved.": "verified by reviews (latest b8cc) and CI on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "diff-file": "reported and confirmed by review"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

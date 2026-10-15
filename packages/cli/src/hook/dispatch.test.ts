@@ -25,15 +25,17 @@ afterEach(() => {
 })
 
 /**
- * Waits until `count` recordings are in the log: they run beside the verdict and must land before
- * the directory goes.
+ * Waits until at least one recording is in the log, and fails the test if none arrives: they run
+ * beside the verdict and must land before the directory goes. Concurrent observations of the same
+ * agent deduplicate against the log, so the count can be lower than the calls made.
  */
-const recorded = async (count: number) => {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const records = await Effect.runPromise(readObservations(directory))
-    if (records.length >= count) return
-    await Bun.sleep(10)
+const recorded = async () => {
+  let count = 0
+  for (let attempt = 0; attempt < 200 && count === 0; attempt++) {
+    count = (await Effect.runPromise(readObservations(directory))).length
+    if (count === 0) await Bun.sleep(10)
   }
+  expect(count).toBeGreaterThan(0)
 }
 
 /** An Agent call as PreToolUse receives it; `extra` adds payload fields such as who made it. */
@@ -94,10 +96,9 @@ describe("an Agent call that is not a holyclaude root's", () => {
     ["a root named like holyclaude", { agent_type: "other:holyclaude" }],
     ["a subagent as the caller", { ...ROOT, agent_id: "agent-1" }],
   ])("is untouched with %s", async (_name, extra) => {
-    const subagentTypes = ["fork", "general-purpose", undefined]
-    for (const subagent_type of subagentTypes)
+    for (const subagent_type of ["fork", "general-purpose", undefined])
       expect(await reasonOf(agentCall({ subagent_type }, extra))).toBeUndefined()
-    if ("agent_id" in extra) await recorded(subagentTypes.length)
+    if ("agent_id" in extra) await recorded()
   })
 
   test("by a holyclaude root with another tool is untouched", async () => {

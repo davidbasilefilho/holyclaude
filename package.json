@@ -13,7 +13,13 @@
     "lint": "mise run lint",
     "lint:readonly": "mise run lint:readonly",
     "typecheck": "mise run typecheck",
-    "test": "mise run test"
+    "check": "mise run check",
+    "check:fix": "mise run check:fix",
+    "test": "mise run test",
+    "build": "mise run build",
+    "bump:minor": "mise run bump:minor",
+    "bump:patch": "mise run bump:patch",
+    "bump:hotfix": "mise run bump:hotfix"
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "2.1.300",

@@ -8,11 +8,11 @@ The plan and its progress live in git, so the work carries on across sessions an
 
 ## Why holyclaude?
 
-- **Long sessions stay cheap.** Opus only plans, decides and accepts, while the 18 specialists run on Haiku or Sonnet at pinned effort. Prompt caching and [compaction](#good-defaults) keep long sessions affordable, and `holyclaude assignment verify` proves each worker ran on the model you paid for.
+- **Long sessions stay cheap.** Opus only plans, decides and accepts, while the 18 specialists run on Haiku or Sonnet at pinned effort, and the Sonnet specialists ask for a one-hour cache in their own frontmatter. The 450,000-token compaction window comes from the [good defaults](#good-defaults) you set, not from the plugin. `holyclaude assignment verify` checks the model and effort each worker actually ran on against what was dispatched, and reports the fields it could not observe.
 - **PRs that are ready to merge.** Every change is reviewed by a specialist with no history on it, and CI is watched on the exact head commit. A PR counts as merge-ready only when the review has no open blockers and the CI gate passed, and repairs get narrow re-reviews so review loops close.
 - **Quality you can check.** Code goes through `/code-review` plus a reviewer, security-sensitive changes get a security review, fixes come with regression tests, and reports carry evidence instead of claims.
 - **Work that survives.** Intents and Assignments live in git, so work outlasts compaction, restarts and new sessions, and collaborators and clones share it.
-- **Your history stays yours.** Specialists cannot commit, push or merge (a guard hook refuses their git writes; see [limits](docs/limits.md)). The root owns the history, and merging waits for your approval.
+- **Your history stays yours.** A guard hook refuses specialists' git writes, so well-meaning workers do not commit, push or merge; it is a guardrail, not a sandbox (see [limits](docs/limits.md)). The root owns the history, and merging waits for your approval.
 
 The design reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
 
@@ -34,7 +34,12 @@ Install it from the marketplace, in a session:
 /plugin install holyclaude@holyclaude
 ```
 
-or from a shell: `claude plugin marketplace add davidbasilefilho/holyclaude` and `claude plugin install holyclaude@holyclaude`.
+or from a shell:
+
+```sh
+claude plugin marketplace add davidbasilefilho/holyclaude
+claude plugin install holyclaude@holyclaude
+```
 
 The plugin's `settings.json` sets `agent` to `holyclaude`, so a local session starts with the root
 agent, as observed; a [cloud session](docs/cloud-sessions.md) did not. Check `/agents` for the `holyclaude:` specialists. If the plugin does not load, or its `agent` setting does not take effect, see [the `.claude/` fallback](docs/claude-fallback.md). To try it from a clone without installing, see [Run from a clone](docs/development.md#run-from-a-clone).
@@ -63,20 +68,23 @@ Read https://raw.githubusercontent.com/davidbasilefilho/holyclaude/main/README.m
 ```
 
 - `"autoCompactWindow": 450000` (or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`): compacts the root and every specialist at 450,000 tokens.
-- `"promptCacheTtl": "1h"`: keeps the root cached on API-key setups, where the default is five minutes; it carries a higher cache-write cost.
-- `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }` and `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`: a backstop to the `PreToolUse` hook, which already refuses these calls when the root is holyclaude. Forks inherit the Opus model and built-in agent types ignore the pinned specialists. Keep the deny entries out of sessions that use other agents. The built-in `/code-review` skill still started a general-purpose subagent in a test with `Agent(general-purpose)` denied; see [settings](docs/settings.md).
+- `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }`: turns off fork mode, since forks inherit the Opus model. A backstop to the `PreToolUse` hook, which already refuses forks when the root is holyclaude.
+- `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`: a backstop to the `PreToolUse` hook, which already refuses these calls when the root is holyclaude. Forks inherit the Opus model and built-in agent types ignore the pinned specialists. Keep the deny entries out of sessions that use other agents. The built-in `/code-review` skill still started a general-purpose subagent in a test with `Agent(general-purpose)` denied; see [settings](docs/settings.md).
 - `"permissions": { "allow": ["Bash(gh pr view *)", "Bash(gh run list *)", "Bash(gh run view *)"] }` (optional): lets the root watch CI with read-only `gh` commands without a prompt.
 - `"deniedModels": ["fable"]` in managed settings (optional): blocks Fable-class models; the key is managed-only.
-- Leave `CLAUDE_CODE_EFFORT_LEVEL` unset, because it overrides every specialist's pinned effort, and `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset, because it forces one model on every subagent and would block Sonnet.
+- Leave `CLAUDE_CODE_EFFORT_LEVEL` unset, because it overrides every specialist's pinned effort.
+- Leave `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset, because it forces one model on every subagent and would block Sonnet.
 
 ## Development
 
-Tasks live in `mise.toml`, which pins Bun. Run them with `mise run <task>`; the root `bun run` scripts call the matching task.
+Tasks live in `mise.toml`, which pins Bun. Run them with `bun run <script>`; the root scripts call the matching mise tasks.
 
 ```sh
+mise trust
+mise install
 bun install
-mise run fmt:readonly && mise run lint:readonly && mise run typecheck && mise run test
-mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli changes
+bun run --parallel check test
+bun run build   # rebuilds plugin/scripts/holyclaude.js after core or cli changes
 ```
 
 The task table, the version rules (`0.X.Y-Z`, six version files that stay identical) and the vendored `frontend-design` sources are in [docs/development.md](docs/development.md).

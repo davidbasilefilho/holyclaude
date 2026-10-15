@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review the fallback doc's dispatch correction.",
+  "scope": [
+    "The repair diff scratchpad/rrvy.diff and the sections of worktree j/docs/claude-fallback.md it touches; blockers elsewhere only."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Reports whether the corrected paragraphs are accurate against packages/cli/src/hook/dispatch.ts, packages/cli/src/hook/observe.ts and plugin/hooks/hooks.json in worktree j, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9v5ern-rrvy"
+    ],
+    "independent_from": [
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx"
+    ]
+  },
+  "id": "assignment-0mv9vb910-e55n",
+  "state": "Succeeded",
+  "result": "No blockers; claims verified against dispatch.ts, observe.ts, hooks.json, verify.ts. Three optional findings (restraint loss note, SessionStart reason, colon rule qualifier).",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Carried forward from revision 10 to 11: revision 11 adds tooling and README scope that a separate Assignment owns and changes no requirement this work was judged against.",
+    "criteria_evidence": {
+      "Reports whether the corrected paragraphs are accurate against packages/cli/src/hook/dispatch.ts, packages/cli/src/hook/observe.ts and plugin/hooks/hooks.json in worktree j, with blockers substantiated.": "Re-review read the repair diff against dispatch.ts, observe.ts, hooks.json and verify.ts with file:line evidence; no blockers."
+    },
+    "required_evidence": {
+      "findings": "Re-review read the repair diff against dispatch.ts, observe.ts, hooks.json and verify.ts with file:line evidence; no blockers."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

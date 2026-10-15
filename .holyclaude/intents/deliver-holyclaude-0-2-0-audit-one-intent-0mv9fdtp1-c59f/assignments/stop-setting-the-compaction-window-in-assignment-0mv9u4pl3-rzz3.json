@@ -40,6 +40,19 @@
   "id": "assignment-0mv9u4pl3-rzz3",
   "state": "Succeeded",
   "result": "autoCompactWindow removed from all agents and its test; README states it as a user default for all agents; .claude/settings.json has attribution and autoCompactWindow 450000; gates and validate pass.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Verified by the review chain ending in b8cc (no blockers) with CI green on dbd1a50.",
+    "criteria_evidence": {
+      "No agent file in plugin/agents sets autoCompactWindow, and the frontmatter pin test is removed or turned into nothing that requires it.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "README lists autoCompactWindow 450000 (or CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000) as a good default for all agents, root and specialists, with no claim that the plugin sets it.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      ".claude/settings.json holds the attribution setting and \"autoCompactWindow\": 450000.": "verified by reviews (latest b8cc) and CI on dbd1a50",
+      "fmt, lint, typecheck, full test and both validate --strict runs pass; repair-only diff saved.": "verified by reviews (latest b8cc) and CI on dbd1a50"
+    },
+    "required_evidence": {
+      "checks-run": "reported and confirmed by review",
+      "diff-file": "reported and confirmed by review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

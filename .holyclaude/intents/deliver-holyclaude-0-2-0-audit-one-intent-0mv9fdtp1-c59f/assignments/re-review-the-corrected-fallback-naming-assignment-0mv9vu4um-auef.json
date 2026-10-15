@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review the corrected fallback naming paragraph.",
+  "scope": [
+    "worktree j/docs/claude-fallback.md lines 31-50; full diff at scratchpad/zmna.diff."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Reports whether following the paragraphs yields a working copied route as far as the repo shows and whether each claim is accurate, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vsncz-zmna"
+    ],
+    "independent_from": [
+      "assignment-0mv9vsncz-zmna",
+      "assignment-0mv9vntdi-6hpe",
+      "assignment-0mv9vluej-607k",
+      "assignment-0mv9vir6o-6l5d",
+      "assignment-0mv9vhpt4-4rqr",
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx"
+    ]
+  },
+  "id": "assignment-0mv9vu4um-auef",
+  "state": "Succeeded",
+  "result": "No blockers; route works as far as the repo shows. Optionals: duplicated recording rule, deny list covers only built-ins, verify re-check never resolves, name rule incomplete, paragraph too long.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Claims verified with file:line across commands.ts, verify.ts, observe.ts, dispatch.ts and plugin files; no blockers.",
+    "criteria_evidence": {
+      "Reports whether following the paragraphs yields a working copied route as far as the repo shows and whether each claim is accurate, with blockers substantiated.": "Findings with file:line evidence"
+    },
+    "required_evidence": {
+      "findings": "findings present"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

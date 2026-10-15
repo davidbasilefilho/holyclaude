@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Reviewer.code",
+  "objective": "Review the docs and test polish PR.",
+  "scope": [
+    "Worktree worktree j, branch release/0.2.2/fix/docs-and-test-polish against main 6e76ec7 (committed by the root)."
+  ],
+  "constraints": [
+    "Read-only; tests run so they cannot write into .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "README Why claims match the code (guard hook refuses specialist git writes, verify checks model and effort, caching and compaction from user defaults); the fallback doc is accurate to hooks.json and the agent names; recorded() fails when nothing is recorded and is stable.",
+    "Gates pass; no version change; findings reported."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9uywxc-ke6d"
+    ],
+    "independent_from": [
+      "assignment-0mv9uywxc-ke6d"
+    ]
+  },
+  "id": "assignment-0mv9v14er-h4gx",
+  "state": "Succeeded",
+  "result": "Blocker B1: fallback doc understates dispatch: the guard refuses every dispatch from a bare holyclaude root to copied specialists unless Agent is dropped from the copied PreToolUse matcher. Optional O1-O4. Gates pass; recorded() fails with observe disabled; stable 30x.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Review with negative test; B1 verified in dispatch.ts and fingerprint.ts; taken as a repair.",
+    "criteria_evidence": {
+      "README Why claims match the code (guard hook refuses specialist git writes, verify checks model and effort, caching and compaction from user defaults); the fallback doc is accurate to hooks.json and the agent names; recorded() fails when nothing is recorded and is stable.": "see findings",
+      "Gates pass; no version change; findings reported.": "see findings"
+    },
+    "required_evidence": {
+      "code-review-run": "invocation, checks and findings",
+      "checks-run": "invocation, checks and findings",
+      "findings": "invocation, checks and findings"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

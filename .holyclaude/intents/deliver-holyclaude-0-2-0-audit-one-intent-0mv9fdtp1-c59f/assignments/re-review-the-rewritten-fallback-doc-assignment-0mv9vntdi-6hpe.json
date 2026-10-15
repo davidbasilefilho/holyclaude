@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review the rewritten fallback-doc paragraphs.",
+  "scope": [
+    "worktree j/docs/claude-fallback.md lines 31-48; diff against PR head at scratchpad/607k.diff."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Reports whether following the two paragraphs yields a working copied route as far as the repo shows, and whether each claim is accurate against the plugin files and hook code, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vluej-607k"
+    ],
+    "independent_from": [
+      "assignment-0mv9vluej-607k",
+      "assignment-0mv9vir6o-6l5d",
+      "assignment-0mv9vhpt4-4rqr",
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx"
+    ]
+  },
+  "id": "assignment-0mv9vntdi-6hpe",
+  "state": "Succeeded",
+  "result": "Three blockers: instructions-alone claim ignores the Agent allowlist; root spawn rule at holyclaude.md:29 not named; verify reports incomplete rather than not applying. Optional: name routes/select/create too.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Findings checked: holyclaude.md:5 and :29, verify.ts incomplete path and observe.ts prefix filter match the report.",
+    "criteria_evidence": {
+      "Reports whether following the two paragraphs yields a working copied route as far as the repo shows, and whether each claim is accurate against the plugin files and hook code, with blockers substantiated.": "Findings with file:line, spot-checked"
+    },
+    "required_evidence": {
+      "findings": "findings verified"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

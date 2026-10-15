@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.implementation",
+  "objective": "Correct the fallback doc's dispatch consequence.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "One or two sentences plus the hook list; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The doc says the dispatch guard refuses every dispatch from a holyclaude root to copied specialists (their names lack the holyclaude: prefix and an agent name cannot contain a colon), so drop Agent from the copied PreToolUse matcher; it names which hooks.json entries to copy and that SessionStart is skipped as the page already says.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9v14er-h4gx",
+      "assignment-0mv9uywxc-ke6d"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9v5ern-rrvy",
+  "state": "Succeeded",
+  "result": "Rewrote the guard and hook paragraphs of docs/claude-fallback.md; oxfmt --check exit 0; diff at scratchpad/rrvy.diff.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Diff read: guard refusal, Agent dropped from matcher, only PreToolUse copied with skipped entries named; observe.ts confirms recording hooks ignore non-holyclaude types.",
+    "criteria_evidence": {
+      "The doc says the dispatch guard refuses every dispatch from a holyclaude root to copied specialists (their names lack the holyclaude: prefix and an agent name cannot contain a colon), so drop Agent from the copied PreToolUse matcher; it names which hooks.json entries to copy and that SessionStart is skipped as the page already says.": "Verified in rrvy.diff",
+      "oxfmt passes; diff saved.": "Verified in rrvy.diff"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0; diff at scratchpad/rrvy.diff",
+      "diff-file": "oxfmt --check exit 0; diff at scratchpad/rrvy.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

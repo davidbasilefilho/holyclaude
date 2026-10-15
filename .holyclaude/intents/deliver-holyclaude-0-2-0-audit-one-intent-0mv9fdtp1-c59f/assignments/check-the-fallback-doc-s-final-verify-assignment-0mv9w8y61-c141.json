@@ -1,0 +1,64 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Reviewer.artifact",
+  "objective": "Check the fallback doc's final verify sentence.",
+  "scope": [
+    "worktree j/docs/claude-fallback.md lines 45-49 (sentence starting 'Because this route skips')."
+  ],
+  "constraints": [
+    "Read-only; the rest was already reviewed."
+  ],
+  "acceptance_criteria": [
+    "Reports whether the sentence is accurate, with blockers substantiated."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9w7dgg-f9no"
+    ],
+    "independent_from": [
+      "assignment-0mv9w7dgg-f9no",
+      "assignment-0mv9w5g93-the0",
+      "assignment-0mv9w469h-etox",
+      "assignment-0mv9w09qq-6gk1",
+      "assignment-0mv9vyriv-nzay",
+      "assignment-0mv9vy30a-3ody",
+      "assignment-0mv9vu4um-auef",
+      "assignment-0mv9vsncz-zmna",
+      "assignment-0mv9vntdi-6hpe",
+      "assignment-0mv9vluej-607k",
+      "assignment-0mv9vir6o-6l5d",
+      "assignment-0mv9vhpt4-4rqr",
+      "assignment-0mv9vb910-e55n",
+      "assignment-0mv9v5ern-rrvy",
+      "assignment-0mv9uywxc-ke6d",
+      "assignment-0mv9v14er-h4gx",
+      "assignment-0mv9vcmyt-txx8",
+      "assignment-0mv9vii2v-0mi4"
+    ]
+  },
+  "id": "assignment-0mv9w8y61-c141",
+  "state": "Succeeded",
+  "result": "No blockers; all four claims verified against verify.ts, observe.ts and the skill. Optional: name the three skipped hooks; add agent_type to the unverified list.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Claim-by-claim evidence with file:line; no blockers.",
+    "criteria_evidence": {
+      "Reports whether the sentence is accurate, with blockers substantiated.": "Findings with file:line"
+    },
+    "required_evidence": {
+      "findings": "findings present"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.mechanical",
+  "objective": "Replace the fallback doc's copied-specialist paragraphs with the specified text.",
+  "scope": [
+    "Worktree worktree j, docs/claude-fallback.md only."
+  ],
+  "constraints": [
+    "Apply the given text; wrap at about 100 columns like the rest of the page; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The two paragraphs starting 'Copied specialists are named' and 'From `plugin/hooks/hooks.json`' carry the specified text, wrapped to match the page.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "docs/claude-fallback.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9vir6o-6l5d"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vluej-607k",
+  "state": "Succeeded",
+  "result": "Replaced the two paragraphs with the specified text, wrapped at 100 columns; oxfmt exit 0; diff at scratchpad/607k.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Read the file: both paragraphs carry the specified text and wrap to the page; independent re-review follows.",
+    "criteria_evidence": {
+      "The two paragraphs starting 'Copied specialists are named' and 'From `plugin/hooks/hooks.json`' carry the specified text, wrapped to match the page.": "Verified in docs/claude-fallback.md",
+      "oxfmt passes; diff saved.": "Verified in docs/claude-fallback.md"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0; diff at scratchpad/607k.diff",
+      "diff-file": "oxfmt --check exit 0; diff at scratchpad/607k.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

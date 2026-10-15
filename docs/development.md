@@ -4,21 +4,24 @@ How to build, check and release holyclaude. The [README](../README.md#developmen
 
 ## Tasks
 
-Tasks live in `mise.toml`, which pins Bun. Run them with `mise run <task>`; the root `bun run`
-scripts (`fmt`, `fmt:readonly`, `lint`, `lint:readonly`, `typecheck`, `test`) and the CLI package's
-`build` script call the matching task.
+Tasks live in `mise.toml`, which pins Bun. Run them with `bun run <script>`: every mise task has a root
+script of the same name that calls `mise run <task>`, and the CLI package's `build` script does the same.
 
 ```sh
+mise trust
+mise install
 bun install
-mise run fmt:readonly && mise run lint:readonly && mise run typecheck && mise run test
-mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli changes
+bun run --parallel check test
+bun run build   # rebuilds plugin/scripts/holyclaude.js after core or cli changes
 ```
 
-| Task                                      | What it does                                                         |
+| Task / script                             | What it does                                                         |
 | ----------------------------------------- | -------------------------------------------------------------------- |
 | `fmt`, `fmt:readonly`                     | Format in place, or check formatting                                 |
 | `lint`, `lint:readonly`                   | Lint with fixes, or lint without them                                |
 | `typecheck`                               | Type-check the repository                                            |
+| `check`                                   | Run `lint:readonly`, `fmt:readonly` and `typecheck`, writing nothing |
+| `check:fix`                               | Run `lint`, `fmt` and `typecheck`, writing fixes                     |
 | `test`                                    | Run the test suite                                                   |
 | `build`                                   | Bundle the CLI into `plugin/scripts/holyclaude.js`                   |
 | `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the six version files and `bun.lock`, print old and new version |

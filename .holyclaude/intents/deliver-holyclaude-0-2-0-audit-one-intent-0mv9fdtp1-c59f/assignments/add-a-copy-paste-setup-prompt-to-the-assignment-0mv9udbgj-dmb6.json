@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 10,
+  "role": "Worker.mechanical",
+  "objective": "Add a copy-paste setup prompt to the README's Good defaults.",
+  "scope": [
+    "Worktree worktree g, README.md only."
+  ],
+  "constraints": [
+    "Only the Good defaults section; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Good defaults tells users who want these defaults to paste a given prompt into Claude Code after installing the plugin; the prompt points the agent at https://raw.githubusercontent.com/davidbasilefilho/holyclaude/main/README.md and asks it to apply the Good defaults section to their environment, showing the changes and asking before writing.",
+    "oxfmt passes; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9u848y-dpjy"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9udbgj-dmb6",
+  "state": "Succeeded",
+  "result": "Setup prompt added to Good defaults (+6 lines); oxfmt passes.",
+  "acceptance": {
+    "intent_revision": 10,
+    "rationale": "Prompt edit verified by review 72ab.",
+    "criteria_evidence": {
+      "Good defaults tells users who want these defaults to paste a given prompt into Claude Code after installing the plugin; the prompt points the agent at https://raw.githubusercontent.com/davidbasilefilho/holyclaude/main/README.md and asks it to apply the Good defaults section to their environment, showing the changes and asking before writing.": "verified by review 72ab",
+      "oxfmt passes; diff saved.": "verified by review 72ab"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "diff-file": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,60 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 11,
+  "role": "Worker.implementation",
+  "objective": "Add check tasks and tidy the README's install, defaults and development sections.",
+  "scope": [
+    "Worktree worktree j: mise.toml, package.json, README.md, docs/development.md, docs/settings.md."
+  ],
+  "constraints": [
+    "No version bump, no git writes, no CI workflow change."
+  ],
+  "acceptance_criteria": [
+    "mise check runs lint:readonly, fmt:readonly and typecheck; mise check:fix runs lint, fmt and typecheck; every mise task has a root bun script calling it.",
+    "README Development block is mise trust, mise install, bun install, bun run --parallel check test, bun run build, and the prose says bun scripts call the mise tasks.",
+    "promptCacheTtl is gone from the good defaults in README and docs/settings.md; each good-defaults item names one setting; the install shell commands sit in a code block.",
+    "bun run check and bun run test pass; bun run --parallel check test works on Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "mise.toml",
+      "package.json",
+      "README.md",
+      "docs/development.md",
+      "docs/settings.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "docs",
+      "tooling"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9uywxc-ke6d"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9vcmyt-txx8",
+  "state": "Succeeded",
+  "result": "check and check:fix mise tasks and bun scripts for every task; typecheck task changed to bun --check to avoid script shadowing; README dev block, install code block, one-setting good defaults, promptCacheTtl removed; all checks exit 0; diff at scratchpad/txx8.diff.",
+  "acceptance": {
+    "intent_revision": 11,
+    "rationale": "Diff read: tasks, scripts, README dev/install/defaults and docs match the request; typecheck renamed to bun --check to avoid check-script shadowing, verified by worker with a deliberate type error; independent code review follows.",
+    "criteria_evidence": {
+      "mise check runs lint:readonly, fmt:readonly and typecheck; mise check:fix runs lint, fmt and typecheck; every mise task has a root bun script calling it.": "Verified in txx8.diff and the worker's checks",
+      "README Development block is mise trust, mise install, bun install, bun run --parallel check test, bun run build, and the prose says bun scripts call the mise tasks.": "Verified in txx8.diff and the worker's checks",
+      "promptCacheTtl is gone from the good defaults in README and docs/settings.md; each good-defaults item names one setting; the install shell commands sit in a code block.": "Verified in txx8.diff and the worker's checks",
+      "bun run check and bun run test pass; bun run --parallel check test works on Bun 1.4.3.": "Verified in txx8.diff and the worker's checks"
+    },
+    "required_evidence": {
+      "checks-run": "check, check:fix, --parallel check test, build all exit 0 under Bun 1.4.3; diff at scratchpad/txx8.diff",
+      "diff-file": "check, check:fix, --parallel check test, build all exit 0 under Bun 1.4.3; diff at scratchpad/txx8.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
