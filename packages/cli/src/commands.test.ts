@@ -223,12 +223,12 @@ describe("intent list", () => {
     const rows = (await runCommand("intent list")).value as { intents: ReadonlyArray<object> }
     expect(rows.intents).toEqual([
       { id: OLDER, state: "open", revision: 1, objective: "o", open_assignments: 1 },
-      { id: NEWER, state: "open", revision: 1, objective: "newer goal", open_assignments: 0 },
+      { id: NEWER, state: "open", revision: 1, objective: "newer goal", open_assignments: 1 },
     ])
     await runCommand("intent close", [], { intent: NEWER, reason: "done" })
     const closed = (await runCommand("intent list", [], { state: "closed" })).value
     expect(closed).toEqual({
-      intents: [expect.objectContaining({ id: NEWER, state: "closed", open_assignments: 0 })],
+      intents: [expect.objectContaining({ id: NEWER, state: "closed", open_assignments: 1 })],
     })
   })
 

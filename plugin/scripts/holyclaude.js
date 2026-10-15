@@ -7865,7 +7865,7 @@ var Assignment = Struct({
   acceptance: NullOr(AcceptanceRecord),
   clone_id: optionalKey2(CloneId)
 });
-var isOpenAssignment = (assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null;
+var isOpenAssignment = (assignment) => assignment.state === "Ready" || assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null;
 var isTerminal = (assignment) => assignment.state === "Succeeded" || assignment.state === "Failed" || assignment.state === "Cancelled";
 
 // ../core/src/model/intent.ts

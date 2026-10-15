@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import { statSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -443,9 +442,9 @@ describe("the observations log", () => {
 
   test("with no previous generation the old log is moved, not rewritten", async () => {
     const old = join(directory, "state.observations.jsonl")
-    const inode = statSync(old).ino
+    const inode = (await stat(old)).ino
     await touch()
-    expect(statSync(join(directory, "local", "observations.1.jsonl")).ino).toBe(inode)
+    expect((await stat(join(directory, "local", "observations.1.jsonl"))).ino).toBe(inode)
     expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n`)
     expect(await exists("state.observations.jsonl")).toBe(false)
   })

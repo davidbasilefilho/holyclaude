@@ -191,7 +191,7 @@ describe("the Intents in the summary", () => {
   test("names every open Intent with revision, objective and open Assignments, and no closed one", () => {
     const context = composeForState(undefined, state)
     expect(context).toContain("intent-0001,2,objective of intent-0001,0")
-    expect(context).toContain("intent-0002,2,objective of intent-0002,1")
+    expect(context).toContain("intent-0002,2,objective of intent-0002,2")
     expect(context).not.toContain("intent-0003")
   })
 
