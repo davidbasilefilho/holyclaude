@@ -1,3 +1,5 @@
+import { dirname, relative } from "node:path"
+
 import {
   AcceptanceRecord,
   AssignmentDraft,
@@ -28,7 +30,9 @@ import {
   findAssignment,
   findIntent,
   followUp,
+  intentFolder,
   intentInUse,
+  isInsideRoots,
   isOpenAssignment,
   openWorktree,
   projectRoot,
@@ -64,7 +68,7 @@ import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
 import { sessionStart } from "./hook/session-start.ts"
 import { subagentStart, subagentStop } from "./hook/subagent.ts"
 import { appendObservation, observationsPath } from "./observations.ts"
-import { loadStateFile } from "./state.ts"
+import { loadStateFile, loadStoredFile } from "./state.ts"
 import { verifyAssignment } from "./verify.ts"
 
 /** What a command produced: TOON for the model, or raw text for hooks, plus an exit code. */
@@ -118,6 +122,18 @@ const intentRow = (intent: Intent, state: State) => ({
     (assignment) => assignment.intent_id === intent.id && isOpenAssignment(assignment),
   ).length,
 })
+
+/**
+ * Where an Intent is stored, relative to the project when the state directory is inside it. One
+ * that exists only in an earlier version's state file has no directory yet, so it gets the one its
+ * first write will make.
+ */
+const intentPath = (intent: Intent, files: ReadonlyMap<string, string>) => {
+  const file = files.get(intent.id)
+  const folder = file === undefined ? intentFolder(stateDirPath(), intent) : dirname(file)
+  const root = projectRoot()
+  return isInsideRoots(folder, [root], root) ? relative(root, folder) : folder
+}
 
 const dispatchInfo = (assignment: Assignment) => {
   const route = routeFor(assignment.role)
@@ -267,7 +283,7 @@ const INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")
 const intentList = cmd({
   path: ["intent", "list"],
   usage: INTENT_LIST_USAGE,
-  summary: "list Intents with state, revision, objective and open Assignments",
+  summary: "list Intents with state, revision, objective, open Assignments and path",
   root: false,
   flags: { state: "string" },
   positionals: 0,
@@ -282,15 +298,17 @@ const intentList = cmd({
           ),
         ),
       )
-      return yield* read((state) =>
-        Effect.succeed({
-          value: {
-            intents: sortedById(state.intents)
-              .filter((intent) => wanted === undefined || intent.state === wanted)
-              .map((intent) => intentRow(intent, state)),
-          },
-        }),
-      )
+      const { state, files } = yield* loadStoredFile
+      return {
+        value: {
+          intents: sortedById(state.intents)
+            .filter((intent) => wanted === undefined || intent.state === wanted)
+            .map((intent) => ({
+              ...intentRow(intent, state),
+              path: intentPath(intent, files),
+            })),
+        },
+      }
     }),
 })
 

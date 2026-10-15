@@ -55,7 +55,7 @@ describe("a corrupt record file", () => {
     const { code, err } = await run("intent", "show")
     expect(code).toBe(1)
     expect(err).toContain("error: CorruptRecord")
-    expect(err).toContain("does not match the directory")
+    expect(err).toContain("does not end the directory name")
   })
 })
 
