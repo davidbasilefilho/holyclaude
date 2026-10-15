@@ -71,11 +71,12 @@ describe("truncation of the core rules", () => {
     expect(context).toContain("[core rules cut to fit; full text in agents/holyclaude.md]")
   })
 
-  test("rules dropped whole leave a marker pointing at the root agent prompt", () => {
+  test("a state too large for the cap shrinks beside the whole rules, with the pointer", () => {
     const context = composeForState(RULES, stateWith(150))
     expect(context.length).toBeLessThanOrEqual(10_000)
-    expect(context).not.toContain("Rule 0:")
-    expect(context).toContain("[core rules dropped to fit; full text in agents/holyclaude.md]")
+    expect(context).toContain(RULES)
+    expect(context).not.toContain("core rules")
+    expect(context).toContain("more_assignments")
     expect(context).toContain("holyclaude intent show")
   })
 
@@ -102,6 +103,58 @@ describe("the shipped core rules", () => {
     expect(rules).toContain(
       "When a material choice cannot be settled from the repository, the documentation or the user's own words, load the `grill-me` skill",
     )
+  })
+})
+
+describe("the shipped core rules beside a large state", () => {
+  const agentFile = Bun.file(new URL("../../../../plugin/agents/holyclaude.md", import.meta.url))
+
+  /** An Intent with long requirements and several open Assignments with long objectives. */
+  const largeState = (): State => ({
+    ...stateWith(12),
+    intents: [
+      {
+        id: "intent-1",
+        objective: "Ship the reworked release flow across every package. ".repeat(20),
+        requirements: "The release flow keeps each package on one shared version. ".repeat(60),
+        revision: 3,
+      },
+    ],
+    assignments: Array.from({ length: 12 }, (_, index) => ({
+      ...running(index + 1),
+      objective: `Implement part ${index + 1} of the release flow and its tests. `.repeat(5),
+    })),
+  })
+
+  test("keep their last sentence, and the whole text, while the state shrinks", async () => {
+    const rules = extractRules(await agentFile.text()) ?? ""
+    const lastSentence =
+      rules
+        .trimEnd()
+        .split(/(?<=[.!?])\s+/)
+        .at(-1) ?? ""
+    expect(lastSentence.length).toBeGreaterThan(20)
+    const state = largeState()
+    // The premise: whole rules and the full summary together would not fit the cap.
+    expect(`${rules}\n\n${composeForState(undefined, state)}`.length).toBeGreaterThan(10_000)
+    const context = composeForState(rules, state)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain(rules)
+    expect(context).toContain(lastSentence)
+    expect(context).not.toContain("core rules cut")
+    expect(context).toContain("assignment-0001")
+  })
+
+  test("are cut, from their end, only when they cannot fit even beside the pointer", () => {
+    const huge = Array.from({ length: 600 }, (_, line) => `Rule ${line}: ${"x".repeat(30)}`).join(
+      "\n",
+    )
+    const context = composeForState(huge, largeState())
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain("Rule 0:")
+    expect(context).not.toContain("Rule 599:")
+    expect(context).toContain("[core rules cut to fit; full text in agents/holyclaude.md]")
+    expect(context).toContain("holyclaude intent show")
   })
 })
 
@@ -207,6 +260,9 @@ describe("the plugin root in injected text", () => {
         { agent_type: "" },
         { agent_type: "general-purpose" },
         { agent_type: "other:holyclaude" },
+        { agent_type: "holyclaude-x" },
+        { agent_type: "holyclaude:Worker.x" },
+        { agent_type: "holyclaude:holyclaude-x" },
         "",
         "{",
       ]

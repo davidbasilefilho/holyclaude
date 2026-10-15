@@ -50,8 +50,9 @@ const compare = (
  * Reports expected against observed model, effort and agent type for an Assignment's bound agent.
  * Expected comes from the route, or the per-call override recorded at bind. Observed agent type
  * comes from the SubagentStart hook, effort from PreToolUse or SubagentStop, and the transcript
- * path from SubagentStop or PreToolUse, combined per field with the newest record winning; the
- * observed model comes from that subagent transcript.
+ * path from SubagentStop or PreToolUse, combined per field with the newest record winning. The
+ * observed model is the one the PostToolUse hook recorded from the Agent call's result, or else the
+ * models in the subagent transcript; `model_source` says which (`none` when neither).
  */
 export const verifyAssignment = (id: string) =>
   Effect.gen(function* () {
@@ -68,8 +69,13 @@ export const verifyAssignment = (id: string) =>
       agent_type: `${PLUGIN_NAME}:${assignment.role}`,
     }
     const seen = seenOf(records, agentId)
-    const models = seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript)
-    const observedModel = models.length === 0 ? undefined : models.join("|")
+    const models =
+      seen.model !== undefined || seen.transcript === undefined
+        ? []
+        : yield* transcriptModels(seen.transcript)
+    const observedModel = seen.model ?? (models.length === 0 ? undefined : models.join("|"))
+    const modelSource =
+      seen.model !== undefined ? "hook" : observedModel !== undefined ? "transcript" : "none"
     const rows = [
       {
         field: "model",
@@ -107,6 +113,7 @@ export const verifyAssignment = (id: string) =>
         role: assignment.role,
         agent_id: agentId,
         expected_source: override === undefined ? "route" : "override",
+        model_source: modelSource,
         checks: rows,
         verdict,
       },
