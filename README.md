@@ -2,24 +2,19 @@
 
 ## What is holyclaude?
 
-A Claude Code plugin that turns one long session into a managed team.
+A Claude Code plugin where you describe the work and an Opus root plans it, hands it to cheaper Haiku and Sonnet specialists, reviews what comes back, and brings you pull requests that are ready to merge.
 
-- **An Opus root that plans and decides.** It turns your request into an Intent with Assignments, then delegates the edits, runs, checks, review and research to 18 pinned Haiku and Sonnet specialists.
-- **Independent review before anything merges.** Work that changes code, artifacts or behavior is reviewed by a specialist with no history on it, and work is accepted on evidence, not on a worker's say-so.
-- **Model routing that keeps cost down.** Routine work runs on Haiku and Sonnet at each specialist's own effort, and a hook refuses forks and built-in agent types, which would bypass the pinned models.
-- **State in git.** Intents and Assignments are plain files in `.holyclaude/`, committed with the work, so progress survives sessions, lost machines and fresh clones.
+The plan and its progress live in git, so the work carries on across sessions and machines.
 
 ## Why holyclaude?
 
-Each choice below is recorded in the repository; [docs/DECISIONS.md](docs/DECISIONS.md) keeps the standing decisions with their reasons.
+- **Long sessions stay cheap.** Opus only plans, decides and accepts, while the 18 specialists run on Haiku or Sonnet at pinned effort. Prompt caching and [compaction](#good-defaults) keep long sessions affordable, and `holyclaude assignment verify` proves each worker ran on the model you paid for.
+- **PRs that are ready to merge.** Every change is reviewed by a specialist with no history on it, and CI is watched on the exact head commit. A PR counts as merge-ready only when the review has no open blockers and the CI gate passed, and repairs get narrow re-reviews so review loops close.
+- **Quality you can check.** Code goes through `/code-review` plus a reviewer, security-sensitive changes get a security review, fixes come with regression tests, and reports carry evidence instead of claims.
+- **Work that survives.** Intents and Assignments live in git, so work outlasts compaction, restarts and new sessions, and collaborators and clones share it.
+- **Your history stays yours.** Specialists cannot commit, push or merge (a guard hook refuses their git writes; see [limits](docs/limits.md)). The root owns the history, and merging waits for your approval.
 
-- **A root that decides and specialists that work.** The root holds the user relationship, the plan and the acceptance, and delegates edits, runs, checks, review and research. Its context stays on decisions, and the work is split into Assignments that each end in a report with evidence.
-- **Cost and model routing.** The 18 specialists are pinned to Haiku or Sonnet, each with its own effort, so routine work does not run on the root's Opus model. That is why the [defaults](#good-defaults) turn off fork mode and deny the built-in agent types, and why `holyclaude assignment verify` checks the model and effort a worker actually ran on against what was dispatched.
-- **Independent review.** A re-review goes to a different reviewer than the one who found the problem.
-- **The root owns the repository's history.** Specialists leave commits, pushes and pull requests to the root, and a guard hook refuses their git writes. It is a guardrail for well-meaning workers rather than a sandbox (see [hooks](docs/hooks.md) and [limits](docs/limits.md)).
-- **State that survives.** Intents and Assignments are committed with the work, so a team or several clones share them ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)).
-- **Compact instructions.** The generated instructions stay short because every token is read on every turn, and the root asks the user only about choices that are theirs ([compact instructions](docs/DECISIONS.md#compact-generated-instructions-no-plan-feature), [grill-me](docs/DECISIONS.md#grill-me-only-for-material-choices)).
-- **No MCP server and no `bin/`.** The plugin reaches its state through a command line tool it ships, and it ships no `bin/` directory so that it installs everywhere ([why](docs/DECISIONS.md#no-bin-in-the-plugin)).
+The design reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## How does it work?
 
@@ -32,28 +27,17 @@ Each choice below is recorded in the repository; [docs/DECISIONS.md](docs/DECISI
 
 ### Install and quick start
 
-Try it straight from a clone, without installing:
-
-```sh
-claude --plugin-dir <path-to-clone>/plugin
-```
-
-The plugin's `settings.json` sets `agent` to `holyclaude`, so a local session starts with the root
-agent, as observed; a [cloud session](docs/cloud-sessions.md) did not. Check `/agents` for the `holyclaude:` specialists, and run
-`<path-to-clone>/plugin/scripts/holyclaude routes` in a shell to see each specialist's model and effort.
-
-To install it through the marketplace route, add the marketplace and then install the plugin. In a
-session:
+Install it from the marketplace, in a session:
 
 ```text
 /plugin marketplace add davidbasilefilho/holyclaude
 /plugin install holyclaude@holyclaude
 ```
 
-`/plugin marketplace add` also accepts a local path to the clone's root. The same steps work from a
-shell as `claude plugin marketplace add <source>` and `claude plugin install holyclaude@holyclaude`.
-Check a checkout with `claude plugin validate <path-to-clone>/plugin` and
-`claude plugin validate <path-to-clone>`. If the plugin does not load, or its `agent` setting does not take effect, see [the `.claude/` fallback](docs/claude-fallback.md).
+or from a shell: `claude plugin marketplace add davidbasilefilho/holyclaude` and `claude plugin install holyclaude@holyclaude`.
+
+The plugin's `settings.json` sets `agent` to `holyclaude`, so a local session starts with the root
+agent, as observed; a [cloud session](docs/cloud-sessions.md) did not. Check `/agents` for the `holyclaude:` specialists. If the plugin does not load, or its `agent` setting does not take effect, see [the `.claude/` fallback](docs/claude-fallback.md). To try it from a clone without installing, see [Run from a clone](docs/development.md#run-from-a-clone).
 
 Then describe a task. The root plans it as an Intent with Assignments, dispatches specialists, and accepts their work on evidence.
 
@@ -80,7 +64,7 @@ Read https://raw.githubusercontent.com/davidbasilefilho/holyclaude/main/README.m
 
 - `"autoCompactWindow": 450000` (or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`): compacts the root and every specialist at 450,000 tokens.
 - `"promptCacheTtl": "1h"`: keeps the root cached on API-key setups, where the default is five minutes; it carries a higher cache-write cost.
-- `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }` and `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`: a backstop to the `PreToolUse` hook, which already refuses these calls when the root is holyclaude. Forks inherit the Opus model and built-in agent types ignore the pinned specialists. Keep the deny entries out of sessions that use other agents.
+- `"env": { "CLAUDE_CODE_FORK_SUBAGENT": "0" }` and `"permissions": { "deny": ["Agent(fork)", "Agent(general-purpose)", "Agent(Explore)", "Agent(Plan)"] }`: a backstop to the `PreToolUse` hook, which already refuses these calls when the root is holyclaude. Forks inherit the Opus model and built-in agent types ignore the pinned specialists. Keep the deny entries out of sessions that use other agents. The built-in `/code-review` skill still started a general-purpose subagent in a test with `Agent(general-purpose)` denied; see [settings](docs/settings.md).
 - `"permissions": { "allow": ["Bash(gh pr view *)", "Bash(gh run list *)", "Bash(gh run view *)"] }` (optional): lets the root watch CI with read-only `gh` commands without a prompt.
 - `"deniedModels": ["fable"]` in managed settings (optional): blocks Fable-class models; the key is managed-only.
 - Leave `CLAUDE_CODE_EFFORT_LEVEL` unset, because it overrides every specialist's pinned effort, and `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset, because it forces one model on every subagent and would block Sonnet.

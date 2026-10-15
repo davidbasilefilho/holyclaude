@@ -23,6 +23,16 @@ mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli chang
 | `build`                                   | Bundle the CLI into `plugin/scripts/holyclaude.js`                   |
 | `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the six version files and `bun.lock`, print old and new version |
 
+## Run from a clone
+
+Try the plugin from a checkout without installing it:
+
+```sh
+claude --plugin-dir <path-to-clone>/plugin
+```
+
+Run `<path-to-clone>/plugin/scripts/holyclaude routes` in a shell to see each specialist's model and effort. `/plugin marketplace add` also accepts a local path to the clone's root, and the same steps work from a shell as `claude plugin marketplace add <path>`. Check a checkout with `claude plugin validate <path-to-clone>/plugin` and `claude plugin validate <path-to-clone>`.
+
 ## Versions
 
 Versions follow `0.X.Y-Z`: `X` is the minor, `Y` the patch and `Z` an optional hotfix. A bump

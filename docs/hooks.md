@@ -28,7 +28,9 @@
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
 `Grep` and `Glob` cost no process. The matcher lists every tool the hook judges (the guard's shell and file-write tools, and `Agent` for the dispatch check),
-and a test keeps the two in step.
+and a test keeps the two in step. The dispatch check applies only when the session's main agent is
+holyclaude. Where the plugin's `agent` setting is not applied (a cloud session, for example) it does
+not run, and `CLAUDE_CODE_FORK_SUBAGENT=0` and the deny entries in the good defaults are the backstop.
 
 The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<role-task>`,
 because only they feed `assignment verify` and the independence rule. An agent with another type,

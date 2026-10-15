@@ -16,7 +16,7 @@
 - The hook reads at most 1 MiB of stdin, and a payload over that, an empty one or one that is not a
   JSON object is denied for every caller, the main thread included: it cannot be attributed, and
   Claude Code sends no such payload. A main-thread Write of more than about 1 MiB is refused for
-  that reason.
+  that reason, and so is any Agent call, since the hook judges those too.
 - Within that limit the guard treats a call as a specialist's when its payload carries an
   `agent_id` that is not null, absent or empty, whatever the type of the value; every other call is
   the main thread's and passes untouched. It denies a specialist call it cannot judge: a command or
