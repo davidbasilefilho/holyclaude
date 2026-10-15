@@ -18,7 +18,7 @@ import {
   cancel,
   createAssignment,
   createIntent,
-  decodeInput,
+  decodeJsonStrict,
   decodeStrict,
   finish,
   findAssignment,
@@ -88,9 +88,6 @@ export interface Command {
   ) => Effect.Effect<Outcome, unknown>
 }
 
-const truncate = (text: string, max: number) =>
-  text.length <= max ? text : `${text.slice(0, max - 1)}…`
-
 const summaryRow = (assignment: Assignment) => ({
   id: assignment.id,
   role: assignment.role,
@@ -98,7 +95,7 @@ const summaryRow = (assignment: Assignment) => ({
   rev: assignment.intent_revision,
   agent_id: assignment.agent_id,
   accepted: assignment.acceptance !== null,
-  objective: truncate(assignment.objective.replace(/\s+/g, " "), 60),
+  objective: assignment.objective.replace(/\s+/g, " "),
 })
 
 const dispatchInfo = (assignment: Assignment) => {
@@ -157,7 +154,7 @@ const fromStdin = <S extends Schema.Decoder<unknown>>(
   schema: S,
   stdin: Effect.Effect<string, StdinMissing>,
   command: string,
-) => need(stdin, command).pipe(Effect.flatMap(decodeInput(schema)))
+) => need(stdin, command).pipe(Effect.flatMap(decodeJsonStrict(schema)))
 
 const IntentUpdateBody = Schema.Struct({
   id: Schema.optionalKey(Text),

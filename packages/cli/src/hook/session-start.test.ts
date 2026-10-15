@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { Assignment, State } from "@holyclaude/core"
 import { Effect } from "effect"
 
-import { clip, composeForState, extractRules, sessionStart } from "./session-start.ts"
+import {
+  clip,
+  composeForState,
+  extractRules,
+  MAX_STATE_FILE_BYTES,
+  sessionStart,
+} from "./session-start.ts"
 
 const running = (index: number): Assignment => ({
   id: `assignment-${String(index).padStart(4, "0")}`,
@@ -176,6 +182,54 @@ describe("the Intent in the summary", () => {
   })
 })
 
+describe("text that fits the budget", () => {
+  const long = (label: string) =>
+    Array.from({ length: 80 }, (_, word) => `${label}${word}`).join(" ")
+
+  test("an Assignment objective, and the Intent text, are shown whole", () => {
+    const state: State = {
+      ...stateWith(1),
+      intents: [
+        { id: "intent-1", objective: long("goal"), requirements: long("need"), revision: 1 },
+      ],
+      assignments: [{ ...running(1), objective: long("task") }],
+    }
+    const context = composeForState(undefined, state)
+    for (const text of [long("goal"), long("need"), long("task")]) expect(context).toContain(text)
+  })
+
+  test("long objectives beside long rules are shortened and their rows kept", () => {
+    const rules = "r".repeat(8000)
+    const state: State = {
+      ...stateWith(3),
+      assignments: [1, 2, 3].map((index) => ({
+        ...running(index),
+        objective: "word ".repeat(600),
+      })),
+    }
+    const context = composeForState(rules, state)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain(rules)
+    for (const index of [1, 2, 3]) {
+      expect(context).toContain(`assignment-000${index}`)
+      expect(context).toContain(`agent-${index}`)
+    }
+    expect(context).toContain("…")
+    expect(context).not.toContain("word ".repeat(600))
+  })
+
+  test("shrinks only to fit the budget, and then by Intent text before rows", () => {
+    const state: State = {
+      ...stateWith(3),
+      intents: [{ id: "intent-1", objective: "o", requirements: "r".repeat(12_000), revision: 1 }],
+    }
+    const context = composeForState(undefined, state)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain("assignment-0003")
+    expect(context).not.toContain("r".repeat(12_000))
+  })
+})
+
 describe("the plugin root in injected text", () => {
   const AGENT = new URL("../../../../plugin/agents/holyclaude.md", import.meta.url)
   const saved = {
@@ -227,6 +281,62 @@ describe("the plugin root in injected text", () => {
     const context: string = output.hookSpecificOutput.additionalContext
     expect(context).not.toContain("${CLAUDE_PLUGIN_ROOT}")
     expect(context).toContain(`"${root}/scripts/holyclaude"`)
+  })
+
+  test("a state error is shown whole", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    // A long path makes the error message longer than any fixed clip.
+    const state = join(base, "d".repeat(200), ".holyclaude")
+    const record = join(state, "intents", "intent-1", "intent.json")
+    mkdirSync(join(state, "intents", "intent-1"), { recursive: true })
+    writeFileSync(record, "{ not json")
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = state
+    const output = JSON.parse(
+      await Effect.runPromise(sessionStart(JSON.stringify({ agent_type: "holyclaude" }))),
+    )
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(`${record} is not a valid`)
+    expect(context).not.toContain("…")
+  })
+
+  test("a state file over the read bound gives the rules and a state error, not the state", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    const state = join(base, ".holyclaude")
+    const record = join(state, "intents", "intent-1", "intent.json")
+    mkdirSync(join(state, "intents", "intent-1"), { recursive: true })
+    writeFileSync(record, "")
+    // A sparse file: its size is past the bound, and no content is written.
+    truncateSync(record, MAX_STATE_FILE_BYTES + 1)
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = state
+    const output = JSON.parse(await Effect.runPromise(sessionStart("")))
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(extractRules(await Bun.file(AGENT).text(), root) ?? "")
+    expect(context).toContain("state_error")
+    expect(context).toContain(`the limit is ${MAX_STATE_FILE_BYTES}`)
+  })
+
+  test("a state load that outlasts its time bound gives the rules and a state error", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = join(base, ".holyclaude")
+    const never = () => Effect.never
+    const output = JSON.parse(
+      await Effect.runPromise(sessionStart("", { load: never, budget: "50 millis" })),
+    )
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(extractRules(await Bun.file(AGENT).text(), root) ?? "")
+    expect(context).toContain("state_error")
   })
 
   describe("by the agent the main thread runs as", () => {

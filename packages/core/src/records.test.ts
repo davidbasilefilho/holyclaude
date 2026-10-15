@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { MAX_RECORD_BYTES } from "./codec.ts"
 import { readCloneId } from "./local.ts"
 import type { Assignment } from "./model/assignment.ts"
 import { emptyState, type Change, type State } from "./model/state.ts"
@@ -206,14 +205,40 @@ describe("record files", () => {
     expect(await committedFiles()).toEqual(first)
   })
 
-  test("a record over the size cap is refused on write and on read", async () => {
-    const huge = { ...emptyState, intents: [intent(INTENT_A, "x".repeat(MAX_RECORD_BYTES))] }
-    expect(
-      (await failure(updateState(directory, () => Effect.succeed({ state: huge, value: 0 }))))._tag,
-    ).toBe("TooLarge")
-    await mkdir(join(directory, "intents", INTENT_A), { recursive: true })
-    await writeFile(intentPath(INTENT_A), "x".repeat(MAX_RECORD_BYTES + 1))
-    expect((await failure(loadState(directory)))._tag).toBe("TooLarge")
+  test("a record over 256 KiB writes and reads back whole", async () => {
+    const objective = "x".repeat(256 * 1024 + 1)
+    await write({ ...emptyState, intents: [intent(INTENT_A, objective)] })
+    expect((await readFile(intentPath(INTENT_A))).byteLength).toBeGreaterThan(256 * 1024)
+    expect((await load()).intents[0]?.objective).toBe(objective)
+  })
+
+  describe("with a read bound", () => {
+    const LIMIT = 4096
+    const padded = "x".repeat(LIMIT)
+    const bounded = () => failure(loadState(directory, LIMIT))
+
+    test("an Intent over it fails the load as TooLarge, and reads whole with no bound", async () => {
+      await write({ ...base, intents: [intent(INTENT_A, padded), intent(INTENT_B)] })
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).intents[0]?.objective).toBe(padded)
+    })
+
+    test("an Assignment over it fails the load as TooLarge", async () => {
+      await write({
+        ...base,
+        assignments: [assignment(FIRST, INTENT_A, { objective: padded }), base.assignments[1]!],
+      })
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).assignments).toHaveLength(2)
+    })
+
+    test("a local file over it fails the load as TooLarge", async () => {
+      await write(base)
+      expect((await Effect.runPromise(loadState(directory, LIMIT))).assignments).toHaveLength(2)
+      await writeFile(join(directory, "local", "agents.json"), JSON.stringify({ [FIRST]: padded }))
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).assignments[0]?.agent_id).toBe(padded)
+    })
   })
 })
 
@@ -463,9 +488,9 @@ describe("what is committed and what stays local", () => {
   })
 })
 
-describe("the local files' own cap", () => {
+describe("the local files", () => {
   const agentsFile = () => join(directory, "local", "agents.json")
-  /** Agent ids for many Assignments of other branches, past the cap of a committed record. */
+  /** Agent ids for many Assignments of other branches. */
   const agents = (count: number) =>
     Object.fromEntries(
       Array.from({ length: count }, (_, index) => [
@@ -474,10 +499,10 @@ describe("the local files' own cap", () => {
       ]),
     )
 
-  test("agents.json may outgrow the record cap, and a write keeps every entry", async () => {
+  test("agents.json may outgrow 256 KiB, and a write keeps every entry", async () => {
     await write(base)
     await writeFile(agentsFile(), JSON.stringify(agents(6000)))
-    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(MAX_RECORD_BYTES)
+    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(256 * 1024)
     expect((await load()).assignments).toHaveLength(2)
 
     await write({
@@ -492,9 +517,21 @@ describe("the local files' own cap", () => {
     expect(stored[FIRST]).toBe("agent-new")
   })
 
-  test("a local file far past it is still refused", async () => {
+  test("a local file over 4 MiB reads and takes a write", async () => {
     await write(base)
     await writeFile(agentsFile(), JSON.stringify(agents(80_000)))
-    expect((await failure(loadState(directory)))._tag).toBe("TooLarge")
+    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(4 * 1024 * 1024)
+    expect((await load()).assignments).toHaveLength(2)
+
+    await write({
+      ...base,
+      assignments: [
+        assignment(FIRST, INTENT_A, { state: "Running", agent_id: "agent-new" }),
+        base.assignments[1]!,
+      ],
+    })
+    const stored = JSON.parse(await readFile(agentsFile(), "utf8"))
+    expect(Object.keys(stored)).toHaveLength(80_001)
+    expect(stored[FIRST]).toBe("agent-new")
   })
 })

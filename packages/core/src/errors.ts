@@ -91,7 +91,7 @@ export class InsufficientEvidence extends Data.TaggedError("InsufficientEvidence
   }
 }
 
-/** A state file or an input exceeds its size cap. */
+/** A file read or an input exceeds its size bound. */
 export class TooLarge extends Data.TaggedError("TooLarge")<{
   readonly subject: string
   readonly bytes: number

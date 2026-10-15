@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { decodeJsonStrict, MAX_LOCAL_BYTES, MAX_RECORD_BYTES } from "./codec.ts"
+import { decodeJsonStrict, MAX_GITIGNORE_BYTES } from "./codec.ts"
 import { emptyState, State } from "./model/state.ts"
 import { loadState, updateState } from "./store.ts"
 
@@ -276,8 +276,8 @@ describe("the folder's .gitignore", () => {
     expect(await text(".gitignore")).toBe("*.log\n")
   })
 
-  test("is refused over the record cap rather than read whole, and left as it is", async () => {
-    const huge = `*.log\n${"#".repeat(MAX_RECORD_BYTES)}\n`
+  test("is refused over its read bound rather than read whole, and left as it is", async () => {
+    const huge = `*.log\n${"#".repeat(MAX_GITIGNORE_BYTES)}\n`
     await writeFile(join(directory, ".gitignore"), huge)
     expect(
       await failure(updateState(directory, () => Effect.succeed({ state: emptyState, value: 0 }))),
@@ -429,20 +429,55 @@ describe("the observations log", () => {
     expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n`)
   })
 
-  test("an old log over the local cap migrates, keeping its newest whole lines", async () => {
-    // Lines of about 100 bytes each, numbered so the oldest and newest can be told apart.
-    const count = Math.ceil((MAX_LOCAL_BYTES * 1.5) / 100)
+  test("an old log of any size migrates whole", async () => {
+    // Lines of about 100 bytes each, 6 MiB in all, numbered so every line can be told apart.
+    const count = Math.ceil((6 * 1024 * 1024) / 100)
     const lines = Array.from({ length: count }, (_, at) => line(`agent-${at}`.padEnd(60, "x")))
     await writeFile(join(directory, "state.observations.jsonl"), `${lines.join("\n")}\n`)
     await touch()
-    const kept = await text("local", "observations.1.jsonl")
-    expect(new TextEncoder().encode(kept).byteLength).toBeLessThanOrEqual(MAX_LOCAL_BYTES)
-    const keptLines = kept.split("\n").filter((entry) => entry !== "")
-    expect(keptLines.at(-1)).toBe(lines.at(-1))
-    expect(keptLines).toEqual(lines.slice(lines.length - keptLines.length))
-    expect(keptLines.length).toBeGreaterThan(count / 2)
+    expect(await text("local", "observations.1.jsonl")).toBe(`${lines.join("\n")}\n`)
     expect(await exists("state.observations.jsonl")).toBe(false)
     expect(await exists("state.json")).toBe(false)
+  })
+
+  test("with no previous generation the old log is moved, not rewritten", async () => {
+    const old = join(directory, "state.observations.jsonl")
+    const inode = (await stat(old)).ino
+    await touch()
+    expect((await stat(join(directory, "local", "observations.1.jsonl"))).ino).toBe(inode)
+    expect(await text("local", "observations.1.jsonl")).toBe(`${OBSERVATION}\n`)
+    expect(await exists("state.observations.jsonl")).toBe(false)
+  })
+
+  test("two large logs are joined without either being loaded whole", async () => {
+    const big = (agent: string) =>
+      `${Array.from({ length: 30_000 }, (_, at) => line(`${agent}-${at}`)).join("\n")}\n`
+    const older = big("old")
+    const newer = big("new")
+    expect(older.length).toBeGreaterThan(1024 * 1024)
+    await writeFile(join(directory, "state.observations.jsonl"), older)
+    await mkdir(join(directory, "local"), { recursive: true })
+    await writeFile(join(directory, "local", "observations.1.jsonl"), newer)
+    // Every way a whole file could be read into memory; slices of a byte or two are not that.
+    const reads = (["text", "bytes", "arrayBuffer", "json"] as const).map((method) =>
+      spyOn(Blob.prototype, method),
+    )
+    try {
+      await touch()
+      const loaded = reads.flatMap((read) => read.mock.contexts as ReadonlyArray<Blob>)
+      expect(Math.max(0, ...loaded.map((blob) => blob.size))).toBeLessThan(1024 * 1024)
+    } finally {
+      for (const read of reads) read.mockRestore()
+    }
+    expect(await text("local", "observations.1.jsonl")).toBe(`${older}${newer}`)
+  })
+
+  test("an old log without a final line break is joined on a line of its own", async () => {
+    await writeFile(join(directory, "state.observations.jsonl"), line("a1"))
+    await mkdir(join(directory, "local"), { recursive: true })
+    await writeFile(join(directory, "local", "observations.1.jsonl"), `${line("a2")}\n`)
+    await touch()
+    expect(await text("local", "observations.1.jsonl")).toBe(`${line("a1")}\n${line("a2")}\n`)
   })
 })
 

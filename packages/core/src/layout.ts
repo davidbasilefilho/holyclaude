@@ -2,7 +2,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { MAX_RECORD_BYTES } from "./codec.ts"
+import { MAX_GITIGNORE_BYTES } from "./codec.ts"
 import { io, readText } from "./io.ts"
 import { refuseSymlinks } from "./safety.ts"
 
@@ -82,12 +82,12 @@ const LEGACY_IGNORE_RULES = "*\n"
  * written as the exact list of ignored files, and the rule an earlier version wrote is replaced by
  * it, since that rule would hide the records. The list covers the old state file and its neighbours
  * too, so replacing the old rule is safe before a migration. Any other content is the user's and
- * stays. A `.gitignore` over the record cap is TooLarge rather than read whole.
+ * stays. A `.gitignore` over 256 KiB is TooLarge rather than read whole.
  */
 export const keepLocalFilesOutOfVersionControl = (directory: string) => {
   const path = join(directory, ".gitignore")
   return refuseSymlinks(directory, path).pipe(
-    Effect.andThen(readText(path, MAX_RECORD_BYTES)),
+    Effect.andThen(readText(path, MAX_GITIGNORE_BYTES)),
     Effect.map((current) =>
       current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined,
     ),

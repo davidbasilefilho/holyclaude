@@ -1,6 +1,5 @@
 import { Effect, Schema } from "effect"
 
-import { MAX_LOCAL_BYTES } from "./codec.ts"
 import { commitFile, encodeJson, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
@@ -22,18 +21,27 @@ const workersPath = (directory: string) => localFile(directory, "workers.json")
 const agentsPath = (directory: string) => localFile(directory, "agents.json")
 const clonePath = (directory: string) => localFile(directory, "clone.json")
 
-const readLocal = <S extends Schema.Decoder<unknown>>(schema: S, directory: string, path: string) =>
-  refuseSymlinks(directory, path).pipe(Effect.andThen(readJson(schema, path, MAX_LOCAL_BYTES)))
+const readLocal = <S extends Schema.Decoder<unknown>>(
+  schema: S,
+  directory: string,
+  path: string,
+  limit?: number,
+) => refuseSymlinks(directory, path).pipe(Effect.andThen(readJson(schema, path, limit)))
 
-/** The worker list of this clone; empty when none was written. */
-export const readWorkers = (directory: string) =>
-  readLocal(WorkersFile, directory, workersPath(directory)).pipe(
+/** The worker list of this clone; empty when none was written. A file over `limit` is TooLarge. */
+export const readWorkers = (directory: string, limit?: number) =>
+  readLocal(WorkersFile, directory, workersPath(directory), limit).pipe(
     Effect.map((file) => file?.workers ?? []),
   )
 
-/** The agent id of each Assignment this clone bound one to, keyed by Assignment id. */
-export const readAgents = (directory: string) =>
-  readLocal(AgentsFile, directory, agentsPath(directory)).pipe(Effect.map((file) => file ?? {}))
+/**
+ * The agent id of each Assignment this clone bound one to, keyed by Assignment id. A file over
+ * `limit` is TooLarge.
+ */
+export const readAgents = (directory: string, limit?: number) =>
+  readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(
+    Effect.map((file) => file ?? {}),
+  )
 
 /**
  * The id of this clone, or undefined when it never reserved anything. A reader that finds none
@@ -51,7 +59,7 @@ export const ensureCloneId = (directory: string, lock: Lock) =>
     const existing = yield* readCloneId(directory)
     if (existing !== undefined) return existing
     const created = yield* newId("clone")
-    const content = yield* encodeJson(CloneFile, { clone_id: created }, clonePath(directory))
+    const content = yield* encodeJson(CloneFile, { clone_id: created })
     yield* commitFile(clonePath(directory), content, lock)
     return created
   })
@@ -92,8 +100,8 @@ const sortedKeys = (agents: Readonly<Record<string, string>>) =>
 export const writeLocal = (directory: string, before: State, after: State, lock: Lock) =>
   Effect.gen(function* () {
     const workersFile = workersPath(directory)
-    const workers = yield* encodeJson(WorkersFile, after, workersFile, MAX_LOCAL_BYTES)
-    const workersBefore = yield* encodeJson(WorkersFile, before, workersFile, MAX_LOCAL_BYTES)
+    const workers = yield* encodeJson(WorkersFile, after)
+    const workersBefore = yield* encodeJson(WorkersFile, before)
     if (workers !== workersBefore) yield* commitFile(workersFile, workers, lock)
 
     const agentsFile = agentsPath(directory)
@@ -102,12 +110,7 @@ export const writeLocal = (directory: string, before: State, after: State, lock:
       row.agent_id === null ? [] : [[row.id, row.agent_id] as const],
     )
     const merged = sortedKeys({ ...stored, ...Object.fromEntries(bound) })
-    const agents = yield* encodeJson(AgentsFile, merged, agentsFile, MAX_LOCAL_BYTES)
-    const agentsBefore = yield* encodeJson(
-      AgentsFile,
-      sortedKeys(stored),
-      agentsFile,
-      MAX_LOCAL_BYTES,
-    )
+    const agents = yield* encodeJson(AgentsFile, merged)
+    const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored))
     if (agents !== agentsBefore) yield* commitFile(agentsFile, agents, lock)
   })
