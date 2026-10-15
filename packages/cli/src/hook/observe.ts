@@ -24,6 +24,7 @@ export const observe = (agentId: string, sighting: Sighting) =>
       ...(sighting.agent_type ? { agent_type: sighting.agent_type } : {}),
       ...(sighting.effort ? { effort: sighting.effort } : {}),
       ...(sighting.transcript ? { transcript: sighting.transcript } : {}),
+      ...(sighting.model ? { model: sighting.model } : {}),
     }
     const known = seenOf(yield* readObservations(), agentId)
     if (!(sighting.agent_type || known.agent_type)?.startsWith(`${PLUGIN_NAME}:`)) return

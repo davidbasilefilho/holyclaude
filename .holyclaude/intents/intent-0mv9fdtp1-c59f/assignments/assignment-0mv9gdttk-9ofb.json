@@ -44,8 +44,25 @@
     "independent_from": []
   },
   "id": "assignment-0mv9gdttk-9ofb",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "PR2 writer: PostToolUse hook on Agent records resolvedModel for holyclaude specialists (both launch shapes); verify prefers it with model_source hook|transcript|none; SessionStart keeps rules whole and shrinks summary first; near-miss tests; command summaries; README updated incl. formatter note. 14 behavior tests fail on base; gates: oxlint, bun check 78 files, bun test 1136 pass; oxfmt fails only on known .holyclaude records; bundle rebuilt. assignments SKILL.md line 74 now stale. Diff at scratchpad/diffs/assignment-0mv9gdttk-9ofb.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Independent code review (no blockers, bundle identical to 1.4.3 build) and security review (low only) support it; behavior tests fail on base; gates green apart from the known record format issue fixed on PR1 and merged before commit.",
+    "criteria_evidence": {
+      "A PostToolUse hook on the Agent tool records resolvedModel for the launched agent id when subagent_type is a holyclaude specialist, for background launches (status async_launched) and foreground completions; other subagent types record nothing.": "post-tool-use.test.ts both shapes, near-miss types write nothing; reviewers confirmed.",
+      "assignment verify takes the observed model from that record when present and falls back to reading the subagent transcript otherwise; its output says which source was used.": "model_source hook|transcript|none; verify tests fail on base.",
+      "Regression tests fail on the base and pass after; README describes the new hook and source.": "14 failures on base copy; README updated.",
+      "PR1 review follow-ups: session-start tests add near-miss agent types (for example holyclaude-x and holyclaude:Worker.x) that must still get the rules; the hook-session-start command summary text matches the new behavior; README notes that repositories which run their own formatter should exclude .holyclaude/ (holyclaude's own .oxfmtrc.json does).": "Near-miss cases added; summary text updated; README formatter note in state section.",
+      "Format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3.": "oxlint, bun check, 1136 tests; bundle identical to 1.4.3 build; format clean after PR1 merge."
+    },
+    "required_evidence": {
+      "checks-run": "Writer and reviewer gates.",
+      "regression-tests": "post-tool-use, verify, session-start, hooks-config tests.",
+      "payload-evidence": "tool_input.subagent_type, tool_response.agentId, resolvedModel.",
+      "changed-paths": "14 files listed by writer.",
+      "diff-file": "scratchpad/diffs/assignment-0mv9gdttk-9ofb.diff"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

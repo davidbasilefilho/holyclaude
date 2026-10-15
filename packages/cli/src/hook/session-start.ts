@@ -29,7 +29,6 @@ const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 /** The one-line pointer to the CLI, which `cli` names as the root should run it. */
 const pointer = (cli: string) => `Full state: ${cli} intent show; ${cli} assignment list`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
-const RULES_DROPPED = "[core rules dropped to fit; full text in agents/holyclaude.md]"
 
 /** Shortens text to at most `max` characters, ending in an ellipsis when it was cut. */
 export const clip = (text: string, max: number) =>
@@ -109,20 +108,20 @@ const fitSummary = (summary: Summary, budget: number): string => {
 }
 
 /**
- * Joins the pieces under the cap. The core rules are cut first, then the state summary shrinks, and
- * the one-line pointer to the CLI stays last.
+ * Joins the pieces under the cap. The core rules stay whole: the state summary shrinks first (fewer
+ * rows, shorter text, then nothing but the one-line pointer to the CLI). The rules are cut, from
+ * their end, only when they cannot fit even beside the pointer.
  */
 const composeContext = (rules: string | undefined, summary: Summary, cli: string): string => {
   const state = block(summary.render(summary.rows, 400))
   const full = [rules, state].filter((part) => part !== undefined).join("\n\n")
   if (full.length <= CAP) return full
   const tail = `\n\n${pointer(cli)}`
-  const room = CAP - tail.length - `\n\n${state}`.length - RULES_CUT.length
-  if (rules !== undefined && room > 0)
-    return `${cutRules(rules, room)}${RULES_CUT}\n\n${state}${tail}`
-  // The rules are dropped whole. Say so, so the root knows to read its agent prompt.
-  const marker = rules === undefined ? "" : `${RULES_DROPPED}\n\n`
-  return `${marker}${fitSummary(summary, CAP - tail.length - marker.length)}${tail}`.trimStart()
+  if (rules !== undefined && rules.length + tail.length > CAP)
+    return `${cutRules(rules, CAP - tail.length - RULES_CUT.length)}${RULES_CUT}${tail}`
+  const roomForState = CAP - tail.length - (rules === undefined ? 0 : rules.length + 2)
+  const body = [rules, fitSummary(summary, roomForState)].filter((part) => part)
+  return `${body.join("\n\n")}${tail}`.trimStart()
 }
 
 /** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */

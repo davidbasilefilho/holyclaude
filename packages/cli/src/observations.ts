@@ -17,13 +17,17 @@ import { Effect, Schema } from "effect"
 
 const Text = Schema.String.check(Schema.isPattern(/\S/))
 
-/** What a hook saw of a running subagent: its effort, role and transcript. */
+/**
+ * What a hook saw of a running subagent: its effort, role, transcript and the model it started on,
+ * which the PostToolUse hook reads from the Agent call's result.
+ */
 const Observed = Schema.Struct({
   kind: Schema.Literal("observed"),
   agent_id: Text,
   agent_type: Schema.optionalKey(Text),
   effort: Schema.optionalKey(Text),
   transcript: Schema.optionalKey(Text),
+  model: Schema.optionalKey(Text),
   at: Schema.String,
 })
 
@@ -115,13 +119,16 @@ export const appendObservation = (
 }
 
 /** What the hooks have seen of one agent, each field from the newest record that carries it. */
-export type Seen = Partial<Pick<typeof Observed.Type, "agent_type" | "effort" | "transcript">>
+export type Seen = Partial<
+  Pick<typeof Observed.Type, "agent_type" | "effort" | "transcript" | "model">
+>
 
 /**
  * Combines an agent's observations field by field. Three hooks write them, each seeing different
  * fields at different times: SubagentStart the agent type, PreToolUse the effort and a transcript
- * path inferred from the parent's, and SubagentStop the effort and the real transcript path. So no
- * single record is complete, and a later record wins only for the fields it carries.
+ * path inferred from the parent's, SubagentStop the effort and the real transcript path, and
+ * PostToolUse on the Agent tool the model the agent started on. So no single record is complete,
+ * and a later record wins only for the fields it carries.
  */
 export const seenOf = (records: ReadonlyArray<ObservationRecord>, agentId: string): Seen => {
   const seen: { -readonly [K in keyof Seen]: Seen[K] } = {}
@@ -130,6 +137,7 @@ export const seenOf = (records: ReadonlyArray<ObservationRecord>, agentId: strin
     if (record.agent_type !== undefined) seen.agent_type = record.agent_type
     if (record.effort !== undefined) seen.effort = record.effort
     if (record.transcript !== undefined) seen.transcript = record.transcript
+    if (record.model !== undefined) seen.model = record.model
   }
   return seen
 }

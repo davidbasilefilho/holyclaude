@@ -34,6 +34,18 @@
   "id": "assignment-0mv9gcg1z-agwa",
   "state": "Succeeded",
   "result": "Format fix: .holyclaude/** added to .oxfmtrc.json ignorePatterns (array rewrapped by oxfmt); oxfmt --check 16 files failing -> exit 0; oxlint, bun check, bun test 1109 pass on 1.4.3; no records touched.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Reviewed one-line config change; oxfmt check goes from 16 failures to exit 0 (root reran before push of 36afc13); other gates green.",
+    "criteria_evidence": {
+      "bunx oxfmt --check exits 0 in worktree pr1 (it fails today on 16 .holyclaude/intents/**/*.json files).": "Writer before/after logs; root rerun: 118 files clean.",
+      "bunx oxlint, bunx bun@1.4.3 check and bunx bun@1.4.3 test pass.": "Writer logs: oxlint 0, check 76 files, 1109 tests."
+    },
+    "required_evidence": {
+      "before-after": "16 files failing -> exit 0.",
+      "checks-run": "oxfmt, oxlint, bun check, bun test.",
+      "diff-file": "scratchpad/diffs/assignment-0mv9gcg1z-agwa.diff"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
