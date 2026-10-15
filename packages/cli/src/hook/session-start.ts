@@ -13,16 +13,9 @@ import {
 } from "@holyclaude/core"
 import { Effect, Option, type Duration } from "effect"
 
-import { PLUGIN_NAME, pluginRoot } from "../fingerprint.ts"
+import { pluginRoot, ROOT_AGENT_TYPES } from "../fingerprint.ts"
 import { toon } from "../toon.ts"
 import { decodeHookInput } from "./input.ts"
-
-/**
- * The `agent_type` a SessionStart payload shows when the main thread runs as the holyclaude agent:
- * the plugin-qualified name, or the bare one. That agent's system prompt already carries the core
- * rules.
- */
-const MAIN_AGENT_TYPES: ReadonlyArray<string> = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME]
 
 /** SessionStart `additionalContext` is capped at this many characters. */
 const CAP = 10_000
@@ -205,7 +198,7 @@ export const sessionStart = (
     const file = Bun.file(join(root, "agents", "holyclaude.md"))
     if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
     const input = yield* decodeHookInput(stdin).pipe(Effect.orElseSucceed(() => undefined))
-    const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "")
+    const runsAsMainAgent = ROOT_AGENT_TYPES.includes(input?.agent_type ?? "")
     const rules = runsAsMainAgent
       ? undefined
       : extractRules(yield* Effect.tryPromise(() => file.text()), root)
