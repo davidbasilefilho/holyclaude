@@ -2,7 +2,7 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Worker.implementation",
-  "objective": "PR3 (worktree /home/user/wt/pr3, branch release/0.2.0/docs/root-rules): tighten the root's rules for the situations the audit found, within the writing bar.",
+  "objective": "PR3 (worktree worktree pr3, branch release/0.2.0/docs/root-rules): tighten the root's rules for the situations the audit found, within the writing bar.",
   "scope": [
     "plugin/agents/holyclaude.md (core rules and later sections)",
     "plugin/skills/interface-inspection/SKILL.md if the screenshot line belongs there"

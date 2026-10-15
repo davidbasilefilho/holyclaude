@@ -2,7 +2,7 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Worker.implementation",
-  "objective": "PR1 (worktree /home/user/wt/pr1, branch release/0.2.0/fix/hook-scope): the observing hooks record only holyclaude specialists, and the SessionStart hook leaves out the core rules when the main thread already runs as the holyclaude agent.",
+  "objective": "PR1 (worktree worktree pr1, branch release/0.2.0/fix/hook-scope): the observing hooks record only holyclaude specialists, and the SessionStart hook leaves out the core rules when the main thread already runs as the holyclaude agent.",
   "scope": [
     "packages/cli/src hook and observation code and their tests",
     "plugin/scripts/holyclaude.js bundle",

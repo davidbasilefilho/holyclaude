@@ -2,7 +2,7 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Worker.implementation",
-  "objective": "PR3 repair (worktree /home/user/wt/pr3): bring the core-rules block of plugin/agents/holyclaude.md back to at most about 8,500 characters while keeping every behavior the previous change added.",
+  "objective": "PR3 repair (worktree worktree pr3): bring the core-rules block of plugin/agents/holyclaude.md back to at most about 8,500 characters while keeping every behavior the previous change added.",
   "scope": [
     "plugin/agents/holyclaude.md core-rules block (between the markers)"
   ],

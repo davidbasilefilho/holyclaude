@@ -2,10 +2,10 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Reviewer.code",
-  "objective": "Independently review PR6 (uncommitted in worktree /home/user/wt/pr6 against main): the CI plugin-validate step, scripts/architecture.test.ts and the one-line AGENTS.md edit.",
+  "objective": "Independently review PR6 (uncommitted in worktree worktree pr6 against main): the CI plugin-validate step, scripts/architecture.test.ts and the one-line AGENTS.md edit.",
   "scope": [
     "Diff file scratchpad/diffs/assignment-0mv9fvesj-g88x.diff",
-    "Worktree /home/user/wt/pr6, base main (origin/main)",
+    "Worktree worktree pr6, base main (origin/main)",
     "Changed paths: .github/workflows/ci.yml, scripts/architecture.test.ts, AGENTS.md"
   ],
   "constraints": [
@@ -44,14 +44,14 @@
     "intent_revision": 2,
     "rationale": "Blocker reproduced with a fixture; dispositions reasoned; gates run on Bun 1.4.3.",
     "criteria_evidence": {
-      "Reports /code-review invocation, finding count and each finding's disposition.": "code-review /home/user/wt/pr6 high, 9 findings each dispositioned.",
+      "Reports /code-review invocation, finding count and each finding's disposition.": "code-review worktree pr6 high, 9 findings each dispositioned.",
       "Judges whether the guard can be bypassed (for example bare builtin specifiers like \"fs\" without the node: prefix, require(), dynamic import()) and whether its text-based spawn check produces false positives on the current tree or likely code.": "Bare builtins, comment in braces and computed dynamic import bypass; no false positives on the tree.",
       "Judges the CI step: pinned version, no credentials, strict failure on warnings, placement, and whether bunx fetch could make CI flaky.": "Pinned, no credentials, strict exits 1, after Test, registry flake risk.",
       "Confirms the AGENTS.md change is exactly one line and matches the allowlist.": "numstat 1/1; list matches sourceAllowlist.",
       "Separates blockers from optional findings with evidence.": "1 blocker plus optional list."
     },
     "required_evidence": {
-      "code-review-run": "Skill code-review /home/user/wt/pr6 high, 9 findings.",
+      "code-review-run": "Skill code-review worktree pr6 high, 9 findings.",
       "checks-run": "oxfmt, oxlint, bun check, bun test, validate x2.",
       "blockers": "bare builtin bypass.",
       "optional-findings": "findings 2,3,4,7,8,9."

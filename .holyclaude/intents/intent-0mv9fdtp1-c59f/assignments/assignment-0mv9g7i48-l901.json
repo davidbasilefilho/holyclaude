@@ -5,7 +5,7 @@
   "objective": "Independently review PR3's rewrite of the holyclaude root's core rules (plugin/agents/holyclaude.md) against the writing bar, the added behaviors, and the rules it replaced.",
   "scope": [
     "Diff file scratchpad/diffs/assignment-0mv9fytyh-9ifu.diff (full change vs origin/main)",
-    "Worktree /home/user/wt/pr3, file plugin/agents/holyclaude.md; base text: origin/main version of the same file"
+    "Worktree worktree pr3, file plugin/agents/holyclaude.md; base text: origin/main version of the same file"
   ],
   "constraints": [
     "Read-only."
@@ -34,8 +34,22 @@
     ]
   },
   "id": "assignment-0mv9g7i48-l901",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "PR3 rules review: not ready; no base rule lost; blockers B1 root tool list has no Edit, B2 finish rule makes waived gates early stops, B3 speak-only list omits acknowledgement and first solo message, B4 block size leaves ~1,400 chars for state before the tail is cut, B5 three references outside the block; optional O1-O11.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Rule-by-rule checklist against base; blockers verified: frontmatter tools lack Edit, L32 comma change, L31 list, composeContext cut order in session-start.ts, out-of-block references.",
+    "criteria_evidence": {
+      "Every rule in the base core-rules block is still stated (possibly merged), or its removal is justified because another section or skill owns it; any lost rule is a blocker.": "lost-rules checklist: none lost.",
+      "Each added behavior is stated clearly and without contradiction: solo root, user instruction wins, ask last / re-ask after resume / acknowledge new instruction, classifier denial, repairs, per-deliverable report and hypotheses, screenshot delivery.": "Five met; solo root and acknowledgement gaps B1-B3.",
+      "The block stays standalone and coherent when injected alone, and does not contradict the later sections (Working the way, Acceptance in detail, Committing, CI watching, Asking).": "B4 size vs hook cap, B5 outside references.",
+      "Writing bar: redundant, obsolete, conflicting, over-long or capital-emphasis text is a finding; blockers separated from optional.": "O1-O11."
+    },
+    "required_evidence": {
+      "lost-rules": "Checklist in report.",
+      "blockers": "B1-B5.",
+      "optional-findings": "O1-O11."
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
