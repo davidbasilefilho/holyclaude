@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Worker.implementation",
+  "objective": "Repair the merge-ready paragraph: same-head review, the Passed gate, a separate default draft sentence.",
+  "scope": [
+    "worktree f/plugin/agents/holyclaude.md line ~167."
+  ],
+  "constraints": [
+    "Only that paragraph; writing bar; core-rules block untouched; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Merge-ready by default: an independent review of that same head SHA left no open blockers and the CI gate on that SHA is Passed as CI watching defines it; the repository's own rules are pointed to, not restated.",
+    "A separate sentence: by default open PRs ready for review, not as drafts, with its reason.",
+    "The reason wording says the final report and any merge decision use the same bar; fmt and full test pass; repair diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9swps9-jn4u",
+      "assignment-0mv9syk1p-xmyt"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9t0n3j-x0pj",
+  "state": "Succeeded",
+  "result": "Paragraph repaired: same-head review, CI gate Passed as CI watching defines it, separate by-default draft sentence, reason names report and merge decision, repo rules pointed to; fmt and 1299 tests pass.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "Repair verified by re-review 50fi.",
+    "criteria_evidence": {
+      "Merge-ready by default: an independent review of that same head SHA left no open blockers and the CI gate on that SHA is Passed as CI watching defines it; the repository's own rules are pointed to, not restated.": "verified by re-review 50fi",
+      "A separate sentence: by default open PRs ready for review, not as drafts, with its reason.": "verified by re-review 50fi",
+      "The reason wording says the final report and any merge decision use the same bar; fmt and full test pass; repair diff saved.": "verified by re-review 50fi"
+    },
+    "required_evidence": {
+      "checks-run": "reported; diff saved",
+      "diff-file": "reported; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
