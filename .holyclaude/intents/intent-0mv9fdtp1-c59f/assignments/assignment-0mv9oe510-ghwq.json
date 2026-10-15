@@ -1,0 +1,53 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Build fix/intent-lifecycle: carry-forward acceptance, close that settles unaccepted work, reopen in use, conflict-marker detection and closed-Intent reconcile flag.",
+  "scope": [
+    "Worktree worktree a, branch release/0.2.0/fix/intent-lifecycle, based on release/0.2.0/feat/collaborative-intents (PR #21)."
+  ],
+  "constraints": [
+    "No change to the persisted record schema (Intent, Assignment, acceptance); older 0.2.0-stack CLIs must still read every record this one writes.",
+    "Follow AGENTS.md and the ship brief; JSDoc on exports; Effect tagged errors; Bun Shell only if a process is needed (none expected).",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "assignment accept --carry-forward accepts a Succeeded Assignment whose intent_revision is below the live revision when the acceptance's intent_revision equals the live one; without the flag the old StaleRevision refusal stands; the flag on a same-revision Assignment is refused or a no-op, stated and tested; rationale must be non-blank.",
+    "intent close refuses with a tagged error listing every Succeeded-unaccepted Assignment of that Intent; an override flag (name of your choice, e.g. --allow-unaccepted <reason>) closes anyway and records the reason in close_reason without a new field.",
+    "intent reopen sets the reopened Intent in use and reports in_use and replaced like intent create; intent use refuses a closed Intent (add the test if missing).",
+    "Loading a record that contains git conflict markers fails with an error naming the record path and saying to resolve the conflict in git, then rerun.",
+    "reconcile lists a closed Intent that still has Ready or Running Assignments as a flagged row.",
+    "Root prompt plugin/agents/holyclaude.md and plugin/skills/assignments/SKILL.md gain: carry-forward use (rationale says why the work still holds; dispatch a validation Assignment instead when the change touched the work's files), close override, and pull before closing an Intent. Compact; state the wc -c size change. The core-rules block between the markers stays within its existing size unless a line must go there.",
+    "README documents the new flags briefly.",
+    "Tests cover each behavior; bundle rebuilt; fmt, lint, typecheck and full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/agents/holyclaude.md",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "intent-lifecycle"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9oe510-ghwq",
+  "state": "Succeeded",
+  "result": "A built: accept --carry-forward (no-op at live revision), intent close refuses with UnacceptedAssignments and --allow-unaccepted <reason> folded into close_reason, reopen sets in use and reports in_use/replaced, readJson reports CorruptRecord for git conflict markers, reconcile closed_with_open_work rows; prompt, skill and README updated; 1229 tests pass; one unidentified failure in a first full run did not recur.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

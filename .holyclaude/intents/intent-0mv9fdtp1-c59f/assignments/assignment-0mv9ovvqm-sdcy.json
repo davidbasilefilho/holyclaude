@@ -1,0 +1,50 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Build docs/review-and-cloud: narrow prose re-reviews, REST CI watching, cloud-limit notes and objective guidance.",
+  "scope": [
+    "Worktree worktree d, branch release/0.2.0/docs/review-and-cloud, based on PR #21 (0638af5)."
+  ],
+  "constraints": [
+    "Prose only; follow the writing bar; replace or tighten rather than stack; report wc -c before/after per file.",
+    "Leave the writing-bar blocks (scripts/writing-bar.test.ts) and the core-rules block unchanged unless a line truly belongs there.",
+    "No word, character or byte caps anywhere (standing decision).",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "Reviewer.artifact reads the whole artifact on a first review; on a re-review it reads the repair's diff and the sections that diff touches, and raises anything outside only if it is a blocker.",
+    "The root prompt and the assignments skill say a re-review targets the repair's changed lines and the re-review Assignment names the diff.",
+    "README Cloud sessions gains two observed bullets: gh GraphQL is blocked and gh api (REST) works; a PR activity subscription can stop delivering partway through, so fall back to polling.",
+    "The root prompt's CI watching uses gh api REST forms (PR head SHA, check runs for that SHA, mergeable and mergeable_state, reviews); it says mergeStateStatus and unresolved review threads exist only in GraphQL, so where GraphQL is blocked those read Unknown, never passed; the fallback for a dropped subscription is polling with Monitor.",
+    "The root prompt and the assignments skill say an objective is one short sentence naming the outcome, with detail in requirements (Intent) or scope and criteria (Assignment); guidance only.",
+    "fmt, lint, typecheck and full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "sizes"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md",
+      "plugin/agents/reviewer-artifact.md",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ovvqm-sdcy",
+  "state": "Succeeded",
+  "result": "D built: reviewer-artifact first review whole, re-review on repair diff and touched sections (blockers outside only); root prompt and skill re-review targets changed lines and names the diff; README two observed cloud bullets; CI watching REST forms with GraphQL-only mergeStateStatus and threads Unknown when blocked, Monitor polling fallback; objective guidance. Gates pass (1210). Open: legacy commit statuses not read; gh api allow rule not added.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

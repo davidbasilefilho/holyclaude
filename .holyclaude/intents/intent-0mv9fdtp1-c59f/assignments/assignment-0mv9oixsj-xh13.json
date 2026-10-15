@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Independently review ci/locked-tools (uncommitted in worktree c, base PR #18).",
+  "scope": [
+    "Worktree worktree c, uncommitted changes against HEAD (release/0.2.0/ci/validate-and-guard, 5b909e3); diff file scratchpad/diffs/assignment-0mv9oe56z-qz2d.diff. Changed: mise.toml, .github/workflows/ci.yml, package.json, bun.lock, scripts/bump-version.ts, scripts/bump-version.test.ts, scripts/lockfile.test.ts (new)."
+  ],
+  "constraints": [
+    "Read-only on the worktree; scratch copies go to the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "Format and lint run the locked binaries and fail loudly when node_modules is absent; no bunx left for them.",
+    "claude-code is locked with integrity and runs from the frozen install without lifecycle scripts; CI step is correct for ubuntu-latest.",
+    "bump-version updates bun.lock workspace versions without touching other bytes; tests would fail without the fix.",
+    "Gates pass; blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "toolchain"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9oe56z-qz2d"
+    ],
+    "independent_from": [
+      "assignment-0mv9oe56z-qz2d"
+    ]
+  },
+  "id": "assignment-0mv9oixsj-xh13",
+  "state": "Succeeded",
+  "result": "No blockers; 4 criteria met; optional: README line 347, write-order and match-count hardening, test casts.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Reviewer ran /code-review (6 findings dispositioned), gates, clean frozen install, validate from installed binary, and mutation checks.",
+    "criteria_evidence": {
+      "Format and lint run the locked binaries and fail loudly when node_modules is absent; no bunx left for them.": "Script not found exit 1 in clean copy; no bunx in mise/ci",
+      "claude-code is locked with integrity and runs from the frozen install without lifecycle scripts; CI step is correct for ubuntu-latest.": "8 platform packages with sha512 incl linux-x64; validate passed from bun run claude",
+      "bump-version updates bun.lock workspace versions without touching other bytes; tests would fail without the fix.": "3 lines changed, length delta 0; 3 tests fail on base script",
+      "Gates pass; blockers and optional findings reported with evidence.": "fmt, lint, check, 1147 tests, frozen install exit 0; findings listed"
+    },
+    "required_evidence": {
+      "code-review-run": "/code-review worktree c high, 6 findings",
+      "checks-run": "gates + clean install + mutation",
+      "findings": "no blockers; optionals listed"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

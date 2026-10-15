@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Update the README version-bump lines in ci/locked-tools to include bun.lock.",
+  "scope": [
+    "Worktree worktree c, README.md only."
+  ],
+  "constraints": [
+    "Change only the version-bump lines; no git writes."
+  ],
+  "acceptance_criteria": [
+    "README's version-bump text (around lines 344-354) says the bump updates the six version files and the workspace versions in bun.lock, and that it refuses when bun.lock is missing or has no workspace version, alongside the existing refusal when the six disagree.",
+    "fmt passes; wc -c before and after reported."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "toolchain"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9oe56z-qz2d"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9oyxo1-y3sz",
+  "state": "Succeeded",
+  "result": "README bump row and refusal sentence now name bun.lock; oxfmt passes; +76 bytes.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Two-line README fix verified by narrow re-review 7aij against the script.",
+    "criteria_evidence": {
+      "README's version-bump text (around lines 344-354) says the bump updates the six version files and the workspace versions in bun.lock, and that it refuses when bun.lock is missing or has no workspace version, alongside the existing refusal when the six disagree.": "re-review 7aij criterion 1 met (README:347, 354-355)",
+      "fmt passes; wc -c before and after reported.": "re-review 7aij criterion 1 met (README:347, 354-355)"
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt --check exit 0",
+      "diff-file": "scratchpad/diffs/assignment-0mv9oyxo1-y3sz.diff"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -32,9 +32,10 @@ jobs:
         env:
           DISABLE_AUTOUPDATER: "1"
         run: |
-          # Pinned so a new Claude Code release cannot turn the job red on its own; validation needs no credentials.
-          bunx @anthropic-ai/claude-code@2.1.300 plugin validate --strict plugin
-          bunx @anthropic-ai/claude-code@2.1.300 plugin validate --strict .
+          # Claude Code is a locked devDependency, so a new release cannot turn the job red on its
+          # own and the binary is integrity-checked; validation needs no credentials.
+          bun run claude plugin validate --strict plugin
+          bun run claude plugin validate --strict .
 
       - name: Format
         run: mise run fmt:readonly
