@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { MAX_LOCAL_BYTES, OBSERVATIONS_ROTATE_BYTES } from "@holyclaude/core"
+import {
+  OBSERVATIONS_READ_BYTES,
+  OBSERVATIONS_ROTATE_BYTES,
+  previousObservationsFile,
+} from "@holyclaude/core"
 import { Effect } from "effect"
 
 import { appendObservation, observationsPath, readObservations } from "./observations.ts"
@@ -50,16 +54,34 @@ describe("readObservations", () => {
     expect(await failure(readObservations(dir))).toMatchObject({ _tag: "SymlinkRefused" })
   })
 
-  test("refuses a file over the local cap before reading it", async () => {
+  const numbered = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      kind: "observed" as const,
+      agent_id: `agent-${index}`,
+      at: "2026-01-01T00:00:00Z",
+    }))
+  const linesOf = (records: ReadonlyArray<object>) =>
+    records.map((record) => `${JSON.stringify(record)}\n`).join("")
+
+  test("reads a generation of the size rotation keeps whole", async () => {
     mkdirSync(join(dir, "local"))
-    writeFileSync(observationsPath(dir), "x".repeat(MAX_LOCAL_BYTES + 1))
-    expect(await failure(readObservations(dir))).toMatchObject({ _tag: "TooLarge" })
+    const records = numbered(Math.ceil((OBSERVATIONS_ROTATE_BYTES * 1.1) / 80))
+    writeFileSync(observationsPath(dir), linesOf(records))
+    expect(await Effect.runPromise(readObservations(dir))).toEqual(records)
   })
 
-  test("reads a file at the cap", async () => {
+  test("reads a generation far past that size from its end, in whole lines", async () => {
     mkdirSync(join(dir, "local"))
-    writeFileSync(observationsPath(dir), "x".repeat(MAX_LOCAL_BYTES))
-    expect(await Effect.runPromise(readObservations(dir))).toEqual([])
+    const records = numbered(Math.ceil((OBSERVATIONS_READ_BYTES * 3) / 80))
+    writeFileSync(previousObservationsFile(dir), linesOf(records))
+    writeFileSync(observationsPath(dir), linesOf(records))
+    const read = await Effect.runPromise(readObservations(dir))
+    // Each generation yields only its newest lines: a suffix, ending at the very last record.
+    expect(read.length).toBeLessThan(records.length * 2)
+    expect(read.length).toBeGreaterThan(OBSERVATIONS_READ_BYTES / 200)
+    const half = read.length / 2
+    expect(read.slice(0, half)).toEqual(read.slice(half))
+    expect(read.slice(half)).toEqual(records.slice(records.length - half))
   })
 })
 
@@ -70,6 +92,11 @@ describe("appendObservation", () => {
     await Effect.runPromise(appendObservation(record, dir))
     expect(await Bun.file(join(dir, ".gitignore")).text()).toContain("/local/")
     expect(await Bun.file(observationsPath(dir)).text()).toBe(`${JSON.stringify(record)}\n`)
+  })
+
+  test("makes local/ with a .gitignore of * so the log stays ignored on its own", async () => {
+    await Effect.runPromise(appendObservation(record, dir))
+    expect(await Bun.file(join(dir, "local", ".gitignore")).text()).toBe("*\n")
   })
 
   test("replaces the ignore-everything rule of an earlier version, whatever is left beside it", async () => {
@@ -128,15 +155,6 @@ describe("the bounded log", () => {
     plant(observationsPath(dir), 1024)
     await Effect.runPromise(appendObservation(observed("newest"), dir))
     expect(await Bun.file(previousPath()).exists()).toBe(false)
-  })
-
-  test("never lets appends grow the log past what a read accepts", async () => {
-    // Just under the read cap: without rotation a few more appends make every read TooLarge.
-    plant(observationsPath(dir), MAX_LOCAL_BYTES - 100)
-    for (const agent of ["a", "b", "c"])
-      await Effect.runPromise(appendObservation(observed(agent), dir))
-    const records = await Effect.runPromise(readObservations(dir))
-    expect(records.slice(-3)).toEqual([observed("a"), observed("b"), observed("c")])
   })
 
   test("drops the oldest generation, never the newest records, on the next rotation", async () => {

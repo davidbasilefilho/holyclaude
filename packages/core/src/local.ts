@@ -1,11 +1,10 @@
 import { Effect, Schema } from "effect"
 
-import { MAX_LOCAL_BYTES } from "./codec.ts"
 import { commitFile, encodeJson, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 import type { Lock } from "./lock.ts"
-import { AssignmentId, CloneId, compareIds, newId } from "./model/ids.ts"
-import { Id } from "./model/primitives.ts"
+import { AssignmentId, CloneId, IntentId, compareIds, newId } from "./model/ids.ts"
+import { Id, Text } from "./model/primitives.ts"
 import type { State } from "./model/state.ts"
 import { Worker } from "./model/worker.ts"
 import { refuseSymlinks } from "./safety.ts"
@@ -16,24 +15,63 @@ import { refuseSymlinks } from "./safety.ts"
 const WorkersFile = Schema.Struct({ workers: Schema.Array(Worker) })
 /** Subagent ids keyed by Assignment id. They name agents of one session on one machine. */
 const AgentsFile = Schema.Record(AssignmentId, Id)
+/** The worktree key of each Running writer that has one, keyed by Assignment id. */
+const WorktreesFile = Schema.Record(AssignmentId, Text)
 const CloneFile = Schema.Struct({ clone_id: CloneId })
+/** The Intent this clone works on, chosen with `intent use`. */
+const ActiveIntentFile = Schema.Struct({ intent_id: IntentId })
 
 const workersPath = (directory: string) => localFile(directory, "workers.json")
 const agentsPath = (directory: string) => localFile(directory, "agents.json")
+const worktreesPath = (directory: string) => localFile(directory, "worktrees.json")
 const clonePath = (directory: string) => localFile(directory, "clone.json")
+const activeIntentPath = (directory: string) => localFile(directory, "active-intent.json")
 
-const readLocal = <S extends Schema.Decoder<unknown>>(schema: S, directory: string, path: string) =>
-  refuseSymlinks(directory, path).pipe(Effect.andThen(readJson(schema, path, MAX_LOCAL_BYTES)))
+const readLocal = <S extends Schema.Decoder<unknown>>(
+  schema: S,
+  directory: string,
+  path: string,
+  limit?: number,
+) => refuseSymlinks(directory, path).pipe(Effect.andThen(readJson(schema, path, limit)))
 
-/** The worker list of this clone; empty when none was written. */
-export const readWorkers = (directory: string) =>
-  readLocal(WorkersFile, directory, workersPath(directory)).pipe(
+/** The worker list of this clone; empty when none was written. A file over `limit` is TooLarge. */
+export const readWorkers = (directory: string, limit?: number) =>
+  readLocal(WorkersFile, directory, workersPath(directory), limit).pipe(
     Effect.map((file) => file?.workers ?? []),
   )
 
-/** The agent id of each Assignment this clone bound one to, keyed by Assignment id. */
-export const readAgents = (directory: string) =>
-  readLocal(AgentsFile, directory, agentsPath(directory)).pipe(Effect.map((file) => file ?? {}))
+/**
+ * The agent id of each Assignment this clone bound one to, keyed by Assignment id. A file over
+ * `limit` is TooLarge.
+ */
+export const readAgents = (directory: string, limit?: number) =>
+  readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(
+    Effect.map((file) => file ?? {}),
+  )
+
+/**
+ * The worktree key of each Running writer this clone reserved with one, keyed by Assignment id. A
+ * file over `limit` is TooLarge.
+ */
+export const readWorktrees = (directory: string, limit?: number) =>
+  readLocal(WorktreesFile, directory, worktreesPath(directory), limit).pipe(
+    Effect.map((file) => file ?? {}),
+  )
+
+/**
+ * The id of the Intent this clone chose to work on, or undefined when it chose none. The Intent may
+ * since have closed or gone, so check it against the state. A file over `limit` is TooLarge.
+ */
+export const readActiveIntent = (directory: string, limit?: number) =>
+  readLocal(ActiveIntentFile, directory, activeIntentPath(directory), limit).pipe(
+    Effect.map((file) => file?.intent_id),
+  )
+
+/** Stores this clone's choice of Intent. Call it under the lock. */
+export const writeActiveIntent = (directory: string, intentId: string, lock: Lock) =>
+  encodeJson(ActiveIntentFile, { intent_id: intentId }).pipe(
+    Effect.flatMap((content) => commitFile(activeIntentPath(directory), content, lock)),
+  )
 
 /**
  * The id of this clone, or undefined when it never reserved anything. A reader that finds none
@@ -51,7 +89,7 @@ export const ensureCloneId = (directory: string, lock: Lock) =>
     const existing = yield* readCloneId(directory)
     if (existing !== undefined) return existing
     const created = yield* newId("clone")
-    const content = yield* encodeJson(CloneFile, { clone_id: created }, clonePath(directory))
+    const content = yield* encodeJson(CloneFile, { clone_id: created })
     yield* commitFile(clonePath(directory), content, lock)
     return created
   })
@@ -86,14 +124,16 @@ const sortedKeys = (agents: Readonly<Record<string, string>>) =>
   Object.fromEntries(Object.entries(agents).toSorted(([a], [b]) => compareIds(a, b)))
 
 /**
- * Writes the worker list and the agent ids when they changed. Agent ids already stored for
- * Assignments that are not in this state stay: they belong to rows on other branches.
+ * Writes the worker list, the agent ids and the worktree keys when they changed. Entries already
+ * stored for Assignments that are not in this state stay: they belong to rows on other branches. A
+ * worktree key lasts as long as its row is Running, so any other state of a row in this state
+ * releases it.
  */
 export const writeLocal = (directory: string, before: State, after: State, lock: Lock) =>
   Effect.gen(function* () {
     const workersFile = workersPath(directory)
-    const workers = yield* encodeJson(WorkersFile, after, workersFile, MAX_LOCAL_BYTES)
-    const workersBefore = yield* encodeJson(WorkersFile, before, workersFile, MAX_LOCAL_BYTES)
+    const workers = yield* encodeJson(WorkersFile, after)
+    const workersBefore = yield* encodeJson(WorkersFile, before)
     if (workers !== workersBefore) yield* commitFile(workersFile, workers, lock)
 
     const agentsFile = agentsPath(directory)
@@ -102,12 +142,23 @@ export const writeLocal = (directory: string, before: State, after: State, lock:
       row.agent_id === null ? [] : [[row.id, row.agent_id] as const],
     )
     const merged = sortedKeys({ ...stored, ...Object.fromEntries(bound) })
-    const agents = yield* encodeJson(AgentsFile, merged, agentsFile, MAX_LOCAL_BYTES)
-    const agentsBefore = yield* encodeJson(
-      AgentsFile,
-      sortedKeys(stored),
-      agentsFile,
-      MAX_LOCAL_BYTES,
-    )
+    const agents = yield* encodeJson(AgentsFile, merged)
+    const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored))
     if (agents !== agentsBefore) yield* commitFile(agentsFile, agents, lock)
+
+    const worktreesFile = worktreesPath(directory)
+    const keys = yield* readWorktrees(directory)
+    const inState = new Set(after.assignments.map((row) => row.id))
+    const held = after.assignments.flatMap((row) =>
+      row.state === "Running" && row.worktree !== undefined
+        ? [[row.id, row.worktree] as const]
+        : [],
+    )
+    const kept = Object.entries(keys).filter(([id]) => !inState.has(id))
+    const worktrees = yield* encodeJson(
+      WorktreesFile,
+      sortedKeys({ ...Object.fromEntries(kept), ...Object.fromEntries(held) }),
+    )
+    const worktreesBefore = yield* encodeJson(WorktreesFile, sortedKeys(keys))
+    if (worktrees !== worktreesBefore) yield* commitFile(worktreesFile, worktrees, lock)
   })

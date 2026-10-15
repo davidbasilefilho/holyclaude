@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { MAX_RECORD_BYTES } from "./codec.ts"
 import { readCloneId } from "./local.ts"
 import type { Assignment } from "./model/assignment.ts"
 import { emptyState, type Change, type State } from "./model/state.ts"
@@ -22,6 +21,7 @@ const intent = (id: string, objective = "Share state") => ({
   objective,
   requirements: "One file per record",
   revision: 1,
+  state: "open" as const,
 })
 
 const assignment = (id: string, intentId: string, overrides: Partial<Assignment> = {}) =>
@@ -120,6 +120,20 @@ describe("round trip", () => {
     expect(loaded).toEqual(base)
   })
 
+  test("writes an open Intent without a state and a closed one with it, and both read back", async () => {
+    const closed = {
+      ...base.intents[1]!,
+      state: "closed" as const,
+      close_reason: "shipped",
+      closed_at: "2026-01-02T03:04:05.000Z",
+    }
+    await write({ ...base, intents: [base.intents[0]!, closed] })
+    const [open, shut] = await readTexts([intentPath(INTENT_A), intentPath(INTENT_B)])
+    expect(JSON.parse(open ?? "")).not.toHaveProperty("state")
+    expect(JSON.parse(shut ?? "")).toMatchObject({ state: "closed", close_reason: "shipped" })
+    expect((await load()).intents).toEqual([base.intents[0]!, closed])
+  })
+
   test("keeps the agent id and the workers, which live in local files", async () => {
     const running = assignment(FIRST, INTENT_A, { state: "Running", agent_id: "agent-7" })
     const state: State = {
@@ -177,7 +191,8 @@ describe("record files", () => {
   test("have a stable key order, a two-space indent and a trailing newline", async () => {
     await write(base)
     const text = await readFile(intentPath(INTENT_A), "utf8")
-    expect(text).toBe(`${JSON.stringify(intent(INTENT_A), null, 2)}\n`)
+    const { state: _open, ...stored } = intent(INTENT_A)
+    expect(text).toBe(`${JSON.stringify(stored, null, 2)}\n`)
     expect(text).toContain('\n  "objective"')
     expect(Object.keys(JSON.parse(text))).toEqual(["id", "objective", "requirements", "revision"])
     const record = JSON.parse(await readFile(assignmentPath(INTENT_A, FIRST), "utf8"))
@@ -206,14 +221,40 @@ describe("record files", () => {
     expect(await committedFiles()).toEqual(first)
   })
 
-  test("a record over the size cap is refused on write and on read", async () => {
-    const huge = { ...emptyState, intents: [intent(INTENT_A, "x".repeat(MAX_RECORD_BYTES))] }
-    expect(
-      (await failure(updateState(directory, () => Effect.succeed({ state: huge, value: 0 }))))._tag,
-    ).toBe("TooLarge")
-    await mkdir(join(directory, "intents", INTENT_A), { recursive: true })
-    await writeFile(intentPath(INTENT_A), "x".repeat(MAX_RECORD_BYTES + 1))
-    expect((await failure(loadState(directory)))._tag).toBe("TooLarge")
+  test("a record over 256 KiB writes and reads back whole", async () => {
+    const objective = "x".repeat(256 * 1024 + 1)
+    await write({ ...emptyState, intents: [intent(INTENT_A, objective)] })
+    expect((await readFile(intentPath(INTENT_A))).byteLength).toBeGreaterThan(256 * 1024)
+    expect((await load()).intents[0]?.objective).toBe(objective)
+  })
+
+  describe("with a read bound", () => {
+    const LIMIT = 4096
+    const padded = "x".repeat(LIMIT)
+    const bounded = () => failure(loadState(directory, LIMIT))
+
+    test("an Intent over it fails the load as TooLarge, and reads whole with no bound", async () => {
+      await write({ ...base, intents: [intent(INTENT_A, padded), intent(INTENT_B)] })
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).intents[0]?.objective).toBe(padded)
+    })
+
+    test("an Assignment over it fails the load as TooLarge", async () => {
+      await write({
+        ...base,
+        assignments: [assignment(FIRST, INTENT_A, { objective: padded }), base.assignments[1]!],
+      })
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).assignments).toHaveLength(2)
+    })
+
+    test("a local file over it fails the load as TooLarge", async () => {
+      await write(base)
+      expect((await Effect.runPromise(loadState(directory, LIMIT))).assignments).toHaveLength(2)
+      await writeFile(join(directory, "local", "agents.json"), JSON.stringify({ [FIRST]: padded }))
+      expect(await bounded()).toMatchObject({ _tag: "TooLarge", limit: LIMIT })
+      expect((await load()).assignments[0]?.agent_id).toBe(padded)
+    })
   })
 })
 
@@ -332,6 +373,18 @@ describe("a record that disagrees with where it lives", () => {
     expect(error).toMatchObject({ _tag: "CorruptRecord", path: intentPath(INTENT_A) })
   })
 
+  test("a record with git conflict markers names the file and says to resolve it in git", async () => {
+    await write(base)
+    const record = await readFile(intentPath(INTENT_A), "utf8")
+    const merged = `<<<<<<< HEAD\n${record}=======\n${record}>>>>>>> feature\n`
+    await writeFile(intentPath(INTENT_A), merged)
+    const error = await failure(loadState(directory))
+    expect(error).toMatchObject({ _tag: "CorruptRecord", path: intentPath(INTENT_A) })
+    expect(String(error)).toContain(intentPath(INTENT_A))
+    expect(String(error)).toContain("resolve the conflict in git")
+    expect(String(error)).toContain("rerun")
+  })
+
   test("an update refuses to run over a corrupt record", async () => {
     await write(base)
     await writeFile(intentPath(INTENT_A), "{ not json")
@@ -346,7 +399,7 @@ describe("the clone stamp", () => {
     reserve(
       state,
       { assignment_id: FIRST, capabilities: ["Write"] },
-      { projectRoot: directory, writableRoots: [directory] },
+      { projectRoot: directory, writableRoots: [directory], worktree: "w" },
     ).pipe(Effect.map(({ state: next }) => ({ state: next, value: "reserved" })))
 
   test("a row entering Running is stamped with this clone's id, created on first use", async () => {
@@ -463,9 +516,9 @@ describe("what is committed and what stays local", () => {
   })
 })
 
-describe("the local files' own cap", () => {
+describe("the local files", () => {
   const agentsFile = () => join(directory, "local", "agents.json")
-  /** Agent ids for many Assignments of other branches, past the cap of a committed record. */
+  /** Agent ids for many Assignments of other branches. */
   const agents = (count: number) =>
     Object.fromEntries(
       Array.from({ length: count }, (_, index) => [
@@ -474,10 +527,10 @@ describe("the local files' own cap", () => {
       ]),
     )
 
-  test("agents.json may outgrow the record cap, and a write keeps every entry", async () => {
+  test("agents.json may outgrow 256 KiB, and a write keeps every entry", async () => {
     await write(base)
     await writeFile(agentsFile(), JSON.stringify(agents(6000)))
-    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(MAX_RECORD_BYTES)
+    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(256 * 1024)
     expect((await load()).assignments).toHaveLength(2)
 
     await write({
@@ -492,9 +545,21 @@ describe("the local files' own cap", () => {
     expect(stored[FIRST]).toBe("agent-new")
   })
 
-  test("a local file far past it is still refused", async () => {
+  test("a local file over 4 MiB reads and takes a write", async () => {
     await write(base)
     await writeFile(agentsFile(), JSON.stringify(agents(80_000)))
-    expect((await failure(loadState(directory)))._tag).toBe("TooLarge")
+    expect((await readFile(agentsFile())).byteLength).toBeGreaterThan(4 * 1024 * 1024)
+    expect((await load()).assignments).toHaveLength(2)
+
+    await write({
+      ...base,
+      assignments: [
+        assignment(FIRST, INTENT_A, { state: "Running", agent_id: "agent-new" }),
+        base.assignments[1]!,
+      ],
+    })
+    const stored = JSON.parse(await readFile(agentsFile(), "utf8"))
+    expect(Object.keys(stored)).toHaveLength(80_001)
+    expect(stored[FIRST]).toBe("agent-new")
   })
 })

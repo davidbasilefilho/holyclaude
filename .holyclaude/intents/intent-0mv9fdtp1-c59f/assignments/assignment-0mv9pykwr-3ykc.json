@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Third D repair: diff files for artifact re-reviews, one policy owner, exact review and check-run reads.",
+  "scope": [
+    "Worktree worktree d: plugin/skills/assignments/SKILL.md section 10, plugin/agents/holyclaude.md CI watching (~131)."
+  ],
+  "constraints": [
+    "Only the four listed edits; core-rules block untouched; no git writes."
+  ],
+  "acceptance_criteria": [
+    "SKILL.md section 10: a SHA range is the target for a Reviewer.code re-review; a Reviewer.artifact (or other shell-less) re-review names a diff file the repair's writer saves, committed or not.",
+    "SKILL.md:121 keeps only the Assignment shape and target forms; the policy sentence owned by holyclaude.md:121 is removed.",
+    "holyclaude.md:131 review read excludes PENDING, relies on the API's oldest-first order (stated), and the check-runs read emits `.check_runs[]`.",
+    "oxfmt and full test pass; repair-only diff saved with git-applicable headers."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/skills/assignments/SKILL.md",
+      "plugin/agents/holyclaude.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9pe0r5-p5oo",
+      "assignment-0mv9pv0bb-2nmh"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9pykwr-3ykc",
+  "state": "Succeeded",
+  "result": "Four edits applied: SHA range target scoped to Reviewer.code; SKILL.md policy sentence removed, shell-less re-reviews name a diff file; reviews exclude PENDING with oldest-first order stated; check-runs jq .check_runs[]. Core block md5 unchanged; fmt and 1210 tests pass.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "D prose verified through review oyxib and narrow re-reviews qy6w, 2nmh, 5sf2; final pass has no blockers; REST reads run live on PR 23.",
+    "criteria_evidence": {
+      "SKILL.md section 10: a SHA range is the target for a Reviewer.code re-review; a Reviewer.artifact (or other shell-less) re-review names a diff file the repair's writer saves, committed or not.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "SKILL.md:121 keeps only the Assignment shape and target forms; the policy sentence owned by holyclaude.md:121 is removed.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "holyclaude.md:131 review read excludes PENDING, relies on the API's oldest-first order (stated), and the check-runs read emits `.check_runs[]`.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "oxfmt and full test pass; repair-only diff saved with git-applicable headers.": "verified by the review chain ending in 5sf2 (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; diff files saved",
+      "diff-file": "reported by the writer; diff files saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1556,6 +1556,7 @@ var isArray = Array2.isArray;
 var isArrayNonEmpty2 = isArrayNonEmpty;
 var isReadonlyArrayNonEmpty = isArrayNonEmpty;
 var empty2 = () => [];
+var of = (a) => [a];
 var map = /* @__PURE__ */ dual(2, (self, f) => self.map(f));
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Duration.js
@@ -2664,6 +2665,9 @@ var try_ = (options) => {
     }
   });
 };
+var promise = (evaluate) => callbackOptions(function(resume, signal) {
+  evaluate(signal).then((a) => resume(succeed3(a)), (e) => resume(die(e)));
+}, evaluate.length !== 0);
 var tryPromise = (options) => {
   const f = typeof options === "function" ? options : options.try;
   const catcher = typeof options === "function" ? (cause) => new UnknownError(cause, "An error occurred in Effect.tryPromise") : options.catch;
@@ -2746,6 +2750,18 @@ var gen = (...args) => {
   }
   const [options, body] = args;
   return suspend(() => fromIteratorUnsafe(body.call(options.self)));
+};
+var fnUntraced = (body, ...pipeables) => {
+  const fn = pipeables.length === 0 ? function() {
+    return suspend(() => fromIteratorUnsafe(body.apply(this, arguments)));
+  } : function() {
+    let effect = suspend(() => fromIteratorUnsafe(body.apply(this, arguments)));
+    for (let i = 0;i < pipeables.length; i++) {
+      effect = pipeables[i](effect, ...arguments);
+    }
+    return effect;
+  };
+  return defineFunctionLength(body.length, fn);
 };
 var defineFunctionLength = (length, fn) => Object.defineProperty(fn, "length", {
   value: length,
@@ -2917,6 +2933,15 @@ var exitMapError = /* @__PURE__ */ dual(2, (self, f) => {
     return self;
   return exitFail(f(error.success));
 });
+var exitAsVoidAll = (exits) => {
+  const failures = [];
+  for (const exit of exits) {
+    if (exit._tag === "Failure") {
+      failures.push(...exit.cause.reasons);
+    }
+  }
+  return failures.length === 0 ? exitVoid : exitFailCause(causeFromReasons(failures));
+};
 var updateContext = /* @__PURE__ */ dual(2, (self, f) => withFiber((fiber) => {
   const prevContext = fiber.context;
   const nextContext = f(prevContext);
@@ -2937,6 +2962,11 @@ var provideService = function() {
 };
 var provideServiceImpl = (self, service, implementation) => updateContext(self, add(service, implementation));
 var filterOrFail = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate, orFailWith) => filterOrElse(self, predicate, orFailWith ? (a) => fail3(orFailWith(a)) : () => fail3(new NoSuchElementError)));
+var forever = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => whileLoop({
+  while: constTrue,
+  body: constant(options?.disableYield ? self : flatMap(self, (_) => yieldNow)),
+  step: constVoid
+}));
 var catchCause = /* @__PURE__ */ dual(2, (self, f) => new OnFailureImpl(self, f.length !== 1 ? (cause) => f(cause) : f));
 var OnFailureProto = /* @__PURE__ */ makePrimitiveProto({
   op: "OnFailure",
@@ -3064,7 +3094,114 @@ var timeout = /* @__PURE__ */ dual(2, (self, duration) => {
   });
 });
 var timeoutOption = /* @__PURE__ */ dual(2, (self, duration) => raceFirst(asSome(self), as(sleep(duration), none2())));
+var ScopeTypeId = "~effect/Scope";
+var ScopeCloseableTypeId = "~effect/Scope/Closeable";
+var scopeClose = (self, exit_) => withFiber((fiber) => {
+  fiberEnterUninterruptibleUnsafe(fiber);
+  return scopeCloseUnsafe(self, exit_) ?? void_;
+});
+var scopeCloseUnsafe = (self, exit_) => {
+  const state = self.state;
+  if (state._tag === "Closed")
+    return;
+  self.state = {
+    _tag: "Closed",
+    exit: exit_
+  };
+  if (self.parent !== undefined) {
+    scopeRemoveFinalizerUnsafe(self.parent, self);
+  }
+  if (state._tag === "Empty")
+    return;
+  if (state.finalizer !== undefined) {
+    return runFinalizer(state.finalizer, exit_);
+  }
+  const finalizers = state.finalizers;
+  if (finalizers.size === 1) {
+    return runFinalizer(finalizers.values().next().value, exit_);
+  }
+  return scopeCloseFinalizers(self, finalizers, exit_);
+};
+var runFinalizer = (finalizer, exit_) => {
+  try {
+    return finalizer(exit_);
+  } catch (defect) {
+    return exitDie(defect);
+  }
+};
 var combineFinalizerCause = (exit_, finalizer) => exitIsSuccess(exit_) ? finalizer : catchCause(finalizer, (cause) => failCause(causeCombine(exit_.cause, cause)));
+var scopeCloseFinalizers = /* @__PURE__ */ fnUntraced(function* (self, finalizers, exit_) {
+  let exits = [];
+  const fibers = [];
+  const arr = Array.from(finalizers.values());
+  const parent = getCurrentFiber();
+  for (let i = arr.length - 1;i >= 0; i--) {
+    const finalizer = arr[i];
+    if (self.strategy === "sequential") {
+      exits.push(yield* exit(runFinalizer(finalizer, exit_)));
+    } else {
+      fibers.push(forkUnsafe(parent, runFinalizer(finalizer, exit_), true, true, "inherit"));
+    }
+  }
+  if (fibers.length > 0) {
+    exits = yield* fiberAwaitAll(fibers);
+  }
+  return yield* exitAsVoidAll(exits);
+});
+var scopeAddFinalizerExit = (scope, finalizer) => {
+  return suspend(() => {
+    if (scope.state._tag === "Closed") {
+      return finalizer(scope.state.exit);
+    }
+    scopeAddFinalizerUnsafe(scope, {}, finalizer);
+    return void_;
+  });
+};
+var scopeAddFinalizer = (scope, finalizer) => scopeAddFinalizerExit(scope, constant(finalizer));
+var scopeAddFinalizerUnsafe = (scope, key, finalizer) => {
+  if (scope.state._tag === "Empty") {
+    scope.state = {
+      _tag: "Open",
+      finalizerKey: key,
+      finalizer,
+      finalizers: undefined
+    };
+  } else if (scope.state._tag === "Open") {
+    const state = scope.state;
+    if (state.finalizer !== undefined) {
+      state.finalizers = new Map([[state.finalizerKey, state.finalizer]]);
+      state.finalizerKey = undefined;
+      state.finalizer = undefined;
+      state.finalizers.set(key, finalizer);
+    } else {
+      state.finalizers.set(key, finalizer);
+    }
+  }
+};
+var scopeRemoveFinalizerUnsafe = (scope, key) => {
+  if (scope.state._tag !== "Open")
+    return;
+  const state = scope.state;
+  if (state.finalizerKey === key) {
+    scope.state = constScopeEmpty;
+  } else if (state.finalizers !== undefined) {
+    state.finalizers.delete(key);
+    if (state.finalizers.size === 0) {
+      scope.state = constScopeEmpty;
+    }
+  }
+};
+var scopeMakeUnsafe = (finalizerStrategy) => makeScope(finalizerStrategy, undefined);
+var makeScope = (finalizerStrategy = "sequential", parent) => ({
+  [ScopeCloseableTypeId]: ScopeCloseableTypeId,
+  [ScopeTypeId]: ScopeTypeId,
+  strategy: finalizerStrategy,
+  parent,
+  state: constScopeEmpty
+});
+var constScopeEmpty = {
+  _tag: "Empty"
+};
 var OnExitImpl = /* @__PURE__ */ function() {
   const Proto = /* @__PURE__ */ makePrimitiveProto({
     op: "OnExit",
@@ -3137,6 +3274,13 @@ var setFiberInterruptible = (fiber) => {
   fiber._stack.push(setInterruptibleFalse);
   if (fiber._interruptedCause)
     return failCause(fiber._interruptedCause);
+};
+var fiberEnterUninterruptibleUnsafe = (fiber) => {
+  const impl = fiber;
+  if (!impl.interruptible)
+    return;
+  impl.interruptible = false;
+  impl._stack.push(setInterruptibleTrue);
 };
 var interruptible = (self) => withFiber((fiber) => {
   if (fiber.interruptible)
@@ -3366,6 +3510,7 @@ var forkUnsafe = (parent, effect, immediate = false, daemon = false, uninterrupt
   }
   return child;
 };
+var forkDetach = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => withFiber((fiber) => succeed3(forkUnsafe(fiber, self, options?.startImmediately, true, options?.uninterruptible))));
 var runForkWith = (context) => (effect, options) => {
   const fiber = new FiberImpl(options?.scheduler ? add(context, Scheduler, options.scheduler) : context, options?.uninterruptible !== true);
   fiber.evaluate(effect);
@@ -3698,6 +3843,11 @@ var fail4 = exitFail;
 var void_2 = exitVoid;
 var isSuccess3 = exitIsSuccess;
 
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Scope.js
+var makeUnsafe2 = scopeMakeUnsafe;
+var addFinalizer = scopeAddFinalizer;
+var close = scopeClose;
+
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Clock.js
 var currentTimeMillis2 = currentTimeMillis;
 
@@ -3837,7 +3987,7 @@ var while_ = /* @__PURE__ */ dual(2, (self, predicate) => fromStep(map2(toStep(s
     return flatMap(isEffect(eff) ? eff : succeed3(eff), (check) => check ? succeed3(result) : done2(output));
   });
 })));
-var forever = /* @__PURE__ */ spaced(zero);
+var forever2 = /* @__PURE__ */ spaced(zero);
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/internal/schedule.js
 var findErrorOnly = (cause) => cause.reasons.every(isFailReason) ? findError(cause) : fail2(cause);
@@ -3857,7 +4007,7 @@ var retry = /* @__PURE__ */ dual(2, (self, options) => {
   const schedule = typeof options === "function" ? options(identity) : isSchedule(options) ? options : buildFromOptions(options);
   return retryOrElse(self, schedule, fail3);
 });
-var passthroughForever = /* @__PURE__ */ passthrough(forever);
+var passthroughForever = /* @__PURE__ */ passthrough(forever2);
 var buildFromOptions = (options) => {
   let schedule = options.schedule ? passthrough(options.schedule) : passthroughForever;
   if (options.while) {
@@ -3886,12 +4036,16 @@ var buildFromOptions = (options) => {
 
 // ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Effect.js
 var forEach2 = forEach;
+var whileLoop2 = whileLoop;
+var promise2 = promise;
 var tryPromise2 = tryPromise;
 var succeed5 = succeed3;
 var suspend2 = suspend;
+var sync2 = sync;
 var void_3 = void_;
 var gen2 = gen;
 var fail5 = fail3;
+var failCause3 = failCause;
 var failCauseSync2 = failCauseSync;
 var die3 = die;
 var try_2 = try_;
@@ -3914,9 +4068,14 @@ var retry2 = retry;
 var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeout2 = timeout;
+var timeoutOption2 = timeoutOption;
 var filterOrFail2 = filterOrFail;
+var matchCauseEffect2 = matchCauseEffect;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
+var onExit2 = onExit;
+var forever3 = forever;
+var forkDetach2 = forkDetach;
 var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
 var mapEager2 = mapEager;
@@ -6944,6 +7103,110 @@ var arbitraryMinimumZonedDateTimeTimestamp = arbitraryMinimumDateTimestamp + 14 
 var arbitraryMaximumZonedDateTimeTimestamp = arbitraryMaximumDateTimestamp - 14 * 60 * 60 * 1000;
 var arbitraryMinimumTimeZoneOffset = -12 * 60 * 60 * 1000;
 var arbitraryMaximumTimeZoneOffset = 14 * 60 * 60 * 1000;
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/MutableRef.js
+var TypeId10 = "~effect/MutableRef";
+var MutableRefProto = {
+  [TypeId10]: TypeId10,
+  ...PipeInspectableProto,
+  toJSON() {
+    return {
+      _id: "MutableRef",
+      current: toJson(this.current)
+    };
+  }
+};
+var make7 = (value) => {
+  const ref = Object.create(MutableRefProto);
+  ref.current = value;
+  return ref;
+};
+
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Channel.js
+var TypeId11 = "~effect/Channel";
+var ChannelProto = {
+  [TypeId11]: {
+    _Env: identity,
+    _InErr: identity,
+    _InElem: identity,
+    _OutErr: identity,
+    _OutElem: identity
+  },
+  pipe() {
+    return pipeArguments(this, arguments);
+  }
+};
+var fromTransform = (transform) => {
+  const self = Object.create(ChannelProto);
+  self.transform = (upstream, scope) => catchCause2(transform(upstream, scope), (cause) => succeed5(failCause3(cause)));
+  return self;
+};
+var toTransform = (channel) => channel.transform;
+var fromReadableStream = (options) => fromTransform((_, scope) => readableStreamToPullUnsafe({
+  scope,
+  readable: options.evaluate(),
+  onError: options.onError,
+  releaseLockOnEnd: options.releaseLockOnEnd
+}));
+var readableStreamToPullUnsafe = (options) => {
+  const reader = options.readable.getReader();
+  const exit = options.exit ?? make7(undefined);
+  const pull = suspend2(() => {
+    if (exit.current)
+      return exit.current;
+    return matchCauseEffect2(tryPromise2({
+      try: () => reader.read(),
+      catch: options.onError
+    }), {
+      onFailure: (cause) => exit.current ?? failCause3(cause),
+      onSuccess: ({
+        done,
+        value
+      }) => {
+        if (exit.current)
+          return exit.current;
+        return done ? done2() : succeed5(of(value));
+      }
+    });
+  });
+  return as2(addFinalizer(options.scope, options.releaseLockOnEnd ? sync2(() => reader.releaseLock()) : promise2(() => reader.cancel().catch(constVoid))), pull);
+};
+var runWith = (self, f, onHalt) => suspend2(() => {
+  const scope = makeUnsafe2();
+  const makePull = toTransform(self)(done2(), scope);
+  return catchDone(flatMap2(makePull, f), onHalt ? onHalt : succeed5).pipe(onExit2((exit) => close(scope, exit)));
+});
+var runForEach = /* @__PURE__ */ dual(2, (self, f) => runWith(self, (pull) => forever3(flatMap2(pull, f), {
+  disableYield: true
+})));
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/internal/stream.js
+var TypeId12 = "~effect/Stream";
+var streamVariance = {
+  _R: identity,
+  _E: identity,
+  _A: identity
+};
+var Stream = function(channel) {
+  this.channel = channel;
+};
+Stream.prototype = {
+  [TypeId12]: streamVariance,
+  pipe() {
+    return pipeArguments(this, arguments);
+  }
+};
+var fromChannel = (channel) => new Stream(channel);
+
+// ../../node_modules/.bun/effect@4.0.4/node_modules/effect/dist/Stream.js
+var fromChannel2 = fromChannel;
+var fromReadableStream2 = (options) => fromChannel2(fromReadableStream(options));
+var runForEach2 = /* @__PURE__ */ dual(2, (self, f) => runForEach(self.channel, (arr) => {
+  let i = 0;
+  return whileLoop2({
+    while: () => i < arr.length,
+    body: () => f(arr[i++]),
+    step: constVoid
+  });
+}));
 // package.json
 var package_default = {
   name: "@holyclaude/cli",
@@ -6966,9 +7229,6 @@ var package_default = {
 
 // src/errors.ts
 class Usage extends TaggedError2("Usage") {
-}
-
-class NoIntent extends TaggedError2("NoIntent") {
 }
 
 class NotBound extends TaggedError2("NotBound") {
@@ -7030,6 +7290,14 @@ var parseArgs = (args, spec, usage) => gen2(function* () {
   return parsed;
 });
 
+// ../core/src/codec.ts
+var MAX_GITIGNORE_BYTES = 256 * 1024;
+var OBSERVATIONS_ROTATE_BYTES = 1024 * 1024;
+var OBSERVATIONS_READ_BYTES = 4 * 1024 * 1024;
+var MAX_LEGACY_STATE_BYTES = 1024 * 1024;
+var strict = { onExcessProperty: "error" };
+var decodeStrict = (schema) => decodeUnknownEffect2(schema, strict);
+var decodeJsonStrict = (schema) => decodeUnknownEffect2(fromJsonString2(schema), strict);
 // ../core/src/errors.ts
 class UnknownRecord extends TaggedError2("UnknownRecord") {
   get message() {
@@ -7046,9 +7314,39 @@ class InvalidPath extends TaggedError2("InvalidPath") {
   }
 }
 
+class InvalidWorktree extends TaggedError2("InvalidWorktree") {
+  get message() {
+    return `Invalid worktree "${this.path}": ${this.reason}`;
+  }
+}
+
 class StaleRevision extends TaggedError2("StaleRevision") {
   get message() {
     return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
+  }
+}
+
+class IntentClosed extends TaggedError2("IntentClosed") {
+  get message() {
+    return `Intent ${this.intent_id} is closed; \`holyclaude intent reopen --intent ${this.intent_id}\` opens it again`;
+  }
+}
+
+class IntentBusy extends TaggedError2("IntentBusy") {
+  get message() {
+    return `Intent ${this.intent_id} has Running Assignments (${this.running.join(", ")}); settle them before closing it`;
+  }
+}
+
+class UnacceptedAssignments extends TaggedError2("UnacceptedAssignments") {
+  get message() {
+    return `Intent ${this.intent_id} has Succeeded Assignments that were never accepted (${this.unaccepted.join(", ")}); accept them before closing it`;
+  }
+}
+
+class NoActiveIntent extends TaggedError2("NoActiveIntent") {
+  get message() {
+    return this.open.length === 0 ? "No Intent is open; create one with `holyclaude intent create`, or reopen one with `holyclaude intent reopen --intent <id>`" : `Several Intents are open and none is in use; run \`holyclaude intent use <id>\` or pass --intent <id>. Open Intents: ${this.open.map((intent) => `${intent.id} (${intent.objective.replace(/\s+/g, " ")})`).join("; ")}`;
   }
 }
 
@@ -7129,25 +7427,6 @@ class StateIo extends TaggedError2("StateIo") {
     return `State I/O failed for ${this.path}: ${String(this.cause)}`;
   }
 }
-
-// ../core/src/codec.ts
-var MAX_INPUT_BYTES = 64 * 1024;
-var MAX_RECORD_BYTES = 256 * 1024;
-var MAX_LOCAL_BYTES = 4 * 1024 * 1024;
-var OBSERVATIONS_ROTATE_BYTES = 1024 * 1024;
-var MAX_LEGACY_STATE_BYTES = 1024 * 1024;
-var strict = { onExcessProperty: "error" };
-var decodeStrict = (schema) => decodeUnknownEffect2(schema, strict);
-var decodeJsonStrict = (schema) => decodeUnknownEffect2(fromJsonString2(schema), strict);
-var byteLength = (text) => new TextEncoder().encode(text).byteLength;
-var withinLimit = (subject, text, limit) => {
-  const bytes = byteLength(text);
-  return bytes > limit ? fail5(new TooLarge({ subject, bytes, limit })) : succeed5(text);
-};
-var decodeInput = (schema) => {
-  const decode = decodeJsonStrict(schema);
-  return (text) => withinLimit("Input", text, MAX_INPUT_BYTES).pipe(flatMap2((ok) => decode(ok)));
-};
 // ../core/src/io.ts
 var attempt = (run) => tryPromise2({ try: run, catch: (cause) => cause });
 var io = (path, run) => attempt(run).pipe(mapError2((cause) => new StateIo({ path, cause })));
@@ -7161,12 +7440,26 @@ var readText = (path, limit) => gen2(function* () {
   const file = Bun.file(path);
   if (!(yield* io(path, () => file.exists())))
     return;
+  if (limit === undefined)
+    return yield* io(path, () => file.text());
   if (file.size > limit)
     return yield* new TooLarge({ subject: path, bytes: file.size, limit });
   const bytes = yield* io(path, () => file.slice(0, limit + 1).bytes());
   if (bytes.byteLength > limit)
     return yield* new TooLarge({ subject: path, bytes: bytes.byteLength, limit });
   return new TextDecoder().decode(bytes);
+});
+var NEWLINE = 10;
+var readTail = (path, limit) => gen2(function* () {
+  const file = Bun.file(path);
+  if (!(yield* io(path, () => file.exists())))
+    return;
+  const start = Math.max(0, file.size - limit);
+  const bytes = yield* io(path, () => file.slice(start).bytes());
+  if (start === 0)
+    return new TextDecoder().decode(bytes);
+  const lineBreak = bytes.indexOf(NEWLINE);
+  return lineBreak === -1 ? "" : new TextDecoder().decode(bytes.subarray(lineBreak + 1));
 });
 // ../core/src/layout.ts
 import { join as join2 } from "path";
@@ -7218,16 +7511,22 @@ var IGNORE_RULES = [
 ].join(`
 `) + `
 `;
+var LOCAL_IGNORE_RULES = `*
+`;
+var LOCAL_IGNORE_READ_BYTES = 16;
+var ensureLocalDirectory = (directory) => {
+  const path = localFile(directory, ".gitignore");
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, LOCAL_IGNORE_READ_BYTES)), catchTag2("TooLarge", () => succeed5(undefined)), flatMap2((current) => current === LOCAL_IGNORE_RULES ? void_3 : io(path, () => Bun.write(path, LOCAL_IGNORE_RULES))), asVoid2);
+};
 var LEGACY_IGNORE_RULES = `*
 `;
 var keepLocalFilesOutOfVersionControl = (directory) => {
   const path = join2(directory, ".gitignore");
-  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, MAX_RECORD_BYTES)), map4((current) => current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(path, rules))), asVoid2);
+  return refuseSymlinks(directory, path).pipe(andThen2(readText(path, MAX_GITIGNORE_BYTES)), map4((current) => current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined), flatMap2((rules) => rules === undefined ? void_3 : io(path, () => Bun.write(path, rules))), asVoid2);
 };
 // ../core/src/lock.ts
-import { mkdir, open, rm, stat } from "fs/promises";
+import { open, rm, stat } from "fs/promises";
 import { hostname } from "os";
-import { dirname } from "path";
 
 // ../core/src/model/primitives.ts
 var Text = String4.check(isPattern2(/\S/));
@@ -7293,32 +7592,17 @@ var acquireLock = (directory, lockFile) => {
 };
 var withStateLock = (directory, use) => {
   const file = lockFile(directory);
-  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(io(directory, () => mkdir(dirname(file), { recursive: true }))), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
+  return acquireUseRelease2(refuseSymlinks(directory, `${file}.breaking`).pipe(andThen2(refuseSymlinks(directory, file)), andThen2(ensureLocalDirectory(directory)), andThen2(acquireLock(directory, file))), use, (lock) => releaseIfOwned(lock.file, lock.token));
 };
 // ../core/src/files.ts
 import { rename } from "fs/promises";
-var fromNextLine = (text) => {
-  const at = text.indexOf(`
-`);
-  return at === -1 ? "" : text.slice(at + 1);
-};
-var keepNewestLines = (text, limit) => {
-  const bytes = new TextEncoder().encode(text);
-  return bytes.byteLength <= limit ? text : fromNextLine(new TextDecoder().decode(bytes.subarray(bytes.byteLength - limit - 1)));
-};
-var readNewestLines = (path, limit) => gen2(function* () {
-  const file = Bun.file(path);
-  if (!(yield* io(path, () => file.exists())))
-    return;
-  const size = file.size;
-  if (size <= limit)
-    return yield* readText(path, limit);
-  const bytes = yield* io(path, () => file.slice(size - limit - 1, size).bytes());
-  return fromNextLine(new TextDecoder().decode(bytes));
-});
-var readJson = (schema, path, limit = MAX_RECORD_BYTES) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
-var encodeJson = (schema, value, path, limit = MAX_RECORD_BYTES) => encodeEffect(schema)(value).pipe(map4((encoded) => `${JSON.stringify(encoded, null, 2)}
-`), flatMap2((json) => withinLimit(path, json, limit)));
+var CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?:\s|$)/m;
+var readJson = (schema, path, limit) => readText(path, limit).pipe(flatMap2((text) => text === undefined ? succeed5(undefined) : decodeJsonStrict(schema)(text).pipe(mapError2((error) => new CorruptRecord({
+  path,
+  reason: CONFLICT_MARKER.test(text) ? "it holds git conflict markers; resolve the conflict in git, then rerun" : error.message
+})))));
+var encodeJson = (schema, value) => encodeEffect(schema)(value).pipe(map4((encoded) => `${JSON.stringify(encoded, null, 2)}
+`));
 var moveFile = (from, to, lock) => gen2(function* () {
   if (!(yield* ownsFile(lock.file, lock.token)))
     return yield* new LockLost({ lockFile: lock.file });
@@ -7332,6 +7616,33 @@ var commitFile = (path, content, lock) => {
   return refuseSymlinks(lock.directory, path).pipe(andThen2(io(path, () => Bun.write(temporary, content))), andThen2(moveFile(temporary, path, lock)), tapError2(() => deleteIfPresent(temporary).pipe(ignore2)));
 };
 var removeFile = (path, lock) => refuseSymlinks(lock.directory, path).pipe(andThen2(deleteIfPresent(path)));
+var NEWLINE2 = 10;
+var endsALine = (path) => io(path, async () => {
+  const file = Bun.file(path);
+  return file.size === 0 || (await file.slice(file.size - 1).bytes())[0] === NEWLINE2;
+});
+var prependLines = (front, path, lock) => {
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  const copy = (source, writer) => fromReadableStream2({
+    evaluate: () => Bun.file(source).stream(),
+    onError: (cause) => new StateIo({ path: source, cause })
+  }).pipe(runForEach2((chunk) => io(temporary, async () => {
+    await writer.write(chunk);
+    await writer.flush();
+  })));
+  return gen2(function* () {
+    yield* refuseSymlinks(lock.directory, path);
+    const separator = (yield* endsALine(front)) ? "" : `
+`;
+    const writer = Bun.file(temporary).writer();
+    yield* gen2(function* () {
+      yield* copy(front, writer);
+      yield* io(temporary, async () => void await writer.write(separator));
+      yield* copy(path, writer);
+    }).pipe(ensuring2(io(temporary, async () => void await writer.end()).pipe(ignore2)));
+    yield* moveFile(temporary, path, lock);
+  }).pipe(tapError2(() => deleteIfPresent(temporary).pipe(ignore2)));
+};
 
 // ../core/src/model/ids.ts
 var TIME_DIGITS = 9;
@@ -7432,20 +7743,27 @@ var Worker = Struct({
 // ../core/src/local.ts
 var WorkersFile = Struct({ workers: ArraySchema(Worker) });
 var AgentsFile = Record(AssignmentId, Id);
+var WorktreesFile = Record(AssignmentId, Text);
 var CloneFile = Struct({ clone_id: CloneId });
+var ActiveIntentFile = Struct({ intent_id: IntentId });
 var workersPath = (directory) => localFile(directory, "workers.json");
 var agentsPath = (directory) => localFile(directory, "agents.json");
+var worktreesPath = (directory) => localFile(directory, "worktrees.json");
 var clonePath = (directory) => localFile(directory, "clone.json");
-var readLocal = (schema, directory, path) => refuseSymlinks(directory, path).pipe(andThen2(readJson(schema, path, MAX_LOCAL_BYTES)));
-var readWorkers = (directory) => readLocal(WorkersFile, directory, workersPath(directory)).pipe(map4((file) => file?.workers ?? []));
-var readAgents = (directory) => readLocal(AgentsFile, directory, agentsPath(directory)).pipe(map4((file) => file ?? {}));
+var activeIntentPath = (directory) => localFile(directory, "active-intent.json");
+var readLocal = (schema, directory, path, limit) => refuseSymlinks(directory, path).pipe(andThen2(readJson(schema, path, limit)));
+var readWorkers = (directory, limit) => readLocal(WorkersFile, directory, workersPath(directory), limit).pipe(map4((file) => file?.workers ?? []));
+var readAgents = (directory, limit) => readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(map4((file) => file ?? {}));
+var readWorktrees = (directory, limit) => readLocal(WorktreesFile, directory, worktreesPath(directory), limit).pipe(map4((file) => file ?? {}));
+var readActiveIntent = (directory, limit) => readLocal(ActiveIntentFile, directory, activeIntentPath(directory), limit).pipe(map4((file) => file?.intent_id));
+var writeActiveIntent = (directory, intentId, lock) => encodeJson(ActiveIntentFile, { intent_id: intentId }).pipe(flatMap2((content) => commitFile(activeIntentPath(directory), content, lock)));
 var readCloneId = (directory) => readLocal(CloneFile, directory, clonePath(directory)).pipe(map4((file) => file?.clone_id));
 var ensureCloneId = (directory, lock) => gen2(function* () {
   const existing = yield* readCloneId(directory);
   if (existing !== undefined)
     return existing;
   const created = yield* newId("clone");
-  const content = yield* encodeJson(CloneFile, { clone_id: created }, clonePath(directory));
+  const content = yield* encodeJson(CloneFile, { clone_id: created });
   yield* commitFile(clonePath(directory), content, lock);
   return created;
 });
@@ -7460,18 +7778,27 @@ var stampClone = (cloneId, before, after) => {
 var sortedKeys = (agents) => Object.fromEntries(Object.entries(agents).toSorted(([a], [b]) => compareIds(a, b)));
 var writeLocal = (directory, before, after, lock) => gen2(function* () {
   const workersFile = workersPath(directory);
-  const workers = yield* encodeJson(WorkersFile, after, workersFile, MAX_LOCAL_BYTES);
-  const workersBefore = yield* encodeJson(WorkersFile, before, workersFile, MAX_LOCAL_BYTES);
+  const workers = yield* encodeJson(WorkersFile, after);
+  const workersBefore = yield* encodeJson(WorkersFile, before);
   if (workers !== workersBefore)
     yield* commitFile(workersFile, workers, lock);
   const agentsFile = agentsPath(directory);
   const stored = yield* readAgents(directory);
   const bound = after.assignments.flatMap((row) => row.agent_id === null ? [] : [[row.id, row.agent_id]]);
   const merged = sortedKeys({ ...stored, ...Object.fromEntries(bound) });
-  const agents = yield* encodeJson(AgentsFile, merged, agentsFile, MAX_LOCAL_BYTES);
-  const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored), agentsFile, MAX_LOCAL_BYTES);
+  const agents = yield* encodeJson(AgentsFile, merged);
+  const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored));
   if (agents !== agentsBefore)
     yield* commitFile(agentsFile, agents, lock);
+  const worktreesFile = worktreesPath(directory);
+  const keys = yield* readWorktrees(directory);
+  const inState = new Set(after.assignments.map((row) => row.id));
+  const held = after.assignments.flatMap((row) => row.state === "Running" && row.worktree !== undefined ? [[row.id, row.worktree]] : []);
+  const kept = Object.entries(keys).filter(([id]) => !inState.has(id));
+  const worktrees = yield* encodeJson(WorktreesFile, sortedKeys({ ...Object.fromEntries(kept), ...Object.fromEntries(held) }));
+  const worktreesBefore = yield* encodeJson(WorktreesFile, sortedKeys(keys));
+  if (worktrees !== worktreesBefore)
+    yield* commitFile(worktreesFile, worktrees, lock);
 });
 // ../core/src/observations.ts
 var rotateObservations = (directory) => {
@@ -7566,16 +7893,25 @@ var Assignment = Struct({
   agent_id: NullOr(Id),
   result: NullOr(Text),
   acceptance: NullOr(AcceptanceRecord),
-  clone_id: optionalKey2(CloneId)
+  clone_id: optionalKey2(CloneId),
+  worktree: optionalKey2(Text)
 });
+var isOpenAssignment = (assignment) => assignment.state === "Ready" || assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null;
 var isTerminal = (assignment) => assignment.state === "Succeeded" || assignment.state === "Failed" || assignment.state === "Cancelled";
 
 // ../core/src/model/intent.ts
+var IntentState = Literals(["open", "closed"]);
 var Intent = Struct({
   id: IntentId,
   objective: Text,
   requirements: String4,
-  revision: StoredRevision
+  revision: StoredRevision,
+  state: optionalKey2(toEncoded2(IntentState)).pipe(decodeTo2(IntentState, {
+    decode: withDefault(succeed5("open")),
+    encode: transformOptional(filter((state) => state !== "open"))
+  })),
+  close_reason: optionalKey2(Text),
+  closed_at: optionalKey2(String4)
 });
 
 // ../core/src/model/state.ts
@@ -7599,7 +7935,23 @@ var refuseOtherClone = (state, id, cloneId) => {
 };
 var invalidTransition = (assignment, action) => fail5(new InvalidTransition({ id: assignment.id, state: assignment.state, action }));
 var requireLiveRevision = (intent, given) => intent.revision < 1 ? fail5(new NoRevision({ intent_id: intent.id })) : given === intent.revision ? void_3 : fail5(new StaleRevision({ given, live: intent.revision }));
-var latestIntent = (state) => sortedById(state.intents).at(-1);
+var requireOpen = (intent) => intent.state === "open" ? void_3 : fail5(new IntentClosed({ intent_id: intent.id }));
+var openIntents = (state) => sortedById(state.intents).filter((intent) => intent.state === "open");
+var intentInUse = (state, stored) => {
+  const open = openIntents(state);
+  const chosen = open.find((intent) => intent.id === stored);
+  return chosen ?? (open.length === 1 ? open[0] : undefined);
+};
+var resolveIntent = (state, flag, stored) => gen2(function* () {
+  if (flag !== undefined)
+    return yield* findIntent(state, flag);
+  const inUse = intentInUse(state, stored);
+  if (inUse !== undefined)
+    return inUse;
+  return yield* new NoActiveIntent({
+    open: openIntents(state).map(({ id, objective }) => ({ id, objective }))
+  });
+});
 var withAssignment = (state, next) => ({
   ...state,
   assignments: state.assignments.map((assignment) => assignment.id === next.id ? next : assignment)
@@ -7612,7 +7964,15 @@ var unchanged = (state, assignment) => ({
   state,
   value: assignment
 });
-var duplicate = (ids) => ids.find((id, index) => ids.indexOf(id) !== index);
+var duplicate = (ids) => {
+  const seen = new Set;
+  for (const id of ids) {
+    if (seen.has(id))
+      return id;
+    seen.add(id);
+  }
+  return;
+};
 var validateState = (state) => gen2(function* () {
   const fail = (message) => fail5(new InvalidRecord({ message }));
   const intentIds = state.intents.map((intent) => intent.id);
@@ -7627,11 +7987,13 @@ var validateState = (state) => gen2(function* () {
     if (repeated !== undefined)
       return yield* fail(`Duplicate ${kind} id ${repeated}`);
   }
+  const knownIntents = new Set(intentIds);
+  const knownAssignments = new Set(assignmentIds);
   for (const assignment of state.assignments) {
-    if (!intentIds.includes(assignment.intent_id))
+    if (!knownIntents.has(assignment.intent_id))
       return yield* fail(`Assignment ${assignment.id} names unknown intent ${assignment.intent_id}`);
     const { dependencies, related_assignments, independent_from } = assignment.metadata;
-    const unknown = [...dependencies, ...related_assignments, ...independent_from].find((id) => !assignmentIds.includes(id));
+    const unknown = [...dependencies, ...related_assignments, ...independent_from].find((id) => !knownAssignments.has(id));
     if (unknown !== undefined)
       return yield* fail(`Assignment ${assignment.id} references unknown assignment ${unknown}`);
   }
@@ -7641,25 +8003,25 @@ var validateState = (state) => gen2(function* () {
 // ../core/src/records.ts
 import { readdir } from "fs/promises";
 import { join as join3 } from "path";
-var AssignmentRecord = Assignment.mapFields(omit2(["agent_id"]));
+var AssignmentRecord = Assignment.mapFields(omit2(["agent_id", "worktree"]));
 var segments = (relative) => relative.split(/[\\/]/);
 var scan = (directory, pattern) => attempt(() => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: directory, onlyFiles: true }))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed5([]) : fail5(new StateIo({ path: directory, cause }))));
 var intentFolders = (directory) => attempt(() => readdir(join3(directory, "intents"))).pipe(catch_2((cause) => hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? succeed5([]) : fail5(new StateIo({ path: join3(directory, "intents"), cause }))));
 var present = (path) => flatMap2((value) => value === undefined ? fail5(new CorruptRecord({ path, reason: "the file disappeared while reading" })) : succeed5(value));
-var readIntents = (directory) => scan(directory, "intents/*/intent.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
+var readIntents = (directory, limit) => scan(directory, "intents/*/intent.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
   const path = join3(directory, relative);
   const folder = segments(relative)[1] ?? "";
-  return refuseSymlinks(directory, path).pipe(andThen2(readJson(Intent, path)), present(path), filterOrFail2((intent) => intent.id === folder, (intent) => new CorruptRecord({
+  return refuseSymlinks(directory, path).pipe(andThen2(readJson(Intent, path, limit)), present(path), filterOrFail2((intent) => intent.id === folder, (intent) => new CorruptRecord({
     path,
     reason: `its id ${intent.id} does not match the directory ${folder}`
   })));
 })));
-var readAssignments = (directory) => scan(directory, "intents/*/assignments/*.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
+var readAssignments = (directory, limit) => scan(directory, "intents/*/assignments/*.json").pipe(flatMap2((files) => forEach2(files, (relative) => {
   const path = join3(directory, relative);
   const parts = segments(relative);
   const folder = parts[1] ?? "";
   const name = (parts[3] ?? "").replace(/\.json$/, "");
-  return refuseSymlinks(directory, path).pipe(andThen2(readJson(AssignmentRecord, path)), present(path), filterOrFail2((record) => record.id === name, (record) => new CorruptRecord({
+  return refuseSymlinks(directory, path).pipe(andThen2(readJson(AssignmentRecord, path, limit)), present(path), filterOrFail2((record) => record.id === name, (record) => new CorruptRecord({
     path,
     reason: `its id ${record.id} does not match the file name ${name}`
   })), filterOrFail2((record) => record.intent_id === folder, (record) => new CorruptRecord({
@@ -7667,31 +8029,35 @@ var readAssignments = (directory) => scan(directory, "intents/*/assignments/*.js
     reason: `its intent ${record.intent_id} does not match the directory ${folder}`
   })));
 })));
-var loadRecordState = (directory) => gen2(function* () {
+var loadRecordState = (directory, limit) => gen2(function* () {
   for (const path of [directory, join3(directory, "intents"), join3(directory, "local")])
     yield* refuseSymlinks(directory, path);
   for (const folder of yield* intentFolders(directory)) {
     yield* refuseSymlinks(directory, join3(directory, "intents", folder));
     yield* refuseSymlinks(directory, join3(directory, "intents", folder, "assignments"));
   }
-  const intents = sortedById(yield* readIntents(directory));
-  const agents = yield* readAgents(directory);
-  const assignments = sortedById(yield* readAssignments(directory)).map((record) => ({
-    ...record,
-    agent_id: agents[record.id] ?? null
-  }));
-  const workers = yield* readWorkers(directory);
+  const intents = sortedById(yield* readIntents(directory, limit));
+  const agents = yield* readAgents(directory, limit);
+  const worktrees = yield* readWorktrees(directory, limit);
+  const assignments = sortedById(yield* readAssignments(directory, limit)).map((record) => {
+    const worktree = record.state === "Running" ? worktrees[record.id] : undefined;
+    return {
+      ...record,
+      agent_id: agents[record.id] ?? null,
+      ...worktree === undefined ? {} : { worktree }
+    };
+  });
+  const workers = yield* readWorkers(directory, limit);
   return yield* validateState({ version: 1, intents, assignments, workers });
 });
 var recordTexts = (directory, state) => gen2(function* () {
   const texts = new Map;
   for (const intent of state.intents) {
-    const path = intentFile(directory, intent.id);
-    texts.set(path, yield* encodeJson(Intent, intent, path));
+    texts.set(intentFile(directory, intent.id), yield* encodeJson(Intent, intent));
   }
   for (const assignment of state.assignments) {
     const path = assignmentFile(directory, assignment.intent_id, assignment.id);
-    texts.set(path, yield* encodeJson(AssignmentRecord, assignment, path));
+    texts.set(path, yield* encodeJson(AssignmentRecord, assignment));
   }
   return texts;
 });
@@ -7731,15 +8097,13 @@ var moveObservations = (directory, lock) => {
   return gen2(function* () {
     yield* refuseSymlinks(directory, from);
     yield* refuseSymlinks(directory, to);
-    const older = yield* readNewestLines(from, MAX_LOCAL_BYTES);
-    if (older === undefined)
+    if (!(yield* io(from, () => Bun.file(from).exists())))
       return;
-    const newer = (yield* readNewestLines(to, MAX_LOCAL_BYTES)) ?? "";
-    const separator = older === "" || older.endsWith(`
-`) ? "" : `
-`;
-    yield* commitFile(to, keepNewestLines(`${older}${separator}${newer}`, MAX_LOCAL_BYTES), lock);
-    yield* removeFile(from, lock);
+    if (yield* io(to, () => Bun.file(to).exists())) {
+      yield* prependLines(from, to, lock);
+      yield* removeFile(from, lock);
+    } else
+      yield* moveFile(from, to, lock);
   });
 };
 var migrateLegacy = (directory, lock) => gen2(function* () {
@@ -7772,9 +8136,9 @@ var migrateLegacy = (directory, lock) => gen2(function* () {
 });
 
 // ../core/src/store.ts
-var loadState = (directory) => gen2(function* () {
+var loadState = (directory, limit) => gen2(function* () {
   const legacy = yield* readLegacy(directory);
-  const existing = yield* loadRecordState(directory);
+  const existing = yield* loadRecordState(directory, limit);
   return legacy === undefined ? existing : mergeLegacy(legacy, existing);
 });
 var updateState = (directory, transition) => withStateLock(directory, (lock) => gen2(function* () {
@@ -7782,17 +8146,34 @@ var updateState = (directory, transition) => withStateLock(directory, (lock) => 
   yield* migrateLegacy(directory, lock);
   const before = yield* loadRecordState(directory);
   const cloneId = ensureCloneId(directory, lock);
-  const { state, value } = yield* transition(before, { cloneId });
+  const { state, value } = yield* transition(before, {
+    cloneId,
+    useIntent: (intentId) => writeActiveIntent(directory, intentId, lock)
+  });
   if (state !== before)
     yield* persist(directory, before, yield* stampClone(cloneId, before, state), lock);
   return value;
 }));
+// ../core/src/worktree.ts
+import { realpath, stat as stat2 } from "fs/promises";
+import { resolve as resolve4 } from "path";
+var openWorktree = (path) => gen2(function* () {
+  if (path.trim() === "")
+    return yield* new InvalidWorktree({ path, reason: "empty path" });
+  const root = resolve4(path);
+  const info = yield* attempt(() => stat2(root)).pipe(catch_2((cause) => fail5(hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? new InvalidWorktree({ path, reason: "no such directory" }) : new StateIo({ path, cause }))));
+  if (!info.isDirectory())
+    return yield* new InvalidWorktree({ path, reason: "not a directory" });
+  const real = yield* io(root, () => realpath(root));
+  const key = new Bun.CryptoHasher("sha256").update(real).digest("hex").slice(0, 16);
+  return { root, key };
+});
 // ../core/src/model/ci.ts
 var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
 var FollowUpInput = Struct({ predecessor_id: Id, assignment: AssignmentDraft });
 var createAssignment = (state, draft) => gen2(function* () {
-  yield* findIntent(state, draft.intent_id);
+  yield* requireOpen(yield* findIntent(state, draft.intent_id));
   const ownership_paths = yield* normalizePaths(draft.metadata.ownership_paths);
   if (draft.mutability !== "ReadOnly" && ownership_paths.length === 0)
     return yield* new InvalidRecord({
@@ -7834,7 +8215,11 @@ var CancelInput = Struct({
   notification: Literal2("stopped"),
   reason: optionalKey2(Text)
 });
-var AcceptInput = Struct({ assignment_id: Id, acceptance: AcceptanceRecord });
+var AcceptInput = Struct({
+  assignment_id: Id,
+  acceptance: AcceptanceRecord,
+  carry_forward: optionalKey2(Boolean3)
+});
 var ResolveReconcileInput = Union2([
   TaggedStruct("Fail", { assignment_id: Id, reason: Text }),
   TaggedStruct("Keep", { assignment_id: Id })
@@ -7877,7 +8262,8 @@ var accept = (state, input) => gen2(function* () {
   if (assignment.state !== "Succeeded")
     return yield* invalidTransition(assignment, "accept");
   const intent = yield* findIntent(state, assignment.intent_id);
-  yield* requireLiveRevision(intent, assignment.intent_revision);
+  if (!(input.carry_forward === true && assignment.intent_revision < intent.revision))
+    yield* requireLiveRevision(intent, assignment.intent_revision);
   yield* requireLiveRevision(intent, acceptance.intent_revision);
   const problems = [
     ...coverageProblems("criteria", assignment.acceptance_criteria, acceptance.criteria_evidence),
@@ -7895,6 +8281,10 @@ var reconcile = (state, cloneId) => {
     elsewhere: running.filter(isElsewhere)
   };
 };
+var closedWithOpenWork = (state) => sortedById(state.intents).filter((intent) => intent.state === "closed").map((intent) => ({
+  intent,
+  assignments: sortedById(state.assignments.filter((assignment) => assignment.intent_id === intent.id && (assignment.state === "Ready" || assignment.state === "Running")))
+})).filter(({ assignments }) => assignments.length > 0);
 var resolveReconcile = (state, input) => gen2(function* () {
   const assignment = yield* findAssignment(state, input.assignment_id);
   if (assignment.state !== "Running")
@@ -7966,6 +8356,7 @@ var reserve = (state, input, context) => gen2(function* () {
   if (assignment.state !== "Ready")
     return yield* invalidTransition(assignment, "reserve");
   const intent = yield* findIntent(state, assignment.intent_id);
+  yield* requireOpen(intent);
   yield* requireLiveRevision(intent, assignment.intent_revision);
   const refuse = (reason, detail) => new DispatchRefused({ id: assignment.id, reason, detail });
   const route = routeFor(assignment.role);
@@ -7985,10 +8376,10 @@ var reserve = (state, input, context) => gen2(function* () {
     if (!accepted)
       return yield* refuse("DependencyNotAccepted", `${id} is not accepted at revision ${assignment.intent_revision}`);
   }
-  const holder = state.assignments.find((other) => writes && other.state === "Running" && (other.clone_id === undefined || other.clone_id === context.cloneId) && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
+  const holder = state.assignments.find((other) => writes && other.state === "Running" && (other.clone_id === undefined || other.clone_id === context.cloneId) && (other.worktree === undefined || other.worktree === context.worktree) && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
   if (holder !== undefined)
     return yield* refuse("OwnershipConflict", `paths overlap ${holder.id}`);
-  return replaceAssignment(state, { ...assignment, state: "Running" });
+  return replaceAssignment(state, { ...assignment, state: "Running", worktree: context.worktree });
 });
 var bindAgent = (state, input) => gen2(function* () {
   const assignment = yield* findAssignment(state, input.assignment_id);
@@ -8025,8 +8416,18 @@ var UpdateIntentInput = Struct({
   requirements: optionalKey2(String4),
   material: Boolean3
 });
+var CloseIntentInput = Struct({
+  id: Id,
+  reason: Text,
+  at: Text,
+  allow_unaccepted: optionalKey2(Text)
+});
+var replaceIntent = (state, next) => ({
+  state: { ...state, intents: state.intents.map((it) => it.id === next.id ? next : it) },
+  value: next
+});
 var createIntent = (state, input) => gen2(function* () {
-  const intent = { id: yield* newId("intent"), ...input, revision: 1 };
+  const intent = { id: yield* newId("intent"), ...input, revision: 1, state: "open" };
   return { state: { ...state, intents: [...state.intents, intent] }, value: intent };
 });
 var updateIntent = (state, input) => gen2(function* () {
@@ -8037,10 +8438,30 @@ var updateIntent = (state, input) => gen2(function* () {
     requirements: input.requirements ?? current.requirements,
     revision: input.material ? current.revision + 1 : current.revision
   };
-  return {
-    state: { ...state, intents: state.intents.map((it) => it.id === next.id ? next : it) },
-    value: next
-  };
+  return replaceIntent(state, next);
+});
+var closeIntent = (state, input) => gen2(function* () {
+  const current = yield* findIntent(state, input.id);
+  if (current.state === "closed")
+    return yield* new InvalidRecord({ message: `Intent ${current.id} is already closed` });
+  const running = state.assignments.filter((row) => row.intent_id === current.id && row.state === "Running").map((row) => row.id);
+  if (running.length > 0)
+    return yield* new IntentBusy({ intent_id: current.id, running });
+  const unaccepted = state.assignments.filter((row) => row.intent_id === current.id && row.state === "Succeeded" && row.acceptance === null).map((row) => row.id);
+  if (unaccepted.length > 0 && input.allow_unaccepted === undefined)
+    return yield* new UnacceptedAssignments({ intent_id: current.id, unaccepted });
+  return replaceIntent(state, {
+    ...current,
+    state: "closed",
+    close_reason: unaccepted.length > 0 ? `${input.reason} (unaccepted ${unaccepted.join(", ")} allowed: ${input.allow_unaccepted})` : input.reason,
+    closed_at: input.at
+  });
+});
+var reopenIntent = (state, id) => gen2(function* () {
+  const { close_reason: _reason, closed_at: _at, ...current } = yield* findIntent(state, id);
+  if (current.state === "open")
+    return yield* new InvalidRecord({ message: `Intent ${current.id} is already open` });
+  return replaceIntent(state, { ...current, state: "open", revision: current.revision + 1 });
 });
 // src/clock.ts
 var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
@@ -8127,8 +8548,7 @@ var subagentTranscript = (input) => {
 };
 
 // src/observations.ts
-import { appendFile, mkdir as mkdir2 } from "fs/promises";
-import { dirname as dirname2 } from "path";
+import { appendFile } from "fs/promises";
 var Text2 = String4.check(isPattern2(/\S/));
 var Observed = Struct({
   kind: Literal2("observed"),
@@ -8152,7 +8572,7 @@ var observationsPath = (directory = stateDirPath()) => observationsFile(director
 var decodeLine = decodeJsonStrict(ObservationRecord);
 var readGeneration = (directory, path) => gen2(function* () {
   yield* refuseSymlinks(directory, path);
-  const text = (yield* readText(path, MAX_LOCAL_BYTES)) ?? "";
+  const text = (yield* readTail(path, OBSERVATIONS_READ_BYTES)) ?? "";
   const records = [];
   for (const line of text.split(`
 `)) {
@@ -8171,10 +8591,7 @@ var readObservations = (directory = stateDirPath()) => gen2(function* () {
 });
 var appendObservation = (record, directory = stateDirPath()) => {
   const path = observationsPath(directory);
-  return refuseSymlinks(directory, path).pipe(andThen2(tryPromise2({
-    try: () => mkdir2(dirname2(path), { recursive: true }),
-    catch: (cause) => new StateIo({ path, cause })
-  })), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
+  return refuseSymlinks(directory, path).pipe(andThen2(ensureLocalDirectory(directory)), andThen2(keepLocalFilesOutOfVersionControl(directory)), andThen2(rotateObservations(directory)), andThen2(tryPromise2({
     try: () => appendFile(path, `${JSON.stringify(record)}
 `),
     catch: (cause) => new StateIo({ path, cause })
@@ -8200,25 +8617,23 @@ var latestOverride = (records, assignmentId, agentId) => records.findLast((recor
 
 // src/hook/observe.ts
 var OBSERVATION_BUDGET = "750 millis";
-var observe = (agentId, sighting) => gen2(function* () {
+var isSpecialist = (agentType) => agentType?.startsWith(`${PLUGIN_NAME}:`);
+var observe = (agentId, sighting, directory = stateDirPath()) => gen2(function* () {
   const seen = {
     ...sighting.agent_type ? { agent_type: sighting.agent_type } : {},
     ...sighting.effort ? { effort: sighting.effort } : {},
     ...sighting.transcript ? { transcript: sighting.transcript } : {},
     ...sighting.model ? { model: sighting.model } : {}
   };
-  const known = seenOf(yield* readObservations(), agentId);
-  if (!(sighting.agent_type || known.agent_type)?.startsWith(`${PLUGIN_NAME}:`))
+  if (sighting.agent_type && !isSpecialist(sighting.agent_type))
+    return;
+  const known = seenOf(yield* readObservations(directory), agentId);
+  if (!isSpecialist(sighting.agent_type || known.agent_type))
     return;
   const keys = Object.keys(seen);
   if (keys.every((key) => seen[key] === known[key]))
     return;
-  yield* appendObservation({
-    kind: "observed",
-    agent_id: agentId,
-    ...seen,
-    at: yield* nowIso
-  });
+  yield* appendObservation({ kind: "observed", agent_id: agentId, ...seen, at: yield* nowIso }, directory);
 }).pipe(timeout2(OBSERVATION_BUDGET), catchCause2(() => void_3));
 
 // src/hook/post-tool-use.ts
@@ -9736,7 +10151,7 @@ var carriedScript = (wrapper, rest, index) => {
   }
   return;
 };
-var unwrap = (name, rest, depth, budget) => {
+var unwrap2 = (name, rest, depth, budget) => {
   const wrapper = WRAPPERS[name];
   if (wrapper === undefined)
     return rest;
@@ -9972,7 +10387,7 @@ var classifyWords = (input, depth, budget) => {
   if (launcher !== undefined)
     return launcher(judge, [head, ...rest], depth, budget);
   if (Object.hasOwn(WRAPPERS, name)) {
-    const inner = unwrap(name, rest, depth, budget);
+    const inner = unwrap2(name, rest, depth, budget);
     if (typeof inner === "string")
       return inner;
     return classifyWords(name === "xargs" ? [...inner, ...XARGS_INPUT] : inner, depth + 1, budget);
@@ -10067,12 +10482,11 @@ var REFUSALS = {
   oversized: `This call's payload is over ${MAX_HOOK_BYTES} bytes, so the guard cannot check it. Send the work in smaller calls, for example one shorter command or a smaller write at a time.`,
   unreadable: `This call's payload is empty or not valid JSON, so the guard cannot check it. Send the call again; if it is refused again, say so in your report.`
 };
-var MAX_REASON_CHARS = 1000;
 var deny = (reason) => JSON.stringify({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS)}...` : reason
+    permissionDecisionReason: reason
   }
 });
 var preToolUse = (stdin) => gen2(function* () {
@@ -10087,12 +10501,14 @@ var preToolUse = (stdin) => gen2(function* () {
   if (agent === undefined)
     return "";
   const reason = yield* try_2(() => denyToolReason(input.tool_name, input.tool_input)).pipe(orElseSucceed2(() => UNREADABLE));
-  if (agent.id !== undefined)
-    yield* observe(agent.id, {
+  if (agent.id !== undefined) {
+    const directory = stateDirPath();
+    yield* forkDetach2(observe(agent.id, {
       agent_type: input.agent_type,
       effort: effortOf(input),
       transcript: subagentTranscript(input)
-    });
+    }, directory));
+  }
   return reason === undefined ? "" : deny(reason);
 });
 
@@ -10632,9 +11048,14 @@ var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
 var PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}";
-var pointer = (cli) => `Full state: ${cli} intent show; ${cli} assignment list`;
+var pointer = (cli) => `Full state: ${cli} intent list; ${cli} assignment list --all`;
 var RULES_CUT = `
 [core rules cut to fit; full text in agents/holyclaude.md]`;
+var WHOLE = Number.POSITIVE_INFINITY;
+var TEXT_LIMITS = [WHOLE, 2000, 400, 120, 0];
+var ROWS_DROP_AT = 120;
+var MAX_STATE_FILE_BYTES = 64 * 1024 * 1024;
+var STATE_LOAD_BUDGET = "10 seconds";
 var clip = (text, max) => max <= 0 ? "" : text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
 var cutRules = (rules, room) => {
   const cut = rules.slice(0, room);
@@ -10642,48 +11063,49 @@ var cutRules = (rules, room) => {
 `);
   return newline > 0 ? cut.slice(0, newline) : cut;
 };
-var row = (assignment) => ({
+var row = (assignment, textLimit) => ({
   id: assignment.id,
   role: assignment.role,
   state: assignment.state,
   agent_id: assignment.agent_id,
   rev: assignment.intent_revision,
-  objective: clip(assignment.objective.replace(/\s+/g, " "), 60)
+  objective: clip(assignment.objective.replace(/\s+/g, " "), textLimit)
 });
-var open2 = (state) => sortedById(state.assignments).filter((assignment) => assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null);
-var summaryOf = (state) => {
+var open2 = (state) => sortedById(state.assignments).filter(isOpenAssignment);
+var summaryOf = (state, chosen) => {
   const rows = open2(state);
+  const intents = openIntents(state);
+  const inUse = intentInUse(state, chosen);
+  const openCounts = Map.groupBy(rows, (assignment) => assignment.intent_id);
   return {
     rows: rows.length,
-    render: (limit, textLimit) => {
-      const intent = latestIntent(state);
-      return toon({
-        intent: intent === undefined ? null : {
-          id: intent.id,
-          revision: intent.revision,
-          objective: clip(intent.objective, textLimit),
-          requirements: clip(intent.requirements, textLimit)
-        },
-        assignments: rows.slice(0, limit).map(row),
-        ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
-      }).trimEnd();
-    }
+    render: (limit, textLimit) => toon({
+      intents: intents.map((intent) => ({
+        id: intent.id,
+        revision: intent.revision,
+        objective: clip(intent.objective, textLimit),
+        open_assignments: openCounts.get(intent.id)?.length ?? 0
+      })),
+      in_use: inUse === undefined ? null : { id: inUse.id, requirements: clip(inUse.requirements, textLimit) },
+      assignments: rows.slice(0, limit).map((assignment) => row(assignment, textLimit)),
+      ...rows.length > limit ? { more_assignments: rows.length - limit } : {}
+    }).trimEnd()
   };
 };
 var brokenSummary = (message) => ({
   rows: 0,
-  render: () => toon({ state_error: clip(message, 300) }).trimEnd()
+  render: (_rows, textLimit) => toon({ state_error: clip(message, textLimit) }).trimEnd()
 });
 var block = (text) => `State:
 ${text}`;
 var fitSummary = (summary, budget) => {
-  for (const textLimit of [400, 120, 0]) {
+  for (const textLimit of TEXT_LIMITS) {
     let rows = summary.rows;
     for (;; ) {
       const text = summary.render(rows, textLimit);
       if (block(text).length <= budget)
         return block(text);
-      if (rows === 0)
+      if (rows === 0 || textLimit > ROWS_DROP_AT)
         break;
       rows = Math.min(rows - 1, Math.floor(rows * 0.8));
     }
@@ -10691,7 +11113,7 @@ var fitSummary = (summary, budget) => {
   return "";
 };
 var composeContext = (rules, summary, cli) => {
-  const state = block(summary.render(summary.rows, 400));
+  const state = block(summary.render(summary.rows, WHOLE));
   const full = [rules, state].filter((part) => part !== undefined).join(`
 
 `);
@@ -10716,7 +11138,7 @@ var extractRules = (agentFile, root) => {
   const rules = agentFile.slice(start + RULES_START.length, end).trim();
   return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root);
 };
-var sessionStart = (stdin) => gen2(function* () {
+var sessionStart = (stdin, { load = loadState, budget = STATE_LOAD_BUDGET } = {}) => gen2(function* () {
   const root = yield* pluginRoot;
   if (root === undefined)
     return "";
@@ -10728,7 +11150,9 @@ var sessionStart = (stdin) => gen2(function* () {
   }));
   const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "");
   const rules = runsAsMainAgent ? undefined : extractRules(yield* tryPromise2(() => file.text()), root);
-  const summary = yield* loadState(stateDirPath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
+  const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(flatMap2((state) => readActiveIntent(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(orElseSucceed2(() => {
+    return;
+  }), map4((id) => summaryOf(state, id)))), timeoutOption2(budget), map4(getOrElse(() => brokenSummary("the state did not load within the time the hook allows it"))), catch_2((error) => succeed5(brokenSummary(error.message))));
   const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
@@ -10830,7 +11254,6 @@ var verifyAssignment = (id) => gen2(function* () {
 });
 
 // src/commands.ts
-var truncate = (text, max) => text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
 var summaryRow = (assignment) => ({
   id: assignment.id,
   role: assignment.role,
@@ -10838,7 +11261,14 @@ var summaryRow = (assignment) => ({
   rev: assignment.intent_revision,
   agent_id: assignment.agent_id,
   accepted: assignment.acceptance !== null,
-  objective: truncate(assignment.objective.replace(/\s+/g, " "), 60)
+  objective: assignment.objective.replace(/\s+/g, " ")
+});
+var intentRow = (intent, state) => ({
+  id: intent.id,
+  state: intent.state,
+  revision: intent.revision,
+  objective: intent.objective.replace(/\s+/g, " "),
+  open_assignments: state.assignments.filter((assignment) => assignment.intent_id === intent.id && isOpenAssignment(assignment)).length
 });
 var dispatchInfo = (assignment) => {
   const route = routeFor(assignment.role);
@@ -10852,17 +11282,21 @@ var dispatchInfo = (assignment) => {
     rev: assignment.intent_revision
   };
 };
-var activeIntent = (state, id) => gen2(function* () {
-  if (id !== undefined)
-    return yield* findIntent(state, id);
-  const latest = latestIntent(state);
-  return latest ?? (yield* new NoIntent({ message: "No Intent exists yet" }));
+var storedIntent = suspend2(() => readActiveIntent(stateDirPath())).pipe(orElseSucceed2(() => {
+  return;
+}));
+var activeIntent = (state, id) => (id === undefined ? storedIntent : succeed5(undefined)).pipe(flatMap2((stored) => resolveIntent(state, id, stored)));
+var agreedIntent = (usage, source, named, flag) => gen2(function* () {
+  if (named !== undefined && flag !== undefined && named !== flag)
+    return yield* usageError(usage, `${source} ${named} and --intent ${flag} name different Intents`);
+  return named ?? flag;
 });
+var INTENT_FLAG = { intent: "string" };
 var read = (use) => loadStateFile.pipe(flatMap2(use));
 var change = (transition) => suspend2(() => updateState(stateDirPath(), transition));
 var changeOwn = (id, transition) => change((state, { cloneId }) => cloneId.pipe(flatMap2((own) => refuseOtherClone(state, id, own)), andThen2(transition(state))));
 var need = (stdin, command) => stdin.pipe(flatMap2((text) => text.trim() === "" ? fail5(new StdinMissing({ command })) : succeed5(text)));
-var fromStdin = (schema, stdin, command) => need(stdin, command).pipe(flatMap2(decodeInput(schema)));
+var fromStdin = (schema, stdin, command) => need(stdin, command).pipe(flatMap2(decodeJsonStrict(schema)));
 var IntentUpdateBody = Struct({
   id: optionalKey2(Text),
   objective: optionalKey2(Text),
@@ -10891,39 +11325,130 @@ var optionalChoice = (schema, value) => gen2(function* () {
 });
 var withRef = (id) => decodeStrict(AssignmentRef)({ assignment_id: id });
 var cmd = (command) => command;
+var SHOW_USAGE = "intent show [id | --intent <id>]";
 var intentShow = cmd({
   path: ["intent", "show"],
-  usage: "intent show [id]",
-  summary: "show the active Intent (latest, or by id)",
+  usage: SHOW_USAGE,
+  summary: "show the Intent in use, or the one named",
   root: false,
-  flags: {},
+  flags: INTENT_FLAG,
   positionals: 1,
   optional: true,
-  run: (args) => read((state) => activeIntent(state, args.positionals[0])).pipe(map4((intent) => ({ value: intent })))
+  run: (args) => agreedIntent(SHOW_USAGE, "Argument", args.positionals[0], stringFlag(args, "intent")).pipe(flatMap2((id) => read((state) => activeIntent(state, id))), map4((intent) => ({ value: intent })))
+});
+var INTENT_LIST_USAGE = `intent list [--state ${IntentState.literals.join("|")}]`;
+var intentList = cmd({
+  path: ["intent", "list"],
+  usage: INTENT_LIST_USAGE,
+  summary: "list Intents with state, revision, objective and open Assignments",
+  root: false,
+  flags: { state: "string" },
+  positionals: 0,
+  run: (args) => gen2(function* () {
+    const value = stringFlag(args, "state");
+    const wanted = yield* optionalChoice(IntentState, value).pipe(mapError2(() => usageError(INTENT_LIST_USAGE, `State ${value} is not one of ${IntentState.literals.join("|")}`)));
+    return yield* read((state) => succeed5({
+      value: {
+        intents: sortedById(state.intents).filter((intent) => wanted === undefined || intent.state === wanted).map((intent) => intentRow(intent, state))
+      }
+    }));
+  })
+});
+var intentUse = cmd({
+  path: ["intent", "use"],
+  usage: "intent use <id>",
+  summary: "work on this Intent in this clone; the choice stays local",
+  root: true,
+  flags: {},
+  positionals: 1,
+  run: (args) => change((state, { useIntent }) => gen2(function* () {
+    const intent = yield* findIntent(state, args.positionals[0] ?? "");
+    yield* requireOpen(intent);
+    yield* useIntent(intent.id);
+    return { state, value: intentRow(intent, state) };
+  })).pipe(map4((row) => ({ value: row })))
+});
+var CLOSE_USAGE = "intent close [--intent <id>] --reason <text> [--allow-unaccepted <reason>]";
+var intentClose = cmd({
+  path: ["intent", "close"],
+  usage: CLOSE_USAGE,
+  summary: "close the Intent with a reason; refused while its Assignments run or Succeeded ones are unaccepted (--allow-unaccepted <reason> closes anyway)",
+  root: true,
+  flags: { ...INTENT_FLAG, reason: "string", "allow-unaccepted": "string" },
+  positionals: 0,
+  run: (args) => gen2(function* () {
+    const reason = yield* flagValue(args, "reason", CLOSE_USAGE);
+    const at = yield* nowIso;
+    const allowed = stringFlag(args, "allow-unaccepted");
+    const intent = yield* change((state) => activeIntent(state, stringFlag(args, "intent")).pipe(flatMap2((target) => decodeStrict(CloseIntentInput)({
+      id: target.id,
+      reason,
+      at,
+      ...allowed === undefined ? {} : { allow_unaccepted: allowed }
+    })), flatMap2((input) => closeIntent(state, input))));
+    return { value: intent };
+  })
+});
+var REOPEN_USAGE = "intent reopen [--intent <id>]";
+var closedIntent = (state, id) => gen2(function* () {
+  if (id !== undefined)
+    return yield* findIntent(state, id);
+  const closed = sortedById(state.intents).filter((intent) => intent.state === "closed");
+  const [only] = closed;
+  if (closed.length === 1 && only !== undefined)
+    return only;
+  return yield* usageError(REOPEN_USAGE, closed.length === 0 ? "No Intent is closed" : `Several Intents are closed; pass --intent <id>. Closed Intents: ${closed.map((intent) => intent.id).join(", ")}`);
+});
+var intentReopen = cmd({
+  path: ["intent", "reopen"],
+  usage: REOPEN_USAGE,
+  summary: "open a closed Intent again (the only closed one, else --intent) and put it in use; the revision bumps; prints the Intent it replaced",
+  root: true,
+  flags: INTENT_FLAG,
+  positionals: 0,
+  run: (args) => change((state, { useIntent }) => gen2(function* () {
+    const target = yield* closedIntent(state, stringFlag(args, "intent"));
+    const replaced = intentInUse(state, yield* storedIntent);
+    const reopened = yield* reopenIntent(state, target.id);
+    yield* useIntent(reopened.value.id);
+    return {
+      state: reopened.state,
+      value: { ...reopened.value, in_use: reopened.value.id, replaced: replaced?.id ?? null }
+    };
+  })).pipe(map4((intent) => ({ value: intent })))
 });
 var intentCreate = cmd({
   path: ["intent", "create"],
   usage: "intent create",
-  summary: "record a new Intent at revision 1",
+  summary: "record a new Intent at revision 1 and put it in use; prints the Intent it replaced",
   input: '{"objective":"...","requirements":"..."?}',
   root: true,
   flags: {},
   positionals: 0,
-  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state) => createIntent(state, input))), map4((intent) => ({ value: intent })))
+  run: (_args, stdin) => fromStdin(CreateIntentInput, stdin, "intent create").pipe(flatMap2((input) => change((state, { useIntent }) => gen2(function* () {
+    const replaced = intentInUse(state, yield* storedIntent);
+    const created = yield* createIntent(state, input);
+    yield* useIntent(created.value.id);
+    return {
+      state: created.state,
+      value: { ...created.value, in_use: created.value.id, replaced: replaced?.id ?? null }
+    };
+  }))), map4((intent) => ({ value: intent })))
 });
+var UPDATE_USAGE = "intent update [--intent <id>] [--material]";
 var intentUpdate = cmd({
   path: ["intent", "update"],
-  usage: "intent update [--material]",
+  usage: UPDATE_USAGE,
   summary: "edit the Intent; --material bumps the revision",
   input: '{"id":"..."?,"objective":"..."?,"requirements":"..."?}',
   root: true,
-  flags: { material: "boolean" },
+  flags: { ...INTENT_FLAG, material: "boolean" },
   positionals: 0,
-  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => change((state) => activeIntent(state, body.id).pipe(flatMap2((intent) => updateIntent(state, {
+  run: (args, stdin) => fromStdin(IntentUpdateBody, stdin, "intent update").pipe(flatMap2((body) => agreedIntent(UPDATE_USAGE, "JSON id", body.id, stringFlag(args, "intent")).pipe(flatMap2((id) => change((state) => activeIntent(state, id).pipe(flatMap2((intent) => updateIntent(state, {
     ...body,
     id: intent.id,
     material: booleanFlag(args, "material")
-  }))))), map4((intent) => ({ value: intent })))
+  }))))))), map4((intent) => ({ value: intent })))
 });
 var assignmentShow = cmd({
   path: ["assignment", "show"],
@@ -10934,7 +11459,7 @@ var assignmentShow = cmd({
   positionals: 1,
   run: (args) => withRef(args.positionals[0]).pipe(flatMap2((ref) => read((state) => findAssignment(state, ref.assignment_id))), map4((assignment) => ({ value: assignment })))
 });
-var LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}]`;
+var LIST_USAGE = `assignment list [--state ${AssignmentState.literals.join("|")}] [--intent <id> | --all]`;
 var stateFilter = (value) => gen2(function* () {
   if (value === undefined)
     return;
@@ -10943,14 +11468,21 @@ var stateFilter = (value) => gen2(function* () {
 var assignmentList = cmd({
   path: ["assignment", "list"],
   usage: LIST_USAGE,
-  summary: "list Assignments, one row each",
+  summary: "list the Assignments of the Intent in use (--intent: another, --all: every one)",
   root: false,
-  flags: { state: "string" },
+  flags: { ...INTENT_FLAG, state: "string", all: "boolean" },
   positionals: 0,
-  run: (args) => stateFilter(stringFlag(args, "state")).pipe(flatMap2((wanted) => read((state) => {
-    const rows = sortedById(state.assignments).filter((assignment) => wanted === undefined || assignment.state === wanted).map(summaryRow);
-    return succeed5({ value: { assignments: rows } });
-  })))
+  run: (args) => gen2(function* () {
+    const wanted = yield* stateFilter(stringFlag(args, "state"));
+    const everything = booleanFlag(args, "all");
+    if (everything && stringFlag(args, "intent") !== undefined)
+      return yield* usageError(LIST_USAGE, "Pick one of --intent <id> or --all");
+    return yield* read((state) => gen2(function* () {
+      const scope = everything ? undefined : (yield* activeIntent(state, stringFlag(args, "intent"))).id;
+      const rows = sortedById(state.assignments).filter((assignment) => scope === undefined || assignment.intent_id === scope).filter((assignment) => wanted === undefined || assignment.state === wanted).map((assignment) => everything ? { intent: assignment.intent_id, ...summaryRow(assignment) } : summaryRow(assignment));
+      return { value: { assignments: rows } };
+    }));
+  })
 });
 var assignmentCreate = cmd({
   path: ["assignment", "create"],
@@ -10964,19 +11496,21 @@ var assignmentCreate = cmd({
 });
 var assignmentReserve = cmd({
   path: ["assignment", "reserve"],
-  usage: "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]...",
+  usage: "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]... [--worktree <dir>]",
   summary: "revalidate and reserve (Ready to Running); prints the dispatch parameters",
   root: true,
-  flags: { capabilities: "string", root: "list" },
+  flags: { capabilities: "string", root: "list", worktree: "string" },
   positionals: 1,
   run: (args) => gen2(function* () {
     const id = args.positionals[0];
     const given = stringFlag(args, "capabilities");
     const roots = listFlag(args, "root");
+    const worktree = yield* openWorktree(stringFlag(args, "worktree") ?? projectRoot());
     const reserved = yield* change((state, { cloneId }) => gen2(function* () {
       const context = {
-        projectRoot: projectRoot(),
-        writableRoots: roots.length > 0 ? roots : [projectRoot()],
+        projectRoot: worktree.root,
+        writableRoots: roots.length > 0 ? roots : [worktree.root],
+        worktree: worktree.key,
         cloneId: yield* cloneId
       };
       const assignment = yield* findAssignment(state, id ?? "");
@@ -11077,15 +11611,19 @@ var assignmentCancel = cmd({
 var AcceptBody = AcceptanceRecord;
 var assignmentAccept = cmd({
   path: ["assignment", "accept"],
-  usage: "assignment accept <id>",
-  summary: "record the evidence review of a Succeeded Assignment",
+  usage: "assignment accept <id> [--carry-forward]",
+  summary: "record the evidence review of a Succeeded Assignment; --carry-forward accepts one made for an earlier revision at the live one",
   input: '{"intent_revision":N,"rationale":"...","criteria_evidence":{"<label>":"..."},"required_evidence":{"<label>":"..."}}',
   root: true,
-  flags: {},
+  flags: { "carry-forward": "boolean" },
   positionals: 1,
   run: (args, stdin) => gen2(function* () {
     const acceptance = yield* fromStdin(AcceptBody, stdin, "assignment accept");
-    const done = yield* change((state) => accept(state, { assignment_id: args.positionals[0] ?? "", acceptance }));
+    const done = yield* change((state) => accept(state, {
+      assignment_id: args.positionals[0] ?? "",
+      acceptance,
+      carry_forward: booleanFlag(args, "carry-forward")
+    }));
     return { value: summaryRow(done) };
   })
 });
@@ -11167,12 +11705,13 @@ var routes2 = cmd({
 var reconcileList = cmd({
   path: ["reconcile"],
   usage: "reconcile",
-  summary: "list Running rows to confirm by agent id, and those running elsewhere",
+  summary: "list Running rows to confirm by agent id, those running elsewhere, and closed Intents with open work",
   root: false,
   flags: {},
   positionals: 0,
   run: () => read((state) => suspend2(() => readCloneId(stateDirPath())).pipe(map4((cloneId) => {
     const { local, elsewhere } = reconcile(state, cloneId);
+    const stranded = closedWithOpenWork(state);
     return {
       value: {
         running: local.map(summaryRow),
@@ -11180,6 +11719,13 @@ var reconcileList = cmd({
           running_elsewhere: elsewhere.map((row) => ({
             ...summaryRow(row),
             clone: row.clone_id
+          }))
+        },
+        ...stranded.length === 0 ? {} : {
+          closed_with_open_work: stranded.map(({ intent, assignments }) => ({
+            intent: intent.id,
+            close_reason: intent.close_reason ?? null,
+            assignments: assignments.map(summaryRow)
           }))
         }
       }
@@ -11262,6 +11808,10 @@ var hookPostToolUse = cmd({
 });
 var COMMANDS = [
   intentShow,
+  intentList,
+  intentUse,
+  intentClose,
+  intentReopen,
   intentCreate,
   intentUpdate,
   assignmentShow,
@@ -11292,13 +11842,14 @@ var HINTS = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
   InvalidPath: "Use relative portable paths such as packages/cli/src.",
+  InvalidWorktree: "Give --worktree an existing directory, such as the path of a git worktree.",
   StaleRevision: "Reread with `holyclaude intent show`, reassess the work at the live revision, then retry.",
   NoRevision: "Set a valid revision with `holyclaude intent update --material`.",
   InvalidTransition: "Check the state with `holyclaude assignment show <id>` and use the command that fits it.",
   DispatchRefused: "Fix the condition named in the message, then reserve again.",
   Conflict: "A different record is stored; compare with `holyclaude assignment show <id>`.",
   InsufficientEvidence: "Cover exactly the declared labels in criteria_evidence and required_evidence.",
-  TooLarge: "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
+  TooLarge: "A file the command reads is over its read bound (the message names the file and the bound); trim it, move it away, or restore it from version control.",
   StateLocked: "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
   StateIo: "Check HOLYCLAUDE_STATE_DIR or CLAUDE_PROJECT_DIR and the file permissions.",
@@ -11307,7 +11858,10 @@ var HINTS = {
   OwnedElsewhere: "Another clone reserved this Assignment. Settle it from there, or with `holyclaude reconcile resolve <id>` once you have evidence about its worker.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError: "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
-  NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
+  NoActiveIntent: "Choose with `holyclaude intent use <id>`, or name one with --intent <id>. With none open, run `holyclaude intent create` or `holyclaude intent reopen --intent <id>`.",
+  IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
+  IntentBusy: "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
+  UnacceptedAssignments: "Review and accept them with `holyclaude assignment accept <id>`, then close again. To close with work left unaccepted, add `--allow-unaccepted <reason>`.",
   NotBound: "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>."
 };
@@ -11326,9 +11880,7 @@ var errorFields = (error) => {
   const tag = typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Error";
   const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error);
   const hint = error instanceof Usage ? error.hint : HINTS[tag] ?? "Run `holyclaude --help` for the commands.";
-  return { error: tag, message: message.split(`
-`).slice(0, 6).join(`
-`).slice(0, 600), hint };
+  return { error: tag, message, hint };
 };
 var stdinOf = (limit) => suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ command: "this command" })) : tryPromise2({
   try: () => (limit === undefined ? Bun.stdin : Bun.stdin.slice(0, limit + 1)).text(),

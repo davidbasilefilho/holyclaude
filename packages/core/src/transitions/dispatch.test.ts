@@ -34,12 +34,12 @@ const assignment = (ownershipPaths: ReadonlyArray<string>): Assignment => ({
 
 const stateWith = (ownershipPaths: ReadonlyArray<string>): State => ({
   version: 1,
-  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1 }],
+  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1, state: "open" }],
   assignments: [assignment(ownershipPaths)],
   workers: [],
 })
 
-const context = { projectRoot: resolve("workspace"), writableRoots: ["src"] }
+const context = { projectRoot: resolve("workspace"), writableRoots: ["src"], worktree: "w" }
 const input = { assignment_id: "assignment-0001", capabilities: ["Write"] } as const
 
 describe("reserve and the writable roots", () => {
@@ -100,5 +100,36 @@ describe("reserve and the ownership of other clones", () => {
     expect((await reserveWith(holder("clone-other"), "clone-mine"))._tag).toBe("None")
     // A clone that has no id yet cannot own a stamped row either.
     expect((await reserveWith(holder("clone-other"), undefined))._tag).toBe("None")
+  })
+})
+
+describe("reserve and the worktree of the holder", () => {
+  const holder = (worktree?: string): Assignment => ({
+    ...assignment(["src/a.ts"]),
+    id: "assignment-0002",
+    state: "Running",
+    ...(worktree === undefined ? {} : { worktree }),
+  })
+  const reserveBesides = (row: Assignment, worktree: string) => {
+    const base = stateWith(["src/a.ts"])
+    return Effect.runPromise(
+      reserve({ ...base, assignments: [...base.assignments, row] }, input, {
+        ...context,
+        worktree,
+      }).pipe(Effect.option),
+    )
+  }
+
+  test("a holder in the same worktree conflicts", async () => {
+    expect((await reserveBesides(holder("w1"), "w1"))._tag).toBe("None")
+  })
+
+  test("a holder in another worktree does not", async () => {
+    const reserved = await reserveBesides(holder("w1"), "w2")
+    expect(reserved._tag === "Some" && reserved.value.value.worktree).toBe("w2")
+  })
+
+  test("a holder without a key could be anywhere, so it conflicts", async () => {
+    expect((await reserveBesides(holder(), "w2"))._tag).toBe("None")
   })
 })

@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Narrow Reviewer.code re-review of E's repair (overwrite guard, bounded slug, folder mapping, stale folder, retry, folding).",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9px0f1-rx09-repair.diff in worktree e; read it and the code it touches."
+  ],
+  "constraints": [
+    "Read-only; never run against a live .holyclaude; outside the repair lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "The repair fixes the security findings F1-F3 and the code-review items without new defects; F1 cannot be reached by any crafted id, name or objective, including within one persist run and through legacy migration.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9px0f1-rx09"
+    ],
+    "independent_from": [
+      "assignment-0mv9px0f1-rx09",
+      "assignment-0mv9pb5se-y5pd",
+      "assignment-0mv9pnsje-pntf",
+      "assignment-0mv9pnspx-6xw4"
+    ]
+  },
+  "id": "assignment-0mv9q56tw-wmn1",
+  "state": "Succeeded",
+  "result": "No blockers in the repair; F1-F3 fixed; gates pass, bundle same, 11 tests fail pre-repair. Optional: folder-mismatch race not retried, unchanged names not checked against new ids, claim failure after a folder move, Windows EPERM mapping, more fold letters.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Narrow code re-review with pre-repair run; optional items folded into the second repair with the security findings.",
+    "criteria_evidence": {
+      "The repair fixes the security findings F1-F3 and the code-review items without new defects; F1 cannot be reached by any crafted id, name or objective, including within one persist run and through legacy migration.": "met; optional findings listed",
+      "Blockers and optional findings reported with evidence.": "met; optional findings listed"
+    },
+    "required_evidence": {
+      "findings": "findings and checks reported",
+      "checks-run": "findings and checks reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

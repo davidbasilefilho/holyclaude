@@ -39,6 +39,19 @@
   "id": "assignment-0mv9p0lsh-llyj",
   "state": "Succeeded",
   "result": "Policies now once in holyclaude.md; SKILL.md -376 and README -249 bytes with command shapes and behavior only; fmt and 1229 tests pass.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "De-duplication verified by re-review 7aij; its one blocker (continue-work) fixed and re-reviewed (rxdn).",
+    "criteria_evidence": {
+      "The pull-before-closing rule with its reason and the carry-forward policy (rationale says why the work holds; validation Assignment when the change touched the work's files) each appear once, in plugin/agents/holyclaude.md.": "verified by re-reviews 7aij and rxdn",
+      "SKILL.md keeps only the command shapes and inputs for accept --carry-forward, intent close --allow-unaccepted and reopen, pointing to the root prompt for policy where needed; README keeps only the user-facing behavior.": "verified by re-reviews 7aij and rxdn",
+      "fmt and full test pass; wc -c before and after per file.": "verified by re-reviews 7aij and rxdn"
+    },
+    "required_evidence": {
+      "checks-run": "reported; repair diff saved",
+      "diff-file": "reported; repair diff saved",
+      "sizes": "reported; repair diff saved"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

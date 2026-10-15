@@ -25,6 +25,16 @@ export class InvalidPath extends Data.TaggedError("InvalidPath")<{
   }
 }
 
+/** The worktree given to reserve is not an existing directory. */
+export class InvalidWorktree extends Data.TaggedError("InvalidWorktree")<{
+  readonly path: string
+  readonly reason: string
+}> {
+  override get message() {
+    return `Invalid worktree "${this.path}": ${this.reason}`
+  }
+}
+
 /** A revision does not equal the live Intent revision. Reread the Intent and reassess. */
 export class StaleRevision extends Data.TaggedError("StaleRevision")<{
   readonly given: number
@@ -32,6 +42,48 @@ export class StaleRevision extends Data.TaggedError("StaleRevision")<{
 }> {
   override get message() {
     return `Stale intent revision ${this.given}; the live revision is ${this.live}`
+  }
+}
+
+/** The Intent is closed, so it authorizes no dispatch and cannot be the one in use. */
+export class IntentClosed extends Data.TaggedError("IntentClosed")<{
+  readonly intent_id: string
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} is closed; \`holyclaude intent reopen --intent ${this.intent_id}\` opens it again`
+  }
+}
+
+/** The Intent cannot close while Assignments of it are Running. */
+export class IntentBusy extends Data.TaggedError("IntentBusy")<{
+  readonly intent_id: string
+  readonly running: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} has Running Assignments (${this.running.join(", ")}); settle them before closing it`
+  }
+}
+
+/** The Intent cannot close while Succeeded Assignments of it wait for the root's acceptance. */
+export class UnacceptedAssignments extends Data.TaggedError("UnacceptedAssignments")<{
+  readonly intent_id: string
+  readonly unaccepted: ReadonlyArray<string>
+}> {
+  override get message() {
+    return `Intent ${this.intent_id} has Succeeded Assignments that were never accepted (${this.unaccepted.join(", ")}); accept them before closing it`
+  }
+}
+
+/** No Intent was named, none is in use, and the open ones are not exactly one. */
+export class NoActiveIntent extends Data.TaggedError("NoActiveIntent")<{
+  readonly open: ReadonlyArray<{ readonly id: string; readonly objective: string }>
+}> {
+  override get message() {
+    return this.open.length === 0
+      ? "No Intent is open; create one with `holyclaude intent create`, or reopen one with `holyclaude intent reopen --intent <id>`"
+      : `Several Intents are open and none is in use; run \`holyclaude intent use <id>\` or pass --intent <id>. Open Intents: ${this.open
+          .map((intent) => `${intent.id} (${intent.objective.replace(/\s+/g, " ")})`)
+          .join("; ")}`
   }
 }
 
@@ -91,7 +143,7 @@ export class InsufficientEvidence extends Data.TaggedError("InsufficientEvidence
   }
 }
 
-/** A state file or an input exceeds its size cap. */
+/** A file read or an input exceeds its size bound. */
 export class TooLarge extends Data.TaggedError("TooLarge")<{
   readonly subject: string
   readonly bytes: number

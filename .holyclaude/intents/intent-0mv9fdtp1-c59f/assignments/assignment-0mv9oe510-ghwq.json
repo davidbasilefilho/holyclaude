@@ -48,6 +48,25 @@
   "id": "assignment-0mv9oe510-ghwq",
   "state": "Succeeded",
   "result": "A built: accept --carry-forward (no-op at live revision), intent close refuses with UnacceptedAssignments and --allow-unaccepted <reason> folded into close_reason, reopen sets in use and reports in_use/replaced, readJson reports CorruptRecord for git conflict markers, reconcile closed_with_open_work rows; prompt, skill and README updated; 1229 tests pass; one unidentified failure in a first full run did not recur.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Independent review c9hc: no blockers, mutation checks per behavior, suite twice green, bundle identical; prose duplication repaired and re-reviewed.",
+    "criteria_evidence": {
+      "assignment accept --carry-forward accepts a Succeeded Assignment whose intent_revision is below the live revision when the acceptance's intent_revision equals the live one; without the flag the old StaleRevision refusal stands; the flag on a same-revision Assignment is refused or a no-op, stated and tested; rationale must be non-blank.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "intent close refuses with a tagged error listing every Succeeded-unaccepted Assignment of that Intent; an override flag (name of your choice, e.g. --allow-unaccepted <reason>) closes anyway and records the reason in close_reason without a new field.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "intent reopen sets the reopened Intent in use and reports in_use and replaced like intent create; intent use refuses a closed Intent (add the test if missing).": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "Loading a record that contains git conflict markers fails with an error naming the record path and saying to resolve the conflict in git, then rerun.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "reconcile lists a closed Intent that still has Ready or Running Assignments as a flagged row.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "Root prompt plugin/agents/holyclaude.md and plugin/skills/assignments/SKILL.md gain: carry-forward use (rationale says why the work still holds; dispatch a validation Assignment instead when the change touched the work's files), close override, and pull before closing an Intent. Compact; state the wc -c size change. The core-rules block between the markers stays within its existing size unless a line must go there.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "README documents the new flags briefly.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn",
+      "Tests cover each behavior; bundle rebuilt; fmt, lint, typecheck and full test pass.": "verified by review c9hc (tests, mutations, bundle cmp) and re-reviews 7aij, rxdn"
+    },
+    "required_evidence": {
+      "checks-run": "reported by writer and confirmed by review c9hc",
+      "changed-paths": "reported by writer and confirmed by review c9hc",
+      "diff-file": "reported by writer and confirmed by review c9hc",
+      "tests-added": "reported by writer and confirmed by review c9hc"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

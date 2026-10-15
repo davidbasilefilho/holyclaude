@@ -1,14 +1,17 @@
 import { join } from "node:path"
 
 import {
-  latestIntent,
+  intentInUse,
+  isOpenAssignment,
   loadState,
+  openIntents,
+  readActiveIntent,
   sortedById,
   stateDirPath,
   type Assignment,
   type State,
 } from "@holyclaude/core"
-import { Effect } from "effect"
+import { Effect, Option, type Duration } from "effect"
 
 import { PLUGIN_NAME, pluginRoot } from "../fingerprint.ts"
 import { toon } from "../toon.ts"
@@ -27,8 +30,40 @@ const RULES_START = "<!-- holyclaude:core-rules:start -->"
 const RULES_END = "<!-- holyclaude:core-rules:end -->"
 const PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 /** The one-line pointer to the CLI, which `cli` names as the root should run it. */
-const pointer = (cli: string) => `Full state: ${cli} intent show; ${cli} assignment list`
+const pointer = (cli: string) => `Full state: ${cli} intent list; ${cli} assignment list --all`
 const RULES_CUT = "\n[core rules cut to fit; full text in agents/holyclaude.md]"
+
+/** The text limit of a summary that is shown whole. */
+const WHOLE = Number.POSITIVE_INFINITY
+
+/** The text limits a tight summary tries in turn, each keeping the text that fits under it. */
+const TEXT_LIMITS = [WHOLE, 2000, 400, 120, 0]
+
+/**
+ * Rows are dropped only once the text limit is down to this, so a row's objective is shortened
+ * before the row, and its id and agent id, is lost.
+ */
+const ROWS_DROP_AT = 120
+
+/**
+ * Most of one state file that SessionStart reads, in bytes. The state belongs to the project, but a
+ * repository can commit files into it, and this hook runs at every start: a file over it fails the
+ * load, and the context carries the rules and a state error instead of the state.
+ */
+export const MAX_STATE_FILE_BYTES = 64 * 1024 * 1024
+
+/**
+ * How long SessionStart waits for the state before it gives up. The hook's own timeout is 30
+ * seconds, and running past it would drop the injected rules, so a slow load degrades to the rules
+ * and a state error, as an oversized file does.
+ */
+export const STATE_LOAD_BUDGET: Duration.Input = "10 seconds"
+
+/** What {@link sessionStart} can be told: the state load, and how long to wait for it. */
+export interface SessionStartOptions {
+  readonly load?: typeof loadState
+  readonly budget?: Duration.Input
+}
 
 /** Shortens text to at most `max` characters, ending in an ellipsis when it was cut. */
 export const clip = (text: string, max: number) =>
@@ -40,67 +75,72 @@ const cutRules = (rules: string, room: number) => {
   return newline > 0 ? cut.slice(0, newline) : cut
 }
 
-const row = (assignment: Assignment) => ({
+const row = (assignment: Assignment, textLimit: number) => ({
   id: assignment.id,
   role: assignment.role,
   state: assignment.state,
   agent_id: assignment.agent_id,
   rev: assignment.intent_revision,
-  objective: clip(assignment.objective.replace(/\s+/g, " "), 60),
+  objective: clip(assignment.objective.replace(/\s+/g, " "), textLimit),
 })
 
-/** Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
-const open = (state: State) =>
-  sortedById(state.assignments).filter(
-    (assignment) =>
-      assignment.state === "Running" ||
-      (assignment.state === "Succeeded" && assignment.acceptance === null),
-  )
+/** Ready, Running and Succeeded-but-unaccepted Assignments, the ones that need the root's attention. */
+const open = (state: State) => sortedById(state.assignments).filter(isOpenAssignment)
 
-/** A state summary that can be rendered with fewer rows and shorter text. */
+/** A state summary that is whole until the budget asks for fewer rows and shorter text. */
 interface Summary {
   readonly rows: number
   readonly render: (rows: number, textLimit: number) => string
 }
 
-const summaryOf = (state: State): Summary => {
+/**
+ * The summary of a state: every open Intent with its open Assignments counted, the requirements of
+ * the one in use (the clone's stored choice while it is open, else the only open Intent), and the
+ * Assignments that need attention.
+ */
+const summaryOf = (state: State, chosen: string | undefined): Summary => {
   const rows = open(state)
+  const intents = openIntents(state)
+  const inUse = intentInUse(state, chosen)
+  const openCounts = Map.groupBy(rows, (assignment) => assignment.intent_id)
   return {
     rows: rows.length,
-    render: (limit, textLimit) => {
-      const intent = latestIntent(state)
-      return toon({
-        intent:
-          intent === undefined
+    render: (limit, textLimit) =>
+      toon({
+        intents: intents.map((intent) => ({
+          id: intent.id,
+          revision: intent.revision,
+          objective: clip(intent.objective, textLimit),
+          open_assignments: openCounts.get(intent.id)?.length ?? 0,
+        })),
+        in_use:
+          inUse === undefined
             ? null
-            : {
-                id: intent.id,
-                revision: intent.revision,
-                objective: clip(intent.objective, textLimit),
-                requirements: clip(intent.requirements, textLimit),
-              },
-        assignments: rows.slice(0, limit).map(row),
+            : { id: inUse.id, requirements: clip(inUse.requirements, textLimit) },
+        assignments: rows.slice(0, limit).map((assignment) => row(assignment, textLimit)),
         ...(rows.length > limit ? { more_assignments: rows.length - limit } : {}),
-      }).trimEnd()
-    },
+      }).trimEnd(),
   }
 }
 
 const brokenSummary = (message: string): Summary => ({
   rows: 0,
-  render: () => toon({ state_error: clip(message, 300) }).trimEnd(),
+  render: (_rows, textLimit) => toon({ state_error: clip(message, textLimit) }).trimEnd(),
 })
 
 const block = (text: string) => `State:\n${text}`
 
-/** Shrinks the state summary: all rows first, then fewer rows, then shorter text, then nothing. */
+/**
+ * Shrinks the state summary: the text of the Intent and the rows first, step by step, keeping every
+ * row; fewer rows only once the text is down to {@link ROWS_DROP_AT}; then nothing.
+ */
 const fitSummary = (summary: Summary, budget: number): string => {
-  for (const textLimit of [400, 120, 0]) {
+  for (const textLimit of TEXT_LIMITS) {
     let rows = summary.rows
     for (;;) {
       const text = summary.render(rows, textLimit)
       if (block(text).length <= budget) return block(text)
-      if (rows === 0) break
+      if (rows === 0 || textLimit > ROWS_DROP_AT) break
       rows = Math.min(rows - 1, Math.floor(rows * 0.8))
     }
   }
@@ -113,7 +153,7 @@ const fitSummary = (summary: Summary, budget: number): string => {
  * their end, only when they cannot fit even beside the pointer.
  */
 const composeContext = (rules: string | undefined, summary: Summary, cli: string): string => {
-  const state = block(summary.render(summary.rows, 400))
+  const state = block(summary.render(summary.rows, WHOLE))
   const full = [rules, state].filter((part) => part !== undefined).join("\n\n")
   if (full.length <= CAP) return full
   const tail = `\n\n${pointer(cli)}`
@@ -124,12 +164,16 @@ const composeContext = (rules: string | undefined, summary: Summary, cli: string
   return `${body.join("\n\n")}${tail}`.trimStart()
 }
 
-/** Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. */
+/**
+ * Composes the SessionStart context for a state: rules, summary and, if cut, the pointer. `chosen`
+ * is the id this clone stored with `intent use`.
+ */
 export const composeForState = (
   rules: string | undefined,
   state: State,
   cli = "holyclaude",
-): string => composeContext(rules, summaryOf(state), cli)
+  chosen?: string,
+): string => composeContext(rules, summaryOf(state, chosen), cli)
 
 /**
  * Pulls the text between the core-rules markers out of the root agent file. Claude Code substitutes
@@ -151,7 +195,10 @@ export const extractRules = (agentFile: string, root?: string): string | undefin
  * system prompt carries them; any other payload, or one that cannot be read, gets them, because
  * then this is the root's only copy. Emits nothing when the agent file is absent.
  */
-export const sessionStart = (stdin: string) =>
+export const sessionStart = (
+  stdin: string,
+  { load = loadState, budget = STATE_LOAD_BUDGET }: SessionStartOptions = {},
+) =>
   Effect.gen(function* () {
     const root = yield* pluginRoot
     if (root === undefined) return ""
@@ -162,8 +209,20 @@ export const sessionStart = (stdin: string) =>
     const rules = runsAsMainAgent
       ? undefined
       : extractRules(yield* Effect.tryPromise(() => file.text()), root)
-    const summary = yield* loadState(stateDirPath()).pipe(
-      Effect.map(summaryOf),
+    const summary = yield* load(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(
+      Effect.flatMap((state) =>
+        // An unreadable choice leaves nothing in use; it never hides the state.
+        readActiveIntent(stateDirPath(), MAX_STATE_FILE_BYTES).pipe(
+          Effect.orElseSucceed(() => undefined),
+          Effect.map((id) => summaryOf(state, id)),
+        ),
+      ),
+      Effect.timeoutOption(budget),
+      Effect.map(
+        Option.getOrElse(() =>
+          brokenSummary("the state did not load within the time the hook allows it"),
+        ),
+      ),
       Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
     )
     const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)

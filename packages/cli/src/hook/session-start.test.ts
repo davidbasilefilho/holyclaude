@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { Assignment, State } from "@holyclaude/core"
+import { updateState, type Assignment, type State } from "@holyclaude/core"
 import { Effect } from "effect"
 
-import { clip, composeForState, extractRules, sessionStart } from "./session-start.ts"
+import {
+  clip,
+  composeForState,
+  extractRules,
+  MAX_STATE_FILE_BYTES,
+  sessionStart,
+} from "./session-start.ts"
 
 const running = (index: number): Assignment => ({
   id: `assignment-${String(index).padStart(4, "0")}`,
@@ -35,7 +41,7 @@ const running = (index: number): Assignment => ({
 
 const stateWith = (count: number): State => ({
   version: 1,
-  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1 }],
+  intents: [{ id: "intent-1", objective: "o", requirements: "r", revision: 1, state: "open" }],
   assignments: Array.from({ length: count }, (_, index) => running(index + 1)),
   workers: [],
 })
@@ -77,7 +83,7 @@ describe("truncation of the core rules", () => {
     expect(context).toContain(RULES)
     expect(context).not.toContain("core rules")
     expect(context).toContain("more_assignments")
-    expect(context).toContain("holyclaude intent show")
+    expect(context).toContain("holyclaude intent list")
   })
 
   test("without rules there is nothing to mark", () => {
@@ -118,6 +124,7 @@ describe("the shipped core rules beside a large state", () => {
         objective: "Ship the reworked release flow across every package. ".repeat(20),
         requirements: "The release flow keeps each package on one shared version. ".repeat(60),
         revision: 3,
+        state: "open",
       },
     ],
     assignments: Array.from({ length: 12 }, (_, index) => ({
@@ -154,25 +161,131 @@ describe("the shipped core rules beside a large state", () => {
     expect(context).toContain("Rule 0:")
     expect(context).not.toContain("Rule 599:")
     expect(context).toContain("[core rules cut to fit; full text in agents/holyclaude.md]")
-    expect(context).toContain("holyclaude intent show")
+    expect(context).toContain("holyclaude intent list")
   })
 })
 
-describe("the Intent in the summary", () => {
-  test("is the latest by id order, so a generated id beats legacy intent-1000", () => {
-    const intent = (id: string) => ({
-      id,
-      objective: `objective of ${id}`,
-      requirements: "",
-      revision: 1,
-    })
+describe("the Intents in the summary", () => {
+  const intent = (id: string, overrides: Partial<State["intents"][number]> = {}) => ({
+    id,
+    objective: `objective of ${id}`,
+    requirements: `requirements of ${id}`,
+    revision: 2,
+    state: "open" as const,
+    ...overrides,
+  })
+  const withIntents = (intents: State["intents"]): State => ({
+    ...stateWith(2),
+    intents,
+    assignments: [
+      { ...running(1), intent_id: "intent-0002" },
+      { ...running(2), intent_id: "intent-0002", state: "Ready" },
+    ],
+  })
+  const state = withIntents([
+    intent("intent-0001"),
+    intent("intent-0002"),
+    intent("intent-0003", { state: "closed", close_reason: "done", closed_at: "2026-01-01" }),
+  ])
+
+  test("names every open Intent with revision, objective and open Assignments, and no closed one", () => {
+    const context = composeForState(undefined, state)
+    expect(context).toContain("intent-0001,2,objective of intent-0001,0")
+    expect(context).toContain("intent-0002,2,objective of intent-0002,2")
+    expect(context).not.toContain("intent-0003")
+  })
+
+  test("marks the Intent in use, and shows its requirements alone", () => {
+    const context = composeForState(undefined, state, "holyclaude", "intent-0002")
+    expect(context).toMatch(/in_use:\n\s+id: intent-0002/)
+    expect(context).toContain("requirements of intent-0002")
+    expect(context).not.toContain("requirements of intent-0001")
+  })
+
+  test("marks no Intent while several are open and none was chosen, or the choice closed", () => {
+    expect(composeForState(undefined, state)).toContain("in_use: null")
+    expect(composeForState(undefined, state, "holyclaude", "intent-0003")).toContain("in_use: null")
+  })
+
+  test("marks the only open Intent without a choice", () => {
+    const one = withIntents([intent("intent-0001"), intent("intent-0003", { state: "closed" })])
+    expect(composeForState(undefined, one)).toMatch(/in_use:\n\s+id: intent-0001/)
+  })
+
+  test("many open Intents still shrink inside the cap with the rules whole", () => {
+    const many = withIntents(
+      Array.from({ length: 40 }, (_, index) =>
+        intent(`intent-${String(index + 1).padStart(4, "0")}`, {
+          objective: "Ship the reworked release flow across every package. ".repeat(10),
+        }),
+      ),
+    )
+    const context = composeForState(RULES, many)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain(RULES)
+    expect(context).toContain("intent-0040")
+  })
+})
+
+describe("text that fits the budget", () => {
+  const long = (label: string) =>
+    Array.from({ length: 80 }, (_, word) => `${label}${word}`).join(" ")
+
+  test("an Assignment objective, and the Intent text, are shown whole", () => {
     const state: State = {
-      ...stateWith(0),
-      intents: [intent("intent-0mg8k2x1a-7f3q"), intent("intent-1000"), intent("intent-0999")],
+      ...stateWith(1),
+      intents: [
+        {
+          id: "intent-1",
+          objective: long("goal"),
+          requirements: long("need"),
+          revision: 1,
+          state: "open",
+        },
+      ],
+      assignments: [{ ...running(1), objective: long("task") }],
     }
     const context = composeForState(undefined, state)
-    expect(context).toContain("objective of intent-0mg8k2x1a-7f3q")
-    expect(context).not.toContain("objective of intent-1000")
+    for (const text of [long("goal"), long("need"), long("task")]) expect(context).toContain(text)
+  })
+
+  test("long objectives beside long rules are shortened and their rows kept", () => {
+    const rules = "r".repeat(8000)
+    const state: State = {
+      ...stateWith(3),
+      assignments: [1, 2, 3].map((index) => ({
+        ...running(index),
+        objective: "word ".repeat(600),
+      })),
+    }
+    const context = composeForState(rules, state)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain(rules)
+    for (const index of [1, 2, 3]) {
+      expect(context).toContain(`assignment-000${index}`)
+      expect(context).toContain(`agent-${index}`)
+    }
+    expect(context).toContain("…")
+    expect(context).not.toContain("word ".repeat(600))
+  })
+
+  test("shrinks only to fit the budget, and then by Intent text before rows", () => {
+    const state: State = {
+      ...stateWith(3),
+      intents: [
+        {
+          id: "intent-1",
+          objective: "o",
+          requirements: "r".repeat(12_000),
+          revision: 1,
+          state: "open",
+        },
+      ],
+    }
+    const context = composeForState(undefined, state)
+    expect(context.length).toBeLessThanOrEqual(10_000)
+    expect(context).toContain("assignment-0003")
+    expect(context).not.toContain("r".repeat(12_000))
   })
 })
 
@@ -212,7 +325,7 @@ describe("the plugin root in injected text", () => {
   test("the pointer names the CLI as given", () => {
     const context = composeForState(RULES, stateWith(150), '"/opt/hc/scripts/holyclaude"')
     expect(context).toContain(
-      'Full state: "/opt/hc/scripts/holyclaude" intent show; "/opt/hc/scripts/holyclaude" assignment list',
+      'Full state: "/opt/hc/scripts/holyclaude" intent list; "/opt/hc/scripts/holyclaude" assignment list --all',
     )
   })
 
@@ -227,6 +340,93 @@ describe("the plugin root in injected text", () => {
     const context: string = output.hookSpecificOutput.additionalContext
     expect(context).not.toContain("${CLAUDE_PLUGIN_ROOT}")
     expect(context).toContain(`"${root}/scripts/holyclaude"`)
+  })
+
+  test("the hook marks the Intent this clone stored with intent use", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    const state = join(base, ".holyclaude")
+    const open = (id: string) => ({
+      id,
+      objective: `objective of ${id}`,
+      requirements: "",
+      revision: 1,
+      state: "open" as const,
+    })
+    await Effect.runPromise(
+      updateState(state, (current, { useIntent }) =>
+        useIntent("intent-0002").pipe(
+          Effect.as({
+            state: { ...current, intents: [open("intent-0001"), open("intent-0002")] },
+            value: 0,
+          }),
+        ),
+      ),
+    )
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = state
+    const output = JSON.parse(await Effect.runPromise(sessionStart("")))
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain("objective of intent-0001")
+    expect(context).toMatch(/in_use:\n\s+id: intent-0002/)
+  })
+
+  test("a state error is shown whole", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    // A long path makes the error message longer than any fixed clip.
+    const state = join(base, "d".repeat(200), ".holyclaude")
+    const record = join(state, "intents", "intent-1", "intent.json")
+    mkdirSync(join(state, "intents", "intent-1"), { recursive: true })
+    writeFileSync(record, "{ not json")
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = state
+    const output = JSON.parse(
+      await Effect.runPromise(sessionStart(JSON.stringify({ agent_type: "holyclaude" }))),
+    )
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(`${record} is not a valid`)
+    expect(context).not.toContain("…")
+  })
+
+  test("a state file over the read bound gives the rules and a state error, not the state", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    const state = join(base, ".holyclaude")
+    const record = join(state, "intents", "intent-1", "intent.json")
+    mkdirSync(join(state, "intents", "intent-1"), { recursive: true })
+    writeFileSync(record, "")
+    // A sparse file: its size is past the bound, and no content is written.
+    truncateSync(record, MAX_STATE_FILE_BYTES + 1)
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = state
+    const output = JSON.parse(await Effect.runPromise(sessionStart("")))
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(extractRules(await Bun.file(AGENT).text(), root) ?? "")
+    expect(context).toContain("state_error")
+    expect(context).toContain(`the limit is ${MAX_STATE_FILE_BYTES}`)
+  })
+
+  test("a state load that outlasts its time bound gives the rules and a state error", async () => {
+    base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+    const root = join(base, "plugin")
+    mkdirSync(join(root, "agents"), { recursive: true })
+    copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+    process.env["CLAUDE_PLUGIN_ROOT"] = root
+    process.env["HOLYCLAUDE_STATE_DIR"] = join(base, ".holyclaude")
+    const never = () => Effect.never
+    const output = JSON.parse(
+      await Effect.runPromise(sessionStart("", { load: never, budget: "50 millis" })),
+    )
+    const context: string = output.hookSpecificOutput.additionalContext
+    expect(context).toContain(extractRules(await Bun.file(AGENT).text(), root) ?? "")
+    expect(context).toContain("state_error")
   })
 
   describe("by the agent the main thread runs as", () => {

@@ -7,7 +7,7 @@ import { CorruptRecord, StateIo } from "./errors.ts"
 import { commitFile, encodeJson, readJson } from "./files.ts"
 import { attempt, hasCode } from "./io.ts"
 import { assignmentFile, intentFile } from "./layout.ts"
-import { readAgents, readWorkers, writeLocal } from "./local.ts"
+import { readAgents, readWorkers, readWorktrees, writeLocal } from "./local.ts"
 import type { Lock } from "./lock.ts"
 import { Assignment } from "./model/assignment.ts"
 import { sortedById } from "./model/ids.ts"
@@ -16,10 +16,11 @@ import { validateState, type State } from "./model/state.ts"
 import { refuseSymlinks } from "./safety.ts"
 
 /**
- * The committed form of an Assignment. `agent_id` names a subagent of one session on one machine,
- * so it is kept in a local file and never written to the record.
+ * The committed form of an Assignment. `agent_id` names a subagent of one session on one machine
+ * and `worktree` keys a directory of this machine, so both are kept in local files and never
+ * written to the record.
  */
-const AssignmentRecord = Assignment.mapFields(Struct.omit(["agent_id"]))
+const AssignmentRecord = Assignment.mapFields(Struct.omit(["agent_id", "worktree"]))
 
 const segments = (relative: string) => relative.split(/[\\/]/)
 
@@ -55,14 +56,14 @@ const present = <A>(path: string) =>
       : Effect.succeed(value),
   )
 
-const readIntents = (directory: string) =>
+const readIntents = (directory: string, limit?: number) =>
   scan(directory, "intents/*/intent.json").pipe(
     Effect.flatMap((files) =>
       Effect.forEach(files, (relative) => {
         const path = join(directory, relative)
         const folder = segments(relative)[1] ?? ""
         return refuseSymlinks(directory, path).pipe(
-          Effect.andThen(readJson(Intent, path)),
+          Effect.andThen(readJson(Intent, path, limit)),
           present(path),
           Effect.filterOrFail(
             (intent) => intent.id === folder,
@@ -77,7 +78,7 @@ const readIntents = (directory: string) =>
     ),
   )
 
-const readAssignments = (directory: string) =>
+const readAssignments = (directory: string, limit?: number) =>
   scan(directory, "intents/*/assignments/*.json").pipe(
     Effect.flatMap((files) =>
       Effect.forEach(files, (relative) => {
@@ -86,7 +87,7 @@ const readAssignments = (directory: string) =>
         const folder = parts[1] ?? ""
         const name = (parts[3] ?? "").replace(/\.json$/, "")
         return refuseSymlinks(directory, path).pipe(
-          Effect.andThen(readJson(AssignmentRecord, path)),
+          Effect.andThen(readJson(AssignmentRecord, path, limit)),
           present(path),
           Effect.filterOrFail(
             (record) => record.id === name,
@@ -112,9 +113,10 @@ const readAssignments = (directory: string) =>
 /**
  * Reads the project state from the record files and the local files, and checks it. Each record
  * must carry the id of the file or directory it sits in; anything else is CorruptRecord. Intents
- * and Assignments come back ordered by id, which is creation order.
+ * and Assignments come back ordered by id, which is creation order. Files are read whole unless a
+ * `limit` is given, in which case a file over it fails the load as TooLarge.
  */
-export const loadRecordState = (directory: string) =>
+export const loadRecordState = (directory: string, limit?: number) =>
   Effect.gen(function* () {
     // A glob may skip a linked directory without a word, which would hide its records, so every
     // directory is checked here instead.
@@ -124,13 +126,20 @@ export const loadRecordState = (directory: string) =>
       yield* refuseSymlinks(directory, join(directory, "intents", folder))
       yield* refuseSymlinks(directory, join(directory, "intents", folder, "assignments"))
     }
-    const intents = sortedById(yield* readIntents(directory))
-    const agents = yield* readAgents(directory)
-    const assignments = sortedById(yield* readAssignments(directory)).map((record): Assignment => ({
-      ...record,
-      agent_id: agents[record.id] ?? null,
-    }))
-    const workers = yield* readWorkers(directory)
+    const intents = sortedById(yield* readIntents(directory, limit))
+    const agents = yield* readAgents(directory, limit)
+    const worktrees = yield* readWorktrees(directory, limit)
+    const assignments = sortedById(yield* readAssignments(directory, limit)).map(
+      (record): Assignment => {
+        const worktree = record.state === "Running" ? worktrees[record.id] : undefined
+        return {
+          ...record,
+          agent_id: agents[record.id] ?? null,
+          ...(worktree === undefined ? {} : { worktree }),
+        }
+      },
+    )
+    const workers = yield* readWorkers(directory, limit)
     return yield* validateState({ version: 1, intents, assignments, workers })
   })
 
@@ -139,12 +148,11 @@ export const recordTexts = (directory: string, state: State) =>
   Effect.gen(function* () {
     const texts = new Map<string, string>()
     for (const intent of state.intents) {
-      const path = intentFile(directory, intent.id)
-      texts.set(path, yield* encodeJson(Intent, intent, path))
+      texts.set(intentFile(directory, intent.id), yield* encodeJson(Intent, intent))
     }
     for (const assignment of state.assignments) {
       const path = assignmentFile(directory, assignment.intent_id, assignment.id)
-      texts.set(path, yield* encodeJson(AssignmentRecord, assignment, path))
+      texts.set(path, yield* encodeJson(AssignmentRecord, assignment))
     }
     return texts
   })

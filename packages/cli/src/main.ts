@@ -13,6 +13,7 @@ const HINTS: Readonly<Record<string, string>> = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
   InvalidPath: "Use relative portable paths such as packages/cli/src.",
+  InvalidWorktree: "Give --worktree an existing directory, such as the path of a git worktree.",
   StaleRevision:
     "Reread with `holyclaude intent show`, reassess the work at the live revision, then retry.",
   NoRevision: "Set a valid revision with `holyclaude intent update --material`.",
@@ -23,7 +24,7 @@ const HINTS: Readonly<Record<string, string>> = {
   InsufficientEvidence:
     "Cover exactly the declared labels in criteria_evidence and required_evidence.",
   TooLarge:
-    "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
+    "A file the command reads is over its read bound (the message names the file and the bound); trim it, move it away, or restore it from version control.",
   StateLocked:
     "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
@@ -38,7 +39,13 @@ const HINTS: Readonly<Record<string, string>> = {
     "Fix or delete the file the message names, or restore it from version control; a missing file reads as nothing, and a file under local/ can always be deleted.",
   SchemaError:
     "Send JSON that matches the command's input shape; see `holyclaude <command> --help`.",
-  NoIntent: "Create one with `holyclaude intent create` (JSON on stdin).",
+  NoActiveIntent:
+    "Choose with `holyclaude intent use <id>`, or name one with --intent <id>. With none open, run `holyclaude intent create` or `holyclaude intent reopen --intent <id>`.",
+  IntentClosed: "Reopen it with `holyclaude intent reopen --intent <id>`, or pick an open Intent.",
+  IntentBusy:
+    "Wait for the Running Assignments to finish, or settle them with `holyclaude assignment cancel <id>` or `holyclaude reconcile resolve <id>`, then close again.",
+  UnacceptedAssignments:
+    "Review and accept them with `holyclaude assignment accept <id>`, then close again. To close with work left unaccepted, add `--allow-unaccepted <reason>`.",
   NotBound:
     "Bind the spawned agent first with `holyclaude assignment bind <id> --agent <agentId>`.",
   StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyclaude <command>.",
@@ -70,7 +77,7 @@ const errorFields = (error: unknown) => {
     error instanceof Usage
       ? error.hint
       : (HINTS[tag] ?? "Run `holyclaude --help` for the commands.")
-  return { error: tag, message: message.split("\n").slice(0, 6).join("\n").slice(0, 600), hint }
+  return { error: tag, message, hint }
 }
 
 /**

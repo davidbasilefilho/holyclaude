@@ -2,7 +2,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { MAX_RECORD_BYTES } from "./codec.ts"
+import { MAX_GITIGNORE_BYTES } from "./codec.ts"
 import { io, readText } from "./io.ts"
 import { refuseSymlinks } from "./safety.ts"
 
@@ -74,6 +74,36 @@ const IGNORE_RULES =
     "/state.observations.jsonl",
   ].join("\n") + "\n"
 
+/** What the `local/` folder's own `.gitignore` holds: everything in the folder is ignored. */
+const LOCAL_IGNORE_RULES = "*\n"
+
+/**
+ * Most of the `local/` folder's `.gitignore` that is read, in bytes. The expected content is two
+ * bytes, so a longer file differs and is replaced without being read whole.
+ */
+const LOCAL_IGNORE_READ_BYTES = 16
+
+/**
+ * Makes the `local/` folder when it is missing, with its own `.gitignore` that ignores everything
+ * in it, so local files stay out of version control even if a repository replaces the folder's
+ * `.gitignore`. That file is committed state too, so a repository could also ship one that
+ * un-ignores a local file; any content other than the expected rule is replaced by it. Nothing is
+ * created through a symbolic link. Call it wherever `local/` may come into being.
+ */
+export const ensureLocalDirectory = (directory: string) => {
+  const path = localFile(directory, ".gitignore")
+  return refuseSymlinks(directory, path).pipe(
+    Effect.andThen(readText(path, LOCAL_IGNORE_READ_BYTES)),
+    Effect.catchTag("TooLarge", () => Effect.succeed(undefined)),
+    Effect.flatMap((current) =>
+      current === LOCAL_IGNORE_RULES
+        ? Effect.void
+        : io(path, () => Bun.write(path, LOCAL_IGNORE_RULES)),
+    ),
+    Effect.asVoid,
+  )
+}
+
 /** What an earlier version wrote: a rule that ignores the whole folder, records included. */
 const LEGACY_IGNORE_RULES = "*\n"
 
@@ -82,12 +112,12 @@ const LEGACY_IGNORE_RULES = "*\n"
  * written as the exact list of ignored files, and the rule an earlier version wrote is replaced by
  * it, since that rule would hide the records. The list covers the old state file and its neighbours
  * too, so replacing the old rule is safe before a migration. Any other content is the user's and
- * stays. A `.gitignore` over the record cap is TooLarge rather than read whole.
+ * stays. A `.gitignore` over 256 KiB is TooLarge rather than read whole.
  */
 export const keepLocalFilesOutOfVersionControl = (directory: string) => {
   const path = join(directory, ".gitignore")
   return refuseSymlinks(directory, path).pipe(
-    Effect.andThen(readText(path, MAX_RECORD_BYTES)),
+    Effect.andThen(readText(path, MAX_GITIGNORE_BYTES)),
     Effect.map((current) =>
       current === undefined || current === LEGACY_IGNORE_RULES ? IGNORE_RULES : undefined,
     ),

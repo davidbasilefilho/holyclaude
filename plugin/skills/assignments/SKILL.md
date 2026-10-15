@@ -7,14 +7,18 @@ description: Use when you are about to create, launch, finish, accept, follow up
 
 The `holyclaude` CLI is not on `PATH`: run it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`, which every `holyclaude <command>` below stands for. It is the interface to Intent and Assignment state, and it keeps the state records consistent for you. The records are one file each under `.holyclaude/`, committed with the project, so free text in an Intent or Assignment stays free of absolute paths and secrets. Output is TOON, which is compact and readable as it is. Structured input is JSON on stdin, and `holyclaude <command> --help` prints a command's stdin shape. Input with an unknown field is rejected and the error names the field, so a rejection tells you exactly what to adjust; read its message and hint, fix the input, and rerun.
 
-Read-only commands are open to every agent: `holyclaude intent show`, `holyclaude assignment show <id>`, `holyclaude assignment list [--state Ready|Running|Succeeded|Failed|Cancelled]`, `holyclaude assignment verify <id>`, `holyclaude routes` and `holyclaude reconcile`. The commands that change state are yours as the root, and workers leave them to you.
+Read-only commands are open to every agent: `holyclaude intent show`, `holyclaude intent list [--state open|closed]`, `holyclaude assignment show <id>`, `holyclaude assignment list [--state Ready|Running|Succeeded|Failed|Cancelled] [--intent <id> | --all]`, `holyclaude assignment verify <id>`, `holyclaude routes` and `holyclaude reconcile`. The commands that change state are yours as the root, and workers leave them to you.
 
 ## 1. Intent
 
 - `holyclaude routes` lists the 18 specialists with mutability, capabilities, independence rule, model and effort.
-- `holyclaude intent show` prints the active Intent and its revision. Read it before the first dispatch and before follow-up work.
-- `holyclaude intent create` takes `{"objective": "...", "requirements": "..."}` on stdin and starts at revision 1. `requirements` is optional text.
-- `holyclaude intent update` takes any of `{"id", "objective", "requirements"}`. Add `--material` when the change alters requirements, user-visible behavior, architecture, trust boundaries, security, persistent contracts, dependencies, toolchain, deployment or ownership, or invalidates accepted work; `--material` bumps the revision. A routine clarification leaves the revision where it is, so omit the flag.
+- `holyclaude intent show` prints the Intent in use and its revision. Read it before the first dispatch and before follow-up work.
+- Several Intents can be open at once. A command that acts on an Intent takes `--intent <id>`, else the Intent in use, else the only open Intent; with several open and none in use, or none open, it fails with `NoActiveIntent`, which lists the open ones. `holyclaude intent list` shows each Intent's id, state, revision, objective and open Assignments, and `assignment list` shows the Intent in use unless you pass `--intent <id>` or `--all`.
+- `holyclaude intent use <id>` puts an Intent in use on this clone by storing the choice in `local/active-intent.json` (never committed, replaced by the next choice). It refuses a closed or unknown Intent. A stored Intent that has since closed counts as none.
+- `intent show` also takes the id as an argument and `intent update` as the JSON `id`; either one that names a different Intent than `--intent` is a usage error.
+- `holyclaude intent close [--intent <id>] --reason <text> [--allow-unaccepted <reason>]` closes an Intent whose work is done. It is refused while one of its Assignments is Running (`IntentBusy`) and while Succeeded ones were never accepted (`UnacceptedAssignments`, listing them); `--allow-unaccepted <reason>` overrides the second (the root prompt says when to close and what to do first). A closed Intent authorizes no create, reserve or follow-up (`IntentClosed`). `holyclaude intent reopen [--intent <id>]` opens it again, puts it in use (the reply names `in_use` and `replaced` as `create` does) and bumps the revision, so earlier acceptances do not carry over to new work; without `--intent` it reopens the only closed Intent and asks for `--intent` when there are several.
+- `holyclaude intent create` takes `{"objective": "...", "requirements": "..."}` on stdin and starts at revision 1. `requirements` is optional text. The new Intent is put in use on this clone, and the reply names it under `in_use` and the Intent it displaced under `replaced` (`null` when none was in use), so tell the user when it displaced one.
+- `holyclaude intent update` takes any of `{"id", "objective", "requirements"}` (`id` defaults to the Intent in use). Add `--material` when the change alters requirements, user-visible behavior, architecture, trust boundaries, security, persistent contracts, dependencies, toolchain, deployment or ownership, or invalidates accepted work; `--material` bumps the revision. A routine clarification leaves the revision where it is, so omit the flag.
 - A `StaleRevision` error means the Intent moved. Run `holyclaude intent show`, reassess the work at the live revision, then continue.
 
 ## 2. Create
@@ -47,7 +51,7 @@ The reply prints the new `id` in state Ready with the `subagent_type`, `model`, 
 
 - acceptance criteria and required-evidence labels are non-empty with no blank label. `intent_revision` records the revision your plan rests on, and reserve checks it against the live one;
 - a ScopedWrite Assignment names at least one ownership path. Paths are relative and portable: each segment is non-empty, and the path avoids absolute forms, `..`, `.`, a trailing dot or space, control characters and any of `:*?"<>|`. `\` becomes `/` and comparison ignores case. Two paths overlap when equal or when one is a directory prefix of the other. Worker.operations names its specific paths, and a dependency install owns the root package.json, the lockfile and node_modules;
-- a writer's paths do not overlap a Running writer; reserve is refused with `DispatchRefused` naming `OwnershipConflict`, so serialize those Assignments yourself. Paths outside the writable roots are refused the same way with `OutsideWritableRoots`;
+- a writer's paths do not overlap a Running writer in the same worktree; reserve is refused with `DispatchRefused` naming `OwnershipConflict`, so serialize those Assignments yourself. Paths outside the writable roots are refused the same way with `OutsideWritableRoots`;
 - every dependency is Succeeded, accepted, in the same Intent and accepted at the same revision;
 - a review Assignment lists the work it must be independent from in `independent_from`.
 
@@ -59,7 +63,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 4. Reserve
 
-`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the specialist's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`.
+`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the specialist's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`. For a writer in another git worktree of the repository, add `--worktree <dir>` (an existing directory, else `InvalidWorktree`): its ownership paths and roots resolve against that directory, so writers in different worktrees run in parallel while writers sharing one still conflict. The reservation holds until the Assignment leaves Running.
 
 ## 5. Spawn or resume
 
@@ -100,7 +104,7 @@ After you have judged the evidence, `holyclaude assignment accept <id>` takes on
 }
 ```
 
-Both maps cover exactly the declared labels, each with non-blank support, and the revision equals the Assignment's and the live one. Only a Succeeded Assignment can be accepted, and accepting again with different content is refused. The CLI checks coverage and you judge truth, so write the rationale from the evidence you reviewed. An `InsufficientEvidence` error lists the missing and unknown labels.
+Both maps cover exactly the declared labels, each with non-blank support, and the revision equals the Assignment's and the live one. Only a Succeeded Assignment can be accepted, and accepting again with different content is refused. `--carry-forward` accepts work made for an earlier revision, with the live revision in the record; the root prompt says when that applies. The CLI checks coverage and you judge truth, so write the rationale from the evidence you reviewed. An `InsufficientEvidence` error lists the missing and unknown labels.
 
 ## 9. Follow up
 
@@ -122,4 +126,4 @@ Running workers finish on their own. If the user stops one, wait for the stopped
 
 ## 12. Reconcile after a restart
 
-A resumed or compacted session loses pending notifications. `holyclaude reconcile` lists Running rows. Confirm each worker's state by its agent id, then run `holyclaude reconcile resolve <id> --fail "<reason>"` when there is evidence the worker stopped, or `holyclaude reconcile resolve <id> --keep` to leave it reserved. Choose exactly one of the two flags. Rows under `running_elsewhere` were reserved by another clone of the project, whose root confirms them: leave them unless you have evidence about their worker, and resolve one only by naming it.
+A resumed or compacted session loses pending notifications. `holyclaude reconcile` lists Running rows (and any closed Intent with open work). Confirm each worker's state by its agent id, then run `holyclaude reconcile resolve <id> --fail "<reason>"` when there is evidence the worker stopped, or `holyclaude reconcile resolve <id> --keep` to leave it reserved. Choose exactly one of the two flags. Rows under `running_elsewhere` were reserved by another clone of the project, whose root confirms them: leave them unless you have evidence about their worker, and resolve one only by naming it.

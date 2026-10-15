@@ -49,7 +49,8 @@ export type AssignmentDraft = typeof AssignmentDraft.Type
  * A persisted Assignment. `agent_id`, `result` and `acceptance` are required keys whose explicit
  * null means "not yet": a missing key is invalid. `clone_id` is stamped by the store on a row that
  * enters Running, and names the clone of the project that reserved it. A row without one counts as
- * this clone's.
+ * this clone's. `worktree` is the opaque key of the worktree a Running writer works in; it lives in
+ * a local file, never in the record, and a Running row without one conflicts with every writer.
  */
 export const Assignment = Schema.Struct({
   ...AssignmentDraft.fields,
@@ -60,9 +61,22 @@ export const Assignment = Schema.Struct({
   result: Schema.NullOr(Text),
   acceptance: Schema.NullOr(AcceptanceRecord),
   clone_id: Schema.optionalKey(CloneId),
+  worktree: Schema.optionalKey(Text),
 })
 /** A persisted unit of delegated work. */
 export type Assignment = typeof Assignment.Type
+
+/**
+ * True while an Assignment still needs the root: it is Ready (planned, not yet reserved), Running,
+ * or it Succeeded and its evidence has not been accepted yet.
+ */
+export const isOpenAssignment = (assignment: {
+  readonly state: AssignmentState
+  readonly acceptance: unknown
+}): boolean =>
+  assignment.state === "Ready" ||
+  assignment.state === "Running" ||
+  (assignment.state === "Succeeded" && assignment.acceptance === null)
 
 /** True once an Assignment can no longer change state. */
 export const isTerminal = (assignment: { readonly state: AssignmentState }): boolean =>

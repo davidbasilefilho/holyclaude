@@ -33,8 +33,19 @@
     "independent_from": []
   },
   "id": "assignment-0mv9p5pgu-3qmn",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "continue-work line 13 now points to the root prompt carry-forward rule; oxfmt and 1229 tests pass.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "One-line pointer verified by re-review rxdn; fmt and 1229 tests pass.",
+    "criteria_evidence": {
+      "continue-work/SKILL.md line 13's sentence about a moved Intent revision is replaced by a pointer: where the revision moved since work finished, follow the root prompt's carry-forward policy (accept with --carry-forward when the work still holds, a validation Assignment when the change touched its files).": "verified by re-review rxdn; oxfmt and full test pass",
+      "oxfmt and the full test suite pass.": "verified by re-review rxdn; oxfmt and full test pass"
+    },
+    "required_evidence": {
+      "checks-run": "reported in worker report; diff saved",
+      "diff-file": "reported in worker report; diff saved"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

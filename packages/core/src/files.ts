@@ -3,81 +3,56 @@
 // and deletes, and Bun.write makes the missing directories.
 import { rename } from "node:fs/promises"
 
-import { Effect, Schema } from "effect"
+import { Effect, Schema, Stream } from "effect"
 
-import { decodeJsonStrict, MAX_RECORD_BYTES, withinLimit } from "./codec.ts"
+import { decodeJsonStrict } from "./codec.ts"
 import { CorruptRecord, LockLost, StateIo } from "./errors.ts"
 import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
 import { ownsFile, type Lock } from "./lock.ts"
 import { refuseSymlinks } from "./safety.ts"
 
-/** The text after the first line break, so it starts on a whole line; none when there is no break. */
-const fromNextLine = (text: string) => {
-  const at = text.indexOf("\n")
-  return at === -1 ? "" : text.slice(at + 1)
-}
-
-/**
- * The newest whole lines of a text that fit in the limit, in bytes. A text within the limit comes
- * back as it is; otherwise the oldest lines go, and the line the cut falls in goes with them.
- */
-export const keepNewestLines = (text: string, limit: number) => {
-  const bytes = new TextEncoder().encode(text)
-  // One byte before the cut is kept too, so a line that starts exactly at the cut survives.
-  return bytes.byteLength <= limit
-    ? text
-    : fromNextLine(new TextDecoder().decode(bytes.subarray(bytes.byteLength - limit - 1)))
-}
-
-/**
- * Reads the newest whole lines of a file that fit in the limit, in bytes, without reading the rest:
- * a log over the limit loses its oldest lines rather than failing. A missing file reads as
- * undefined. It does not look for symbolic links, so call {@link refuseSymlinks} first.
- */
-export const readNewestLines = (path: string, limit: number) =>
-  Effect.gen(function* () {
-    const file = Bun.file(path)
-    if (!(yield* io(path, () => file.exists()))) return undefined
-    const size = file.size
-    if (size <= limit) return yield* readText(path, limit)
-    const bytes = yield* io(path, () => file.slice(size - limit - 1, size).bytes())
-    return fromNextLine(new TextDecoder().decode(bytes))
-  })
+/** A line git leaves in a file when a merge could not combine both sides. */
+const CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?:\s|$)/m
 
 /**
  * Reads and strictly decodes a JSON file. A missing file reads as undefined. A file that is not
  * valid JSON for the schema is reported as CorruptRecord with the path, so the user is pointed at
- * the file and not at the input of the command.
+ * the file and not at the input of the command; one that holds git conflict markers says to resolve
+ * the conflict in git first. Without a limit the file is read whole.
  */
 export const readJson = <S extends Schema.Decoder<unknown>>(
   schema: S,
   path: string,
-  limit: number = MAX_RECORD_BYTES,
+  limit?: number,
 ) =>
   readText(path, limit).pipe(
     Effect.flatMap((text) =>
       text === undefined
         ? Effect.succeed(undefined)
         : decodeJsonStrict(schema)(text).pipe(
-            Effect.mapError((error) => new CorruptRecord({ path, reason: error.message })),
+            Effect.mapError(
+              (error) =>
+                new CorruptRecord({
+                  path,
+                  reason: CONFLICT_MARKER.test(text)
+                    ? "it holds git conflict markers; resolve the conflict in git, then rerun"
+                    : error.message,
+                }),
+            ),
           ),
     ),
   )
 
 /**
  * Encodes a value as the text of its file: two-space indent, a trailing newline, and keys in the
- * schema's field order, so the same record is always the same bytes. Fails with TooLarge over the
- * given cap, a record's by default.
+ * schema's field order, so the same record is always the same bytes.
  */
 export const encodeJson = <S extends Schema.Codec<unknown, unknown, never, never>>(
   schema: S,
   value: S["Type"],
-  path: string,
-  limit: number = MAX_RECORD_BYTES,
 ) =>
   Schema.encodeEffect(schema)(value).pipe(
     Effect.map((encoded) => `${JSON.stringify(encoded, null, 2)}\n`),
-    Effect.flatMap((json) => withinLimit(path, json, limit)),
   )
 
 /**
@@ -122,3 +97,48 @@ export const commitFile = (path: string, content: string, lock: Lock) => {
 /** Removes a file under the lock, never through a symbolic link. */
 export const removeFile = (path: string, lock: Lock) =>
   refuseSymlinks(lock.directory, path).pipe(Effect.andThen(deleteIfPresent(path)))
+
+const NEWLINE = 10
+
+/** Whether the file is empty or ends in a line break, so more lines can follow it directly. */
+const endsALine = (path: string) =>
+  io(path, async () => {
+    const file = Bun.file(path)
+    return file.size === 0 || (await file.slice(file.size - 1).bytes())[0] === NEWLINE
+  })
+
+/**
+ * Rewrites a file as the lines of another file followed by its own, through a temporary neighbour
+ * and a rename, provided the lock is still this writer's. Both are streamed into the new file, so
+ * neither is ever held whole in memory, however large. A line break is added between them when the
+ * front file does not end in one. The front file is left in place, and a failure leaves no temp
+ * file.
+ */
+export const prependLines = (front: string, path: string, lock: Lock) => {
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`
+  const copy = (source: string, writer: Bun.FileSink) =>
+    Stream.fromReadableStream({
+      evaluate: () => Bun.file(source).stream(),
+      onError: (cause) => new StateIo({ path: source, cause }),
+    }).pipe(
+      Stream.runForEach((chunk) =>
+        io(temporary, async () => {
+          await writer.write(chunk)
+          await writer.flush()
+        }),
+      ),
+    )
+  return Effect.gen(function* () {
+    yield* refuseSymlinks(lock.directory, path)
+    const separator = (yield* endsALine(front)) ? "" : "\n"
+    const writer = Bun.file(temporary).writer()
+    yield* Effect.gen(function* () {
+      yield* copy(front, writer)
+      yield* io(temporary, async () => void (await writer.write(separator)))
+      yield* copy(path, writer)
+    }).pipe(
+      Effect.ensuring(io(temporary, async () => void (await writer.end())).pipe(Effect.ignore)),
+    )
+    yield* moveFile(temporary, path, lock)
+  }).pipe(Effect.tapError(() => deleteIfPresent(temporary).pipe(Effect.ignore)))
+}

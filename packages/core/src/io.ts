@@ -29,18 +29,41 @@ export const attemptTransient = <A>(run: () => Promise<A>) =>
   )
 
 /**
- * Reads a file as text. A missing file reads as undefined; a file over the limit is TooLarge. The
- * read itself stops one byte past the limit, so a file that grows after its size was taken, or one
- * whose size the system does not report, is never read whole. It does not look for symbolic links,
- * so call `refuseSymlinks` first.
+ * Reads a file as text. A missing file reads as undefined. With a limit, a file over it is
+ * TooLarge, and the read itself stops one byte past the limit, so a file that grows after its size
+ * was taken, or one whose size the system does not report, is never read whole; give a limit
+ * wherever the file is not the project's own state. Without one the file is read whole. It does not
+ * look for symbolic links, so call `refuseSymlinks` first.
  */
-export const readText = (path: string, limit: number) =>
+export const readText = (path: string, limit?: number) =>
   Effect.gen(function* () {
     const file = Bun.file(path)
     if (!(yield* io(path, () => file.exists()))) return undefined
+    if (limit === undefined) return yield* io(path, () => file.text())
     if (file.size > limit) return yield* new TooLarge({ subject: path, bytes: file.size, limit })
     const bytes = yield* io(path, () => file.slice(0, limit + 1).bytes())
     if (bytes.byteLength > limit)
       return yield* new TooLarge({ subject: path, bytes: bytes.byteLength, limit })
     return new TextDecoder().decode(bytes)
+  })
+
+const NEWLINE = 10
+
+/**
+ * Reads the last `limit` bytes of a file as text, for a log whose newest lines matter most. A
+ * missing file reads as undefined. A file longer than the limit is read from inside a line, so
+ * everything up to the first line break is dropped and the text holds whole lines only (one whole
+ * line more than the cut may go with it). The read takes no more than the limit, plus whatever was
+ * appended since the size was taken, whatever the file's size. It does not look for symbolic links,
+ * so call `refuseSymlinks` first.
+ */
+export const readTail = (path: string, limit: number) =>
+  Effect.gen(function* () {
+    const file = Bun.file(path)
+    if (!(yield* io(path, () => file.exists()))) return undefined
+    const start = Math.max(0, file.size - limit)
+    const bytes = yield* io(path, () => file.slice(start).bytes())
+    if (start === 0) return new TextDecoder().decode(bytes)
+    const lineBreak = bytes.indexOf(NEWLINE)
+    return lineBreak === -1 ? "" : new TextDecoder().decode(bytes.subarray(lineBreak + 1))
   })
