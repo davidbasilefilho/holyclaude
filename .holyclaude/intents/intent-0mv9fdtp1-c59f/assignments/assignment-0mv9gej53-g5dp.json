@@ -39,8 +39,8 @@
     "independent_from": []
   },
   "id": "assignment-0mv9gej53-g5dp",
-  "state": "Running",
-  "result": null,
+  "state": "Succeeded",
+  "result": "PR3 repair: B1 solo line prefers a file-edit tool where available; B2 waived gate named Unknown, never Passed, other Pending/Unknown early stop; B3 speak list adds acknowledgement and solo first message; B5 references inlined; O1, O2, O4, O6 applied; block 8,540->8,532 after trimming ~430 chars elsewhere (hook-enforced VCS line, concise messages, unrelated-work clause, CLI I/O note, ask-when-nothing-left clause); gates on 1.4.3 pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gej53-g5dp.diff.",
   "acceptance": null,
   "clone_id": "clone-0mv9fejex-b8cj"
 }

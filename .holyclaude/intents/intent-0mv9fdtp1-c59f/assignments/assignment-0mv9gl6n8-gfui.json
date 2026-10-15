@@ -1,0 +1,60 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.code",
+  "objective": "Independently review PR2 (uncommitted in worktree pr2 against its base release/0.2.0/fix/hook-scope at 75ac276): PostToolUse resolvedModel recording, verify model source, SessionStart composition order.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gdttk-9ofb.diff",
+    "Worktree pr2, base 75ac276"
+  ],
+  "constraints": [
+    "Read-only; leave the worktree as found.",
+    "First pass /code-review on the uncommitted change at effort high, no --comment, no --fix.",
+    "Gates via bunx bun@1.4.3; format failures limited to .holyclaude/** are a known base issue fixed on PR1."
+  ],
+  "acceptance_criteria": [
+    "Reports /code-review invocation, finding count and dispositions.",
+    "Judges correctness of the hook (payload shapes, specialist filter, record under launched agentId), verify's model source and fallback, and the new composition (rules whole, summary shrinks, pointer, cut only when rules alone exceed the budget).",
+    "Confirms the committed bundle is byte-identical to a Bun 1.4.3 build of the worktree (build to a scratch path and compare).",
+    "Separates blockers from optional findings with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "bundle-check",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9gdttk-9ofb"
+    ]
+  },
+  "id": "assignment-0mv9gl6n8-gfui",
+  "state": "Succeeded",
+  "result": "PR2 code review: no blockers; /code-review 10 findings (1 recommended doc fix: assignments SKILL.md line 74 stale; 5 optional; 4 rejected by design); gates green except known .holyclaude format issue; 1136 tests; bundle cmp identical to a 1.4.3 build.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Reviewer ran gates and rebuilt the bundle to a scratch path; dispositions reasoned against the Intent.",
+    "criteria_evidence": {
+      "Reports /code-review invocation, finding count and dispositions.": "code-review /home/user/wt/pr2 high, 10 findings in a table.",
+      "Judges correctness of the hook (payload shapes, specialist filter, record under launched agentId), verify's model source and fallback, and the new composition (rules whole, summary shrinks, pointer, cut only when rules alone exceed the budget).": "Judgments section covers each with tests cited.",
+      "Confirms the committed bundle is byte-identical to a Bun 1.4.3 build of the worktree (build to a scratch path and compare).": "cmp IDENTICAL.",
+      "Separates blockers from optional findings with evidence.": "No blockers; 5 optional."
+    },
+    "required_evidence": {
+      "code-review-run": "10 findings.",
+      "checks-run": "oxfmt (known), oxlint, bun check 78, bun test 1136.",
+      "bundle-check": "identical",
+      "blockers": "none",
+      "optional-findings": "5 listed."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

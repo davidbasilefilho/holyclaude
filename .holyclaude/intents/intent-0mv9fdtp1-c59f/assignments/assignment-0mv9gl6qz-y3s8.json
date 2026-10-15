@@ -1,0 +1,50 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.security",
+  "objective": "Independent security review of PR2's new PostToolUse hook on the Agent tool and the changed SessionStart composition.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gdttk-9ofb.diff",
+    "Worktree pr2"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Assesses whether a payload can write outside the state directory, poison verify for another agent id, or create state for non-holyclaude agents; whether stdin handling is bounded and fails safe; whether the new hooks.json entry widens what runs.",
+    "Assesses whether the SessionStart change can drop or truncate the core rules in a way that matters.",
+    "Each finding traced source to sink with severity, or none."
+  ],
+  "required_evidence": [
+    "findings",
+    "severity"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9gdttk-9ofb"
+    ]
+  },
+  "id": "assignment-0mv9gl6qz-y3s8",
+  "state": "Succeeded",
+  "result": "PR2 security review: no critical/high/medium; low L1 no stdin or field cap (stuck log only past the 4 MiB local cap), L2 requested type overwrites observed type, L3 hook model masks a mid-run model change, L4 resume relabel suspicion removed by the L2 fix; SessionStart change cannot drop rules and stays within the budget.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Traced payload sources to the log sink and verify; read-only limits stated.",
+    "criteria_evidence": {
+      "Assesses whether a payload can write outside the state directory, poison verify for another agent id, or create state for non-holyclaude agents; whether stdin handling is bounded and fails safe; whether the new hooks.json entry widens what runs.": "No outside writes, id from Claude Code, gate before writes, same exec form; stdin unbounded (L1).",
+      "Assesses whether the SessionStart change can drop or truncate the core rules in a way that matters.": "Rules cut only past the budget, else whole.",
+      "Each finding traced source to sink with severity, or none.": "L1-L4 traced with severity."
+    },
+    "required_evidence": {
+      "findings": "L1-L4.",
+      "severity": "Low only."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
