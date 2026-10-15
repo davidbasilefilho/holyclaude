@@ -7,7 +7,7 @@ observed in local sessions and not in [cloud sessions](#cloud-sessions). The roo
 plans work as an Intent with Assignments, dispatches pinned Haiku and Sonnet specialists,
 judges their reports, and accepts work on evidence. State lives in the project's
 `.holyclaude/` directory (see [State](#state)) and is reached through the `holyclaude` command line tool that the
-plugin ships. There is no MCP server.
+plugin ships.
 
 ## How does it work?
 
@@ -42,6 +42,23 @@ session:
 shell as `claude plugin marketplace add <source>` and `claude plugin install holyclaude@holyclaude`.
 Check a checkout with `claude plugin validate <path-to-clone>/plugin` and
 `claude plugin validate <path-to-clone>`.
+
+#### The `.claude/` fallback
+
+If the plugin does not load, or its `agent` setting does not take effect, the same pieces can live in
+`.claude/` for plain Claude Code. This route must not rely on the plugin's own SessionStart hook:
+
+- the holyclaude root agent file in `~/.claude/agents/` or `.claude/agents/`;
+- the user-level `settings.json` setting `agent` to it;
+- the specialists and skills in `.claude/agents` and `.claude/skills`;
+- the CLI on `PATH` through `bun link` in `packages/cli`, with
+  `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"` in the copied agents and skills replaced by
+  `holyclaude`, because Claude Code substitutes that variable only in a plugin's own files;
+- the hooks in user or project settings.
+
+If the main thread stays on the default agent even so, a SessionStart hook in user or project
+settings could inject the root rules, and the root's restraint would depend on its instructions
+alone.
 
 ### Settings the plugin cannot ship
 
@@ -346,10 +363,10 @@ Each choice below is recorded in the repository; [docs/DECISIONS.md](docs/DECISI
 - **A root that decides and specialists that work.** The root holds the user relationship, the plan and the acceptance, and delegates edits, runs, checks, review and research. Its context stays on decisions, and the work is split into Assignments that each end in a report with evidence.
 - **Cost and model routing.** The 18 specialists are pinned to Haiku or Sonnet, each with its own effort, so routine work does not run on the root's Opus model. That is why the [settings](#settings-the-plugin-cannot-ship) turn off fork mode and deny the built-in agent types, and why `holyclaude assignment verify` checks the model and effort a worker actually ran on against what was dispatched.
 - **Independent review.** Work that changes code, artifacts or behavior is reviewed by a specialist with no history on it, and a re-review goes to a different reviewer than the one who found the problem. Work is accepted on evidence, not on a worker's say-so.
-- **Workers cannot write to the repository's history.** Specialists leave commits, pushes and pull requests to the root, and a hook guards their shell and file writes (see [Hooks](#hooks) and [Limits](#limits)).
+- **The root owns the repository's history.** Specialists leave commits, pushes and pull requests to the root, and a guard hook refuses their git writes. It is a guardrail for well-meaning workers rather than a sandbox (see [Hooks](#hooks) and [Limits](#limits)).
 - **State that survives.** Intents and Assignments are plain files in `.holyclaude/`, committed with the work, so a team or several clones share them and a record outlives a lost machine ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)).
 - **Compact instructions.** The generated instructions stay short because every token is read on every turn, and the root asks the user only about choices that are theirs ([compact instructions](docs/DECISIONS.md#compact-generated-instructions-no-plan-feature), [grill-me](docs/DECISIONS.md#grill-me-only-for-material-choices)).
-- **No MCP server and no `bin/`.** The plugin reaches its state through a command line tool it ships, and it ships no `bin/` directory so that it installs everywhere ([why](docs/DECISIONS.md#no-bin-in-the-plugin)).
+- **No MCP server and no `bin/`.** There is no MCP server: the plugin reaches its state through a command line tool it ships, and it ships no `bin/` directory so that it installs everywhere ([why](docs/DECISIONS.md#no-bin-in-the-plugin)).
 
 ## Development
 
@@ -394,7 +411,7 @@ CLI reads its version from `packages/cli/package.json` at build time; commit the
 
 - The [Claude Code](https://github.com/anthropics/claude-code) team, for the plugin system that holyclaude is built on.
 - The [T3](https://github.com/pingdotgg/t3code) team: T3 Code works great with holyclaude.
-- [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) and its author code-yeongyu, for the work that came before.
+- The [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) team, for the work that came before.
 - The [OpenCode](https://github.com/anomalyco/opencode) team, for their open-source agent.
 - [HolyCodex](https://github.com/davidbasilefilho/holycodex), the Codex plugin that holyclaude was adapted from.
 
