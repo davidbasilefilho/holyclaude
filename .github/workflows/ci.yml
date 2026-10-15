@@ -28,6 +28,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate plugin and marketplace
+        env:
+          DISABLE_AUTOUPDATER: "1"
+        run: |
+          # Pinned so a new Claude Code release cannot turn the job red on its own; validation needs no credentials.
+          bunx @anthropic-ai/claude-code@2.1.300 plugin validate --strict plugin
+          bunx @anthropic-ai/claude-code@2.1.300 plugin validate --strict .
+
       - name: Format
         run: mise run fmt:readonly
 
