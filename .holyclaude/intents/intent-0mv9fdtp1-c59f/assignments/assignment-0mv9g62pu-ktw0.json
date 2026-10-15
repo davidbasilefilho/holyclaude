@@ -2,7 +2,7 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Worker.implementation",
-  "objective": "PR6 repair (worktree /home/user/wt/pr6): close the guard's bypasses found in review and harden the CI step.",
+  "objective": "PR6 repair (worktree worktree pr6): close the guard's bypasses found in review and harden the CI step.",
   "scope": [
     "scripts/architecture.test.ts",
     ".github/workflows/ci.yml"
@@ -42,8 +42,24 @@
     "independent_from": []
   },
   "id": "assignment-0mv9g62pu-ktw0",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "PR6 repair: bare builtins normalized via isBuiltin, comments stripped with transpiler scanImports cross-check, scan covers plugin/ and .mts/.cts, validate step moved after install with DISABLE_AUTOUPDATER=1; red on 4 temporary violations, green on tree; gates on 1.4.3, 1107 pass. Diff at scratchpad/diffs/assignment-0mv9g62pu-ktw0.diff.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Repair closes the reviewed blocker; independent re-review attacked it and found no blockers; gates green.",
+    "criteria_evidence": {
+      "Bare builtin specifiers (fs, fs/promises, path, os, child_process and any other Node builtin, detected with isBuiltin from node:module or an equivalent) are treated as node: imports and checked against the allowlist, so `import { readFileSync } from \"fs\"` fails.": "Re-review scratch copy flags bare fs, os, readline, fs/promises.",
+      "An import whose braces span lines and contain comments is parsed (comments stripped before matching), with a sanity assertion that the scan parsed imports from the tree.": "Fixture test plus transpiler cross-check; re-review confirmed.",
+      "The scan also covers plugin/ and .mts/.cts files, skipping node_modules and the generated bundle.": "Re-review confirmed plugin/*.ts, .mts, .cts scanned; node_modules skipped.",
+      "The CI validate step runs right after dependency install (before format), with DISABLE_AUTOUPDATER=1 in its env.": "ci.yml step order and env in diff.",
+      "Each new rule is shown red on a temporary violation and green on the tree; format, lint, typecheck and test pass.": "Writer red run on 4 files; gates green 1107."
+    },
+    "required_evidence": {
+      "checks-run": "Gates on 1.4.3.",
+      "red-green-proof": "Temporary violations red, deleted, green.",
+      "changed-paths": "ci.yml, scripts/architecture.test.ts, AGENTS.md.",
+      "diff-file": "scratchpad/diffs/assignment-0mv9g62pu-ktw0.diff"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

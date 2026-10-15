@@ -2,7 +2,7 @@
   "intent_id": "intent-0mv9fdtp1-c59f",
   "intent_revision": 2,
   "role": "Worker.implementation",
-  "objective": "PR5 (worktree /home/user/wt/pr5, branch release/0.2.0/docs/cloud-and-decisions): a README section on cloud sessions and a new docs/DECISIONS.md recording the standing decisions and the vendored frontend-design provenance.",
+  "objective": "PR5 (worktree worktree pr5, branch release/0.2.0/docs/cloud-and-decisions): a README section on cloud sessions and a new docs/DECISIONS.md recording the standing decisions and the vendored frontend-design provenance.",
   "scope": [
     "README.md: a new cloud-sessions section and the Third-party material paragraph",
     "docs/DECISIONS.md (new)"

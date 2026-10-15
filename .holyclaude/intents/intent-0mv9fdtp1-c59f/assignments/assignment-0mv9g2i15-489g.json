@@ -4,8 +4,8 @@
   "role": "Reviewer.security",
   "objective": "Independent security review of PR1 (hook observation gating and SessionStart stdin handling) and PR6 (CI step fetching Claude Code via bunx; architecture guard).",
   "scope": [
-    "PR1 diff scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff (worktree /home/user/wt/pr1)",
-    "PR6 diff scratchpad/diffs/assignment-0mv9fvesj-g88x.diff (worktree /home/user/wt/pr6)",
+    "PR1 diff scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff (worktree worktree pr1)",
+    "PR6 diff scratchpad/diffs/assignment-0mv9fvesj-g88x.diff (worktree worktree pr6)",
     "Base origin/main"
   ],
   "constraints": [

@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR2 (worktree worktree pr2, branch release/0.2.0/feat/resolved-model, based on PR1): a PostToolUse hook on the Agent tool records the subagent's resolvedModel, and assignment verify uses it before falling back to the transcript; plus PR1 review follow-ups.",
+  "scope": [
+    "packages/cli/src (hooks, observations, verify, commands) and tests",
+    "plugin/hooks/hooks.json",
+    "plugin/scripts/holyclaude.js",
+    "README.md"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md.",
+    "Record only holyclaude specialists, as PR1 does."
+  ],
+  "acceptance_criteria": [
+    "A PostToolUse hook on the Agent tool records resolvedModel for the launched agent id when subagent_type is a holyclaude specialist, for background launches (status async_launched) and foreground completions; other subagent types record nothing.",
+    "assignment verify takes the observed model from that record when present and falls back to reading the subagent transcript otherwise; its output says which source was used.",
+    "Regression tests fail on the base and pass after; README describes the new hook and source.",
+    "PR1 review follow-ups: session-start tests add near-miss agent types (for example holyclaude-x and holyclaude:Worker.x) that must still get the rules; the hook-session-start command summary text matches the new behavior; README notes that repositories which run their own formatter should exclude .holyclaude/ (holyclaude's own .oxfmtrc.json does).",
+    "Format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "regression-tests",
+    "payload-evidence",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src",
+      "plugin/hooks/hooks.json",
+      "plugin/scripts/holyclaude.js",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [
+      "assignment-0mv9fvem5-zb5b"
+    ],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gdttk-9ofb",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
