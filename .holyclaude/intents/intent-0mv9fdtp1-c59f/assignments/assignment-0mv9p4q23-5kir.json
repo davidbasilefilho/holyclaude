@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Refuse an empty --worktree value in assignment reserve.",
+  "scope": [
+    "Worktree worktree b: packages/cli/src, packages/core/src, plugin/scripts/holyclaude.js."
+  ],
+  "constraints": [
+    "Minimal fix with a regression test; no git writes."
+  ],
+  "acceptance_criteria": [
+    "assignment reserve --worktree \"\" (or whitespace) is refused with InvalidWorktree and reserves nothing; a regression test fails without the fix.",
+    "Bundle rebuilt; fmt, lint, typecheck, full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/cli/src",
+      "packages/core/src",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9op2qr-40db",
+      "assignment-0mv9oy63p-zksq"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9p4q23-5kir",
+  "state": "Succeeded",
+  "result": "openWorktree refuses blank or whitespace paths with InvalidWorktree (empty path); regression tests in worktree.test.ts and commands.test.ts failed before; 1231/0; bundle rebuilt.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Empty --worktree refusal verified by re-review jx8k.",
+    "criteria_evidence": {
+      "assignment reserve --worktree \"\" (or whitespace) is refused with InvalidWorktree and reserves nothing; a regression test fails without the fix.": "verified by re-review jx8k (no-fix run 3 fail; gates pass)",
+      "Bundle rebuilt; fmt, lint, typecheck, full test pass.": "verified by re-review jx8k (no-fix run 3 fail; gates pass)"
+    },
+    "required_evidence": {
+      "checks-run": "reported; repair diff saved",
+      "diff-file": "reported; repair diff saved",
+      "tests-added": "reported; repair diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

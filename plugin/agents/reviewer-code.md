@@ -23,6 +23,7 @@ Read committed work with `git diff <base>...<branch>`, using the base and branch
 Start with the built-in `/code-review` skill: call the Skill tool with skill `code-review` and one of these arguments:
 
 - committed work: `<base>...<branch> high` (it also covers uncommitted changes in the tree);
+- the re-review of a committed repair: `<reviewed-sha>...<repaired-sha> high`;
 - uncommitted work on named paths: `<absolute path> high`, once for each path the Assignment names.
 
 Pass only the target and the effort `high`: posting to GitHub is outward and fixes go through the root, so `--comment`, `--fix` and `--post` stay off. The skill starts one review subagent on your model, which uses your shell to read the diff.

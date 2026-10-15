@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.mechanical",
+  "objective": "Allowlist realpath in the architecture test for worktree-ownership.",
+  "scope": [
+    "Worktree worktree b, file scripts/architecture.test.ts only."
+  ],
+  "constraints": [
+    "Change only the one allowlist entry; no git writes."
+  ],
+  "acceptance_criteria": [
+    "sourceAllowlist[\"node:fs/promises\"] gains realpath with the reason \"no Bun equivalent: resolve symbolic links so two spellings of one directory share a worktree key\", in key order.",
+    "fmt, lint, typecheck and the full test suite pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "scripts/architecture.test.ts"
+    ],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9op2qr-40db"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ovvlx-yzba",
+  "state": "Succeeded",
+  "result": "realpath allowlisted (oxfmt wrapped the value); full suite 1227 pass 0 fail; fmt, lint, typecheck pass.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Allowlist entry verified within review of B (architecture test passes; realpath justified).",
+    "criteria_evidence": {
+      "sourceAllowlist[\"node:fs/promises\"] gains realpath with the reason \"no Bun equivalent: resolve symbolic links so two spellings of one directory share a worktree key\", in key order.": "verified by reviews zksq and jx8k: architecture test passes",
+      "fmt, lint, typecheck and the full test suite pass.": "verified by reviews zksq and jx8k: architecture test passes"
+    },
+    "required_evidence": {
+      "checks-run": "reported; diff saved",
+      "diff-file": "reported; diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,61 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Second repair of docs/review-and-cloud: head-gated review state, verified REST reads, one owner for re-review targets.",
+  "scope": [
+    "Worktree worktree d: plugin/agents/holyclaude.md, plugin/agents/reviewer-code.md, plugin/skills/assignments/SKILL.md, README.md."
+  ],
+  "constraints": [
+    "Prose only; writing bar; core-rules block unchanged; read-only gh calls only; no git writes."
+  ],
+  "acceptance_criteria": [
+    "F1-F4 fixed as the brief specifies, with the watch's REST commands run live against this repository's PRs and their output shown.",
+    "O2 and O5 applied.",
+    "fmt and full test pass; wc -c before and after; repair-only diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "live-run",
+    "diff-file",
+    "sizes"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md",
+      "plugin/agents/reviewer-code.md",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9p4f7o-efpz",
+      "assignment-0mv9pa01e-qy6w"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9pe0r5-p5oo",
+  "state": "Succeeded",
+  "result": "F1-F4, O2, O5 applied; live REST reads on PR 23 produce the summary line; reduction tested on synthetic lines (no live reviews exist); found gh --paginate second page 403 in this proxy; fmt and 1210 tests pass.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "D prose verified through review oyxib and narrow re-reviews qy6w, 2nmh, 5sf2; final pass has no blockers; REST reads run live on PR 23.",
+    "criteria_evidence": {
+      "F1-F4 fixed as the brief specifies, with the watch's REST commands run live against this repository's PRs and their output shown.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "O2 and O5 applied.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "fmt and full test pass; wc -c before and after; repair-only diff saved.": "verified by the review chain ending in 5sf2 (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; diff files saved",
+      "live-run": "reported by the writer; diff files saved",
+      "diff-file": "reported by the writer; diff files saved",
+      "sizes": "reported by the writer; diff files saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

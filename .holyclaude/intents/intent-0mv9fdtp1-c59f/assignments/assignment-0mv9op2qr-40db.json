@@ -1,0 +1,66 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Build fix/worktree-ownership: reserve --worktree keys write-area overlap per worktree.",
+  "scope": [
+    "Worktree worktree b, branch release/0.2.0/fix/worktree-ownership, based on PR #21 (0638af5)."
+  ],
+  "constraints": [
+    "Nothing about the worktree reaches committed records: no new record field, no absolute path; the key lives in local untracked state next to agent ids.",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "assignment reserve --worktree <dir> makes <dir> the writable root (ownership paths resolve against it, OutsideWritableRoots checked against it) and records an opaque key for that worktree in local state.",
+    "Two writers with overlapping ownership paths conflict only when their worktree keys match; a reservation without --worktree keys to the project root, so existing behavior is unchanged.",
+    "The key is released with the reservation (finish, cancel, rollback, reconcile resolve --fail) and survives a CLI restart.",
+    "<dir> must be an existing directory; refuse otherwise with a tagged error.",
+    "assignments skill and README document --worktree compactly (wc -c before/after).",
+    "Tests cover overlap in the same worktree, no conflict across worktrees, default behavior, release, and the record files staying free of the key; bundle rebuilt; fmt, lint, typecheck, full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "ownership"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9op2qr-40db",
+  "state": "Succeeded",
+  "result": "B built: reserve --worktree <dir> with sha256 realpath key in local/worktrees.json, overlap only within the same worktree, keyless rows hold against all, InvalidWorktree for missing or file paths, skill and README updated. 1226 pass, 1 fail: architecture allowlist rejects the new realpath import from node:fs/promises (outside ownership).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Independent review zksq: no blockers, e2e across worktrees, records clean, older CLI compatible; empty-flag repair re-reviewed.",
+    "criteria_evidence": {
+      "assignment reserve --worktree <dir> makes <dir> the writable root (ownership paths resolve against it, OutsideWritableRoots checked against it) and records an opaque key for that worktree in local state.": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k",
+      "Two writers with overlapping ownership paths conflict only when their worktree keys match; a reservation without --worktree keys to the project root, so existing behavior is unchanged.": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k",
+      "The key is released with the reservation (finish, cancel, rollback, reconcile resolve --fail) and survives a CLI restart.": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k",
+      "<dir> must be an existing directory; refuse otherwise with a tagged error.": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k",
+      "assignments skill and README document --worktree compactly (wc -c before/after).": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k",
+      "Tests cover overlap in the same worktree, no conflict across worktrees, default behavior, release, and the record files staying free of the key; bundle rebuilt; fmt, lint, typecheck, full test pass.": "verified by review zksq (tests, e2e, bundle cmp) and re-review jx8k"
+    },
+    "required_evidence": {
+      "checks-run": "reported by writer, confirmed by review zksq",
+      "changed-paths": "reported by writer, confirmed by review zksq",
+      "diff-file": "reported by writer, confirmed by review zksq",
+      "tests-added": "reported by writer, confirmed by review zksq"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

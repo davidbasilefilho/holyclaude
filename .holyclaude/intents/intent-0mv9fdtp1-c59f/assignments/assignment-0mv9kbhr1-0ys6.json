@@ -37,6 +37,19 @@
   "id": "assignment-0mv9kbhr1-0ys6",
   "state": "Succeeded",
   "result": "PR7 final-repair review: no blockers; hook tests 823 pass, bun check clean; mutation removing the time bound makes the new test fail; optional README sentence for the 10 s bound, hint wording, default wiring.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 2 to 5: revisions 3-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #19, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "The time bound degrades to rules plus a state error and its regression test is behavior-sensitive.": "Met in #19: independent review of that head and CI green on it",
+      "The hint no longer tells the user to shorten input; the state dir is resolved before forking.": "Met in #19: independent review of that head and CI green on it",
+      "Blockers separated from optional.": "Met in #19: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #19 review",
+      "blockers": "Reported by the worker and confirmed by the #19 review",
+      "optional-findings": "Reported by the worker and confirmed by the #19 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

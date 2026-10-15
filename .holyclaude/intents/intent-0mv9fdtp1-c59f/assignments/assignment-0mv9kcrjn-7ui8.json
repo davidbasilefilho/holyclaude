@@ -50,6 +50,27 @@
   "id": "assignment-0mv9kcrjn-7ui8",
   "state": "Succeeded",
   "result": "PR8 code: local/.gitignore *, Intent state open/closed with reason (absent=open), close refuses while Running, reopen bumps revision, closed refuses dispatch, intent list/use/close/reopen, --intent and --all, resolution flag>stored>only open, NoActiveIntent otherwise, SessionStart names open Intents and marks in-use, skills and README; 34 tests fail on base; gates pass (1190); bundle rebuilt. Choices: open count excludes Ready; assignment list fails with several open and none chosen; handoff skill stale.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 3 to 5: revisions 4-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #21, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "local/ gets its own .gitignore containing * whenever the CLI creates it.": "Met in #21: independent review of that head and CI green on it",
+      "Intent records carry state open|closed with a close reason; absent state decodes as open.": "Met in #21: independent review of that head and CI green on it",
+      "intent close --reason refuses while an Assignment of that Intent is Running; intent reopen returns it to open and bumps its revision; a closed Intent never authorizes a dispatch.": "Met in #21: independent review of that head and CI green on it",
+      "intent list prints id, state, revision, objective and open-Assignment count, with --state.": "Met in #21: independent review of that head and CI green on it",
+      "intent use <id> stores the per-clone choice under local/ and refuses a closed Intent; with exactly one open Intent it is used automatically; with several open and none chosen, Intent-scoped commands fail listing the open Intents; --intent <id> overrides on any Intent-scoped command; greatest-id selection is gone.": "Met in #21: independent review of that head and CI green on it",
+      "assignment list defaults to the active Intent (with a flag or --intent for others).": "Met in #21: independent review of that head and CI green on it",
+      "SessionStart names every open Intent (id, revision, objective, open-Assignment count) and marks the one in use; rows shrink inside the budget.": "Met in #21: independent review of that head and CI green on it",
+      "continue-work asks which Intent to continue when several are open; the assignments skill documents the new commands.": "Met in #21: independent review of that head and CI green on it",
+      "README: new commands and states, local/.gitignore, collaborators need the same version because older versions reject the new fields, existing Intents read as open until closed.": "Met in #21: independent review of that head and CI green on it",
+      "Regression tests for each behavior fail on the base; format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3.": "Met in #21: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #21 review",
+      "regression-tests": "Reported by the worker and confirmed by the #21 review",
+      "changed-paths": "Reported by the worker and confirmed by the #21 review",
+      "diff-file": "Reported by the worker and confirmed by the #21 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
