@@ -1,0 +1,67 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Build ci/locked-tools: tools run from the lockfile, claude-code locked, version script updates bun.lock.",
+  "scope": [
+    "Worktree worktree c, branch release/0.2.0/ci/locked-tools, based on release/0.2.0/ci/validate-and-guard (PR #18)."
+  ],
+  "constraints": [
+    "No new tool that overlaps the toolchain; AGENTS.md unchanged; README.md is not yours (report any README line that would need changing instead of editing it).",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "Before switching, show that `bun run oxfmt --check` and `bun run oxlint` (or the exact bun run form) resolve the locked node_modules binaries on Bun 1.4.3, and that they fail loudly when node_modules is absent instead of fetching.",
+    "mise.toml format and lint tasks (and any CI step) use that form; no bunx remains for oxfmt or oxlint.",
+    "claude-code: in a clean copy, add @anthropic-ai/claude-code at exact 2.1.300 as a root devDependency, install with --frozen-lockfile on Bun 1.4.3 without lifecycle scripts, and run `plugin validate --strict plugin` and `.` from the installed binary. If that works, CI runs it that way; if not, create a CI-only package (own package.json and bun.lock, outside the workspaces) and CI installs it frozen and runs it from there. Report which and why.",
+    "scripts/bump-version.ts also updates the workspace version entries in bun.lock; a test asserts the bun.lock workspace versions equal the manifests' versions, and the bump script's test covers the lockfile update.",
+    "fmt, lint, typecheck and full test pass; bun install --frozen-lockfile passes."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "claude-code-decision"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "mise.toml",
+      ".github/workflows",
+      "package.json",
+      "bun.lock",
+      "scripts/bump-version.ts",
+      "scripts/version.test.ts",
+      "scripts/lockfile.test.ts",
+      "ci"
+    ],
+    "symbols": [],
+    "domains": [
+      "toolchain"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9oe56z-qz2d",
+  "state": "Succeeded",
+  "result": "C built: mise fmt/lint via bun run (locked binaries, fail loudly without install); claude-code 2.1.300 exact root devDependency, frozen install without lifecycle scripts, validate passes from bun run claude; bump-version updates bun.lock workspace versions with lockfile.test.ts and 3 bump tests. Gates pass (1147 tests). README 347/353-354 need a bun.lock mention (not owned).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Writer report verified by independent review a867 (no blockers); README drift handled in a follow-up.",
+    "criteria_evidence": {
+      "Before switching, show that `bun run oxfmt --check` and `bun run oxlint` (or the exact bun run form) resolve the locked node_modules binaries on Bun 1.4.3, and that they fail loudly when node_modules is absent instead of fetching.": "Confirmed by review assignment-0mv9oixsj-xh13 checks",
+      "mise.toml format and lint tasks (and any CI step) use that form; no bunx remains for oxfmt or oxlint.": "Confirmed by review assignment-0mv9oixsj-xh13 checks",
+      "claude-code: in a clean copy, add @anthropic-ai/claude-code at exact 2.1.300 as a root devDependency, install with --frozen-lockfile on Bun 1.4.3 without lifecycle scripts, and run `plugin validate --strict plugin` and `.` from the installed binary. If that works, CI runs it that way; if not, create a CI-only package (own package.json and bun.lock, outside the workspaces) and CI installs it frozen and runs it from there. Report which and why.": "Confirmed by review assignment-0mv9oixsj-xh13 checks",
+      "scripts/bump-version.ts also updates the workspace version entries in bun.lock; a test asserts the bun.lock workspace versions equal the manifests' versions, and the bump script's test covers the lockfile update.": "Confirmed by review assignment-0mv9oixsj-xh13 checks",
+      "fmt, lint, typecheck and full test pass; bun install --frozen-lockfile passes.": "Confirmed by review assignment-0mv9oixsj-xh13 checks"
+    },
+    "required_evidence": {
+      "checks-run": "gates pass, 1147 tests",
+      "changed-paths": "7 files within ownership",
+      "diff-file": "scratchpad/diffs/assignment-0mv9oe56z-qz2d.diff",
+      "claude-code-decision": "root exact devDependency; frozen install and validate verified"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

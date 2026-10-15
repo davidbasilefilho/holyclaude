@@ -11,10 +11,14 @@ import { attempt, attemptTransient, hasCode, io, readText } from "./io.ts"
 import { ownsFile, type Lock } from "./lock.ts"
 import { refuseSymlinks } from "./safety.ts"
 
+/** A line git leaves in a file when a merge could not combine both sides. */
+const CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?:\s|$)/m
+
 /**
  * Reads and strictly decodes a JSON file. A missing file reads as undefined. A file that is not
  * valid JSON for the schema is reported as CorruptRecord with the path, so the user is pointed at
- * the file and not at the input of the command. Without a limit the file is read whole.
+ * the file and not at the input of the command; one that holds git conflict markers says to resolve
+ * the conflict in git first. Without a limit the file is read whole.
  */
 export const readJson = <S extends Schema.Decoder<unknown>>(
   schema: S,
@@ -26,7 +30,15 @@ export const readJson = <S extends Schema.Decoder<unknown>>(
       text === undefined
         ? Effect.succeed(undefined)
         : decodeJsonStrict(schema)(text).pipe(
-            Effect.mapError((error) => new CorruptRecord({ path, reason: error.message })),
+            Effect.mapError(
+              (error) =>
+                new CorruptRecord({
+                  path,
+                  reason: CONFLICT_MARKER.test(text)
+                    ? "it holds git conflict markers; resolve the conflict in git, then rerun"
+                    : error.message,
+                }),
+            ),
           ),
     ),
   )

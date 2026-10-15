@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.code",
+  "objective": "Independently review fix/intent-lifecycle (uncommitted in worktree a, base PR #21).",
+  "scope": [
+    "Worktree worktree a, uncommitted changes against HEAD 0638af5 (PR #21 head); diff file scratchpad/diffs/assignment-0mv9oe510-ghwq.diff."
+  ],
+  "constraints": [
+    "Read-only on the worktree; scratch copies go to the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "Carry-forward, close refusal and override, reopen in use, conflict-marker detection and closed_with_open_work behave as specified, with no persisted schema change.",
+    "Tests would fail without each change; the full suite passes twice in a row (report any flaky test by name).",
+    "Prose changes are compact, correct and outside the core-rules block; README accurate.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "intent-lifecycle"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9oe510-ghwq"
+    ],
+    "independent_from": [
+      "assignment-0mv9oe510-ghwq"
+    ]
+  },
+  "id": "assignment-0mv9op2l8-c9hc",
+  "state": "Succeeded",
+  "result": "No blockers; 7 /code-review findings dispositioned; suite twice 1229/0; bundle byte-identical; mutation checks show each change tested. Optional: prose rules repeated across holyclaude.md, SKILL.md and README; reconcile row for Succeeded-unaccepted on closed Intent; marker check scope.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Independent review with mutation evidence; I take the prose-duplication optional as a writing-bar repair.",
+    "criteria_evidence": {
+      "Carry-forward, close refusal and override, reopen in use, conflict-marker detection and closed_with_open_work behave as specified, with no persisted schema change.": "verified with tests and mutation reverts; AcceptanceRecord untouched",
+      "Tests would fail without each change; the full suite passes twice in a row (report any flaky test by name).": "6 mutation reverts each fail tests; 1229/0 twice, no flake",
+      "Prose changes are compact, correct and outside the core-rules block; README accurate.": "edits at 108-112 outside block; README matches code; duplication optional noted",
+      "Blockers and optional findings reported with evidence.": "none blocking; optionals listed"
+    },
+    "required_evidence": {
+      "code-review-run": "/code-review worktree a high, 7 findings",
+      "checks-run": "gates, two full runs, bundle cmp, mutations",
+      "findings": "no blockers"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

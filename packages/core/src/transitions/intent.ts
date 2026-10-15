@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 
-import { IntentBusy, InvalidRecord } from "../errors.ts"
+import { IntentBusy, InvalidRecord, UnacceptedAssignments } from "../errors.ts"
 import { newId } from "../model/ids.ts"
 import type { Intent } from "../model/intent.ts"
 import { Id, Text } from "../model/primitives.ts"
@@ -24,8 +24,16 @@ export const UpdateIntentInput = Schema.Struct({
 /** Decoded input of updateIntent. */
 export type UpdateIntentInput = typeof UpdateIntentInput.Type
 
-/** Input of closeIntent: the Intent, why it closes, and when. */
-export const CloseIntentInput = Schema.Struct({ id: Id, reason: Text, at: Text })
+/**
+ * Input of closeIntent: the Intent, why it closes, and when. `allow_unaccepted` is the reason to
+ * close although Succeeded Assignments were never accepted.
+ */
+export const CloseIntentInput = Schema.Struct({
+  id: Id,
+  reason: Text,
+  at: Text,
+  allow_unaccepted: Schema.optionalKey(Text),
+})
 /** Decoded input of closeIntent. */
 export type CloseIntentInput = typeof CloseIntentInput.Type
 
@@ -59,7 +67,9 @@ export const updateIntent = (state: State, input: UpdateIntentInput) =>
 
 /**
  * Closes an open Intent with a reason and the time. Refused while any Assignment of the Intent is
- * Running, since its worker would be acting on work that no longer authorizes it.
+ * Running, since its worker would be acting on work that no longer authorizes it. Also refused
+ * while Succeeded Assignments of it are unaccepted, unless `allow_unaccepted` gives a reason, which
+ * is kept in the close reason with the ids it overrode.
  */
 export const closeIntent = (state: State, input: CloseIntentInput) =>
   Effect.gen(function* () {
@@ -70,10 +80,21 @@ export const closeIntent = (state: State, input: CloseIntentInput) =>
       .filter((row) => row.intent_id === current.id && row.state === "Running")
       .map((row) => row.id)
     if (running.length > 0) return yield* new IntentBusy({ intent_id: current.id, running })
+    const unaccepted = state.assignments
+      .filter(
+        (row) =>
+          row.intent_id === current.id && row.state === "Succeeded" && row.acceptance === null,
+      )
+      .map((row) => row.id)
+    if (unaccepted.length > 0 && input.allow_unaccepted === undefined)
+      return yield* new UnacceptedAssignments({ intent_id: current.id, unaccepted })
     return replaceIntent(state, {
       ...current,
       state: "closed",
-      close_reason: input.reason,
+      close_reason:
+        unaccepted.length > 0
+          ? `${input.reason} (unaccepted ${unaccepted.join(", ")} allowed: ${input.allow_unaccepted})`
+          : input.reason,
       closed_at: input.at,
     })
   })

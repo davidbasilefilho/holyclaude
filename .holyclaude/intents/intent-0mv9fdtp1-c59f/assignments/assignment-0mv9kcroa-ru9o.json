@@ -37,6 +37,21 @@
   "id": "assignment-0mv9kcroa-ru9o",
   "state": "Succeeded",
   "result": "PR8 prose: shared writing bar between markers in holyclaude.md, worker-implementation.md, reviewer-artifact.md; scripts/writing-bar.test.ts 5 tests red on a word change and a missing marker, green on tree; root no longer quotes the bar, names expected size; core-rules line on choosing an Intent at session start (+212); gates pass (1153). Edited the pre-PR3 holyclaude.md (PR8 base predates PR3/PR4 merge-up).",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 3 to 5: revisions 4-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #21, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "The writing bar text is identical in holyclaude.md, worker-implementation.md and reviewer-artifact.md between shared markers, and scripts/writing-bar.test.ts fails if any copy differs or a marker is missing.": "Met in #21: independent review of that head and CI green on it",
+      "The root no longer quotes the bar in instruction-text Assignments; it names the expected size relative to the text replaced.": "Met in #21: independent review of that head and CI green on it",
+      "One core-rules line: at session start, when several Intents are open and none is in use, ask the user which one and run holyclaude intent use.": "Met in #21: independent review of that head and CI green on it",
+      "Format, lint, typecheck and test pass; the drift test shown red on a deliberate difference and green on the tree.": "Met in #21: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #21 review",
+      "red-green-proof": "Reported by the worker and confirmed by the #21 review",
+      "size-change": "Reported by the worker and confirmed by the #21 review",
+      "diff-file": "Reported by the worker and confirmed by the #21 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

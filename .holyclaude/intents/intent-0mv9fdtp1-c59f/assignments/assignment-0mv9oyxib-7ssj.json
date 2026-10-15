@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review docs/review-and-cloud prose (worktree d, base PR #21).",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9ovvqm-sdcy.diff; files in worktree d: plugin/agents/holyclaude.md, plugin/agents/reviewer-artifact.md, plugin/skills/assignments/SKILL.md, README.md; base 0638af5."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Each of the six D criteria is met as worded in the brief.",
+    "The prose meets the writing bar: each rule once with its reason, no duplicate or conflicting line elsewhere in the four files, no caps.",
+    "The REST forms are correct gh api usage and the GraphQL-only claims are accurate.",
+    "Blockers and optional findings reported with evidence."
+  ],
+  "required_evidence": [
+    "findings",
+    "criteria-check"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ovvqm-sdcy"
+    ],
+    "independent_from": [
+      "assignment-0mv9ovvqm-sdcy"
+    ]
+  },
+  "id": "assignment-0mv9oyxib-7ssj",
+  "state": "Succeeded",
+  "result": "Not ready: blockers B1 README allowlist still gh pr checks, no gh api; B2 reviewer-artifact.md:27 whole-artifact line conflicts with re-review scope; B3 changed-lines re-review has no code target; B4 legacy commit statuses not counted; B5 per_page=100 truncates silently; B6 threads Unknown makes terminal green unreachable where GraphQL is blocked. Optional O1-O8 (duplicate reason, objective rule twice, circular fallback, re-review scope mismatch, review-state derivation, mergeable null, field names, README condition).",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Thorough first review; six blockers verified against the text and accepted as repair scope.",
+    "criteria_evidence": {
+      "Each of the six D criteria is met as worded in the brief.": "see findings B1-B6, O1-O9 with file:line",
+      "The prose meets the writing bar: each rule once with its reason, no duplicate or conflicting line elsewhere in the four files, no caps.": "see findings B1-B6, O1-O9 with file:line",
+      "The REST forms are correct gh api usage and the GraphQL-only claims are accurate.": "see findings B1-B6, O1-O9 with file:line",
+      "Blockers and optional findings reported with evidence.": "see findings B1-B6, O1-O9 with file:line"
+    },
+    "required_evidence": {
+      "findings": "B1-B6 blockers, O1-O9 optional",
+      "criteria-check": "per criterion with lines"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

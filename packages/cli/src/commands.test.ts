@@ -657,3 +657,156 @@ describe("assignment verify", () => {
     expect(await Effect.runPromise(Effect.flip(verify))).toMatchObject({ _tag: "TooLarge" })
   })
 })
+
+/** Marks the Running Assignment as Succeeded, as `assignment finish` leaves it. */
+const succeed = () =>
+  Effect.runPromise(
+    updateState(directory, (state) =>
+      Effect.succeed({
+        state: {
+          ...state,
+          assignments: state.assignments.map((row) => ({ ...row, state: "Succeeded" as const })),
+        },
+        value: 0,
+      }),
+    ),
+  )
+
+const review = (revision: number, rationale = "the change touched none of its files") =>
+  JSON.stringify({
+    intent_revision: revision,
+    rationale,
+    criteria_evidence: { a: "seen" },
+    required_evidence: { e: "seen" },
+  })
+
+const bumpRevision = () => runCommand("intent update", [], { material: true }, "{}")
+
+describe("assignment accept --carry-forward", () => {
+  test("accepts work from an earlier revision at the live one, and only with the flag", async () => {
+    await succeed()
+    await bumpRevision()
+    expect(await refusal("assignment accept", ["assignment-0001"], {}, review(2))).toMatchObject({
+      _tag: "StaleRevision",
+      given: 1,
+      live: 2,
+    })
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(2),
+    )
+    expect(done.value).toMatchObject({ id: "assignment-0001", rev: 1, accepted: true })
+    const row = (await Effect.runPromise(loadState(directory))).assignments[0]!
+    expect(row.intent_revision).toBe(1)
+    expect(row.acceptance?.intent_revision).toBe(2)
+  })
+
+  test("needs a rationale, and an acceptance at the live revision", async () => {
+    await succeed()
+    await bumpRevision()
+    const flags = { "carry-forward": true }
+    expect(
+      await refusal("assignment accept", ["assignment-0001"], flags, review(2, "  ")),
+    ).toMatchObject({ _tag: "SchemaError" })
+    expect(await refusal("assignment accept", ["assignment-0001"], flags, review(1))).toMatchObject(
+      { _tag: "StaleRevision" },
+    )
+    expect((await Effect.runPromise(loadState(directory))).assignments[0]?.acceptance).toBeNull()
+  })
+
+  test("on work at the live revision the flag changes nothing", async () => {
+    await succeed()
+    const done = await runCommand(
+      "assignment accept",
+      ["assignment-0001"],
+      { "carry-forward": true },
+      review(1),
+    )
+    expect(done.value).toMatchObject({ accepted: true })
+  })
+})
+
+describe("intent close and unaccepted work", () => {
+  test("is refused listing the Succeeded Assignments never accepted, and --allow-unaccepted records why", async () => {
+    await succeed()
+    const error = await refusal("intent close", [], { reason: "shipped" })
+    expect(error).toMatchObject({
+      _tag: "UnacceptedAssignments",
+      unaccepted: ["assignment-0001"],
+    })
+    expect(String(error)).toContain("assignment-0001")
+    expect((await intentOf(OLDER)).state).toBe("open")
+    await runCommand("intent close", [], {
+      reason: "shipped",
+      "allow-unaccepted": "superseded by the rewrite",
+    })
+    const closed = await intentOf(OLDER)
+    expect(closed.state).toBe("closed")
+    expect(closed.close_reason).toContain("shipped")
+    expect(closed.close_reason).toContain("superseded by the rewrite")
+  })
+
+  test("an accepted Assignment does not block the close", async () => {
+    await succeed()
+    await runCommand("assignment accept", ["assignment-0001"], {}, review(1))
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await intentOf(OLDER)).close_reason).toBe("shipped")
+  })
+})
+
+describe("intent reopen and the Intent in use", () => {
+  test("puts the reopened Intent in use and says which one it replaced", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    await addNewerIntent()
+    await runCommand("intent use", [NEWER])
+    const reopened = (await runCommand("intent reopen", [], { intent: OLDER })).value as object
+    expect(reopened).toMatchObject({ id: OLDER, in_use: OLDER, replaced: NEWER, revision: 2 })
+    expect(await Bun.file(chosenFile()).text()).toContain(OLDER)
+    expect((await runCommand("intent show")).value).toMatchObject({ id: OLDER })
+  })
+
+  test("says none was replaced when no Intent was open", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("intent reopen")).value).toMatchObject({
+      in_use: OLDER,
+      replaced: null,
+    })
+  })
+})
+
+describe("reconcile and a closed Intent", () => {
+  test("flags a closed Intent that still has Ready or Running Assignments", async () => {
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            intents: state.intents.map((intent) => ({
+              ...intent,
+              state: "closed" as const,
+              close_reason: "shipped",
+              closed_at: "2026-01-02T03:04:05.000Z",
+            })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    const { value } = await runCommand("reconcile")
+    expect(value).toMatchObject({
+      closed_with_open_work: [
+        { intent: OLDER, close_reason: "shipped", assignments: [{ id: "assignment-0001" }] },
+      ],
+    })
+  })
+
+  test("says nothing about closed Intents when none has open work", async () => {
+    await runCommand("reconcile resolve", ["assignment-0001"], { fail: "gone" })
+    await runCommand("intent close", [], { reason: "shipped" })
+    expect((await runCommand("reconcile")).value).not.toHaveProperty("closed_with_open_work")
+  })
+})

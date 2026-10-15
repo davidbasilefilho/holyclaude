@@ -1,0 +1,41 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of D's repair of the six blockers.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9p4f7o-efpz-repair.diff in worktree d (holyclaude.md, reviewer-artifact.md, assignments SKILL.md, README.md); read the diff and the sections it touches."
+  ],
+  "constraints": [
+    "Read-only; outside the changed lines raise only blockers."
+  ],
+  "acceptance_criteria": [
+    "Each of B1-B6 is fixed as the brief specifies and no new conflict or duplicate is introduced.",
+    "Blockers and optional findings reported with file:line evidence."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9p4f7o-efpz"
+    ],
+    "independent_from": [
+      "assignment-0mv9p4f7o-efpz",
+      "assignment-0mv9ovvqm-sdcy",
+      "assignment-0mv9oyxib-7ssj"
+    ]
+  },
+  "id": "assignment-0mv9pa01e-qy6w",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
