@@ -1,0 +1,50 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Re-review PR5's docs after repair (README Cloud sessions, Third-party material, agent-setting qualifications, docs/DECISIONS.md).",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9gamg7-hyu9.diff",
+    "Worktree worktree pr5, base origin/main"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Each blocker from the first review is resolved: size-cap decision stated as decided for 0.2.0 without claiming no caps today; claude-code hash described as HEAD at verification; observed bullets without overreach or unmarked inference; commit-keys line excludes managed-only keys; agent-setting claims qualified with a pointer; stop-hook line limited to sessions observed.",
+    "No new conflict, redundancy or inaccuracy introduced; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9g2wfu-rkz8",
+      "assignment-0mv9gamg7-hyu9",
+      "assignment-0mv9g5n31-5je4"
+    ]
+  },
+  "id": "assignment-0mv9gdtpk-yq5l",
+  "state": "Succeeded",
+  "result": "PR5 re-review: not ready; blocker 5 partly unresolved (README L69-70 and L92 qualifiers), size-cap entry inaccurate (caps no content; omits 64 KiB CLI stdin, SessionStart 10k budget and clips, CLI list 60-char clip, legacy 4 MiB trim and 1 MiB read), stop-hook clause too general, dedup fails across README and DECISIONS, managed-only bullet is not a cloud difference; optional O1-O8.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Each verdict quotes lines and checks caps against code (codec.ts, commands.ts, session-start.ts, legacy.ts).",
+    "criteria_evidence": {
+      "Each blocker from the first review is resolved: size-cap decision stated as decided for 0.2.0 without claiming no caps today; claude-code hash described as HEAD at verification; observed bullets without overreach or unmarked inference; commit-keys line excludes managed-only keys; agent-setting claims qualified with a pointer; stop-hook line limited to sessions observed.": "Per-blocker verdicts with quotes; 2,3,4 met; 1,5,6 not fully.",
+      "No new conflict, redundancy or inaccuracy introduced; blockers separated from optional.": "Dedup blocker A and cloud-list blocker B; O1-O8."
+    },
+    "required_evidence": {
+      "blockers": "1,5,6 partial; A, B.",
+      "optional-findings": "O1-O8."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

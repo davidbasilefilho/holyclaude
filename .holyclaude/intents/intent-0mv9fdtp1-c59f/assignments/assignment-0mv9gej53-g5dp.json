@@ -1,0 +1,46 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR3 repair (worktree worktree pr3): fix the rules review's blockers B1, B2, B3, B5 and selected optional findings, without growing the core-rules block.",
+  "scope": [
+    "plugin/agents/holyclaude.md core-rules block"
+  ],
+  "constraints": [
+    "Follow the ship brief and writing bar.",
+    "The trimmed core-rules block stays at or below 8,540 characters (its current size); a code change in another PR keeps the rules whole ahead of the state summary.",
+    "Do not edit the CI watching or Committing sections; do not change the frontmatter tools line."
+  ],
+  "acceptance_criteria": [
+    "B1: the solo-root line does not name a tool the root lacks; it says to prefer a file-edit tool over shell rewrites where one is available and to keep each edit reviewable.",
+    "B2: the finish rule states that a gate the user waived is named Unknown in the final report rather than counted as Passed, and any other Pending or Unknown result, or a waived gate counted as Passed, is an early stop; the solo line names each waived independent-review gate (for example code or security).",
+    "B3: the speak-only list allows a one-line acknowledgement of a new user instruction and the first message of a solo run naming waived gates.",
+    "B5: no reference resolves only outside the block (the Specialists table, Sizing work, CI watching forms): name the roster via holyclaude routes, state the sizing rule inline briefly, drop the CI-forms parenthetical.",
+    "Optional: routine choices are yours to make without asking; weak-result routing stated plainly; 'After a resume, ask again any question the user left unanswered'; 'reassess the work against it'.",
+    "Size reported; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "size-change",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9fytyh-9ifu",
+      "assignment-0mv9g7i48-l901"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9gej53-g5dp",
+  "state": "Succeeded",
+  "result": "PR3 repair: B1 solo line prefers a file-edit tool where available; B2 waived gate named Unknown, never Passed, other Pending/Unknown early stop; B3 speak list adds acknowledgement and solo first message; B5 references inlined; O1, O2, O4, O6 applied; block 8,540->8,532 after trimming ~430 chars elsewhere (hook-enforced VCS line, concise messages, unrelated-work clause, CLI I/O note, ask-when-nothing-left clause); gates on 1.4.3 pass (1100 tests). Diff at scratchpad/diffs/assignment-0mv9gej53-g5dp.diff.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,6 +1,7 @@
 # holyclaude
 
-holyclaude is a Claude Code plugin that turns the main thread into a root agent. The root
+holyclaude is a Claude Code plugin whose `agent` setting starts the main thread as a root agent, as
+observed in local sessions and not in [cloud sessions](#cloud-sessions). The root
 plans work as an Intent with Assignments, dispatches pinned Haiku and Sonnet specialists,
 judges their reports, and accepts work on evidence. State lives in the project's
 `.holyclaude/` directory (see [State](#state)) and is reached through the `holyclaude` command line tool that the
@@ -8,7 +9,7 @@ plugin ships. There is no MCP server.
 
 ## State
 
-State is kept as one JSON file per record in the project's `.holyclaude/` directory, and the directory is meant to be committed, so a team or several clones of a project share it through version control:
+State is kept as one JSON file per record in the project's `.holyclaude/` directory, which is meant to be committed ([why](docs/DECISIONS.md#holyclaude-state-is-versioned-in-git)):
 
 ```text
 .holyclaude/
@@ -25,13 +26,13 @@ State is kept as one JSON file per record in the project's `.holyclaude/` direct
   state.json.migrated                 an earlier version's single state file, after migration
 ```
 
-Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. The latest Intent is the last in that order, and `assignment list`, `reconcile` and the session summary use it too.
+Two clones that create different records never write the same file, so merging their branches does not conflict. Ids are generated without a counter, as a kind, the creation time in base36 and a short random suffix (`intent-0mg8k2x1a-7f3q`). Among generated ids, plain text order is creation order. The ids of an earlier version (`intent-0001`, with any number of digits) are kept and sort before every generated id, in numeric order. The latest Intent is the last in that order. The session summary shows the latest Intent's objective and requirements and lists the open Assignments of every Intent; `intent show` and `intent update` (without an id) use the latest Intent; `assignment list` and `reconcile` order their rows across all Intents by the same id order.
 
 Each record's id must match its file or directory name; a file that does not is rejected as `CorruptRecord`, which names the file. Writes go through a temporary file and a rename under a local lock, and only the records a command changed are written. A committed record file over 256 KiB is refused. The local files have their own 4 MiB cap instead, because they are never merged and only grow (the agent id of a finished Assignment still feeds `verify`, and a worker's history feeds the independence rule), so their entries cannot be pruned safely. The observations log is the exception: it is only a note for `verify` and the hooks, so once it passes 1 MiB the next append moves it, under the lock, to `observations.1.jsonl` (replacing the generation before) and starts a new one. Readers read both generations, oldest first, so the log on disk stays at about two generations and the newest records are never the ones dropped. The lock and guard files are read only up to 4 KiB (a larger one counts as unreadable and is judged by its age), the `.gitignore` up to 256 KiB, and a subagent transcript that `assignment verify` opens up to 64 MiB; past those caps a read fails as `TooLarge` rather than load the file.
 
 Nothing under the state directory may be a symbolic link or, on Windows, a junction. A link committed to a repository could send a write, rename, remove or append outside the directory, or make a read return a file that is not state, so these are refused with `SymlinkRefused` before the path is touched: the directory itself, `intents/`, every `intents/<id>/` and `assignments/` folder (checked by name, since a directory glob would skip a link without a word), `local/`, each record file, each local file (`workers.json`, `agents.json`, `clone.json`), the lock file and its guard (before the lock is taken), the `.gitignore`, both generations of the observations log (which every specialist tool call and `assignment verify` read, and each of which is also refused over the 4 MiB local cap), and the old `state.json`, `state.json.migrated` and `state.observations.jsonl` that a migration reads, moves or removes. Reads and writes alike are covered. One read is not: `assignment verify` opens the transcript path that the observations log records, and that file lives outside the state directory, in Claude Code's own session store; that read is size-capped instead.
 
-The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log.
+The `.gitignore` in `.holyclaude/` lists exactly these files: `/local/`, `*.tmp`, `/state.json.migrated`, `/state.json`, `/state.json.lock*` and `/state.observations.jsonl`. The first two cover what this version keeps out of the records; the rest are what an earlier version left beside them. So the records are committed and nothing machine-specific is. A subagent id means nothing on another machine, so `agent_id` is never written to a record: it is kept in `local/agents.json` and merged back when the state is read. The same goes for the worker list, the lock owner (process id and host name) and the transcript paths in the observations log. The records are JSON that holyclaude writes, not formatted source, so a repository that runs its own formatter should exclude `.holyclaude/` from it (holyclaude's own `.oxfmtrc.json` does).
 
 The records do hold what you and your root write into them: the objective, requirements, scope, constraints, acceptance criteria, results and evidence of an Intent or Assignment are committed as free text. Keep absolute paths, user names and secrets out of them, because the repository may be public.
 
@@ -66,8 +67,8 @@ Try it straight from a clone, without installing:
 claude --plugin-dir <path-to-clone>/plugin
 ```
 
-The plugin's `settings.json` sets `agent` to `holyclaude`, so the session starts with the root
-agent. Check `/agents` for the `holyclaude:` specialists, and run
+The plugin's `settings.json` sets `agent` to `holyclaude`, so a local session starts with the root
+agent, as observed (a cloud session did not; see [Cloud sessions](#cloud-sessions)). Check `/agents` for the `holyclaude:` specialists, and run
 `<path-to-clone>/plugin/scripts/holyclaude routes` in a shell to see each specialist's model and effort.
 
 To install it through the marketplace route, add the marketplace and then install the plugin. In a
@@ -89,7 +90,7 @@ T3 Code drives Claude through the Agent SDK and loads the user, project and loca
 include `enabledPlugins` and `agent`. It does not pass a plugin directory, so `--plugin-dir` does
 not apply there. Install through the marketplace route above, from a plain `claude` session on the
 same machine, so the plugin is enabled in the settings T3 reads. Then start a thread in T3 Code and
-confirm that the thread runs the `holyclaude` root and that `holyclaude:` specialists can be dispatched.
+confirm that the thread runs the `holyclaude` root and that `holyclaude:` specialists can be dispatched. In plain local `claude` sessions, the plugin's `agent` setting has been observed to start the session with the root; in T3 Code this is unverified. In a cloud session it did not start the root (see [Cloud sessions](#cloud-sessions)).
 
 T3 Code's `$` skills picker lists only skills in the Claude config directory and the project's
 `.claude/skills`, so the plugin's skills do not appear there. The root and the workers still load
@@ -111,9 +112,17 @@ fallback must not rely on the plugin's own SessionStart hook:
   `holyclaude`, because Claude Code substitutes that variable only in a plugin's own files;
 - the hooks in user or project settings.
 
-If T3 Code ignores `agent` in user settings too, the main thread stays on the default agent. Then a
-SessionStart hook in user or project settings can inject the root rules, and the root's restraint
-depends on its instructions alone.
+If T3 Code turns out to ignore `agent` in user settings too, the main thread would stay on the default
+agent. Then a SessionStart hook in user or project settings could inject the root rules, and the
+root's restraint would depend on its instructions alone.
+
+## Cloud sessions
+
+Cloud sessions (Claude Code on the web) differ from a local session in three ways that matter here. Each point is marked as documented (stated in the Claude Code documentation, checked 2026-10-15 for Claude Code 2.1.300) or observed (seen in two cloud sessions with holyclaude loaded, not documented).
+
+- **Settings.** Documented: a cloud session does not read user settings (`~/.claude/settings.json`) or local settings. A single-repository session reads the repository's committed `.claude/settings.json`; a multi-repository session reads only `enabledPlugins` and `extraKnownMarketplaces` from it. Commit the keys you need, such as those in [Settings the plugin cannot ship](#settings-the-plugin-cannot-ship) except its managed-only keys, to `.claude/settings.json` of a single-repository project, or set them as environment variables on the cloud environment (in `.env` format).
+- **The root agent.** Observed: the plugin's `agent` setting did not make the main thread the `holyclaude` agent. The main thread ran as the default agent, and the core rules that the SessionStart hook injects were the root's copy of its instructions.
+- **Stop hooks.** Observed in two cloud sessions: the environment ran a stop hook that asked for uncommitted files to be committed, and it flagged the `.holyclaude/` state, which is meant to be committed with the work (see [State](#state)), so commit it together with the change.
 
 ## Settings the plugin cannot ship
 
@@ -121,6 +130,8 @@ A plugin's `settings.json` honors only `agent` and `subagentStatusLine`, so ever
 yours to set. Put each entry in the settings file for the scope where you run the holyclaude root.
 The `permissions.deny` entries apply to sessions that run the holyclaude root, so keep them out of the
 settings of sessions that use other agents.
+
+Managed-only keys apply in any session, cloud or local. Documented: Claude Code reads `deniedModels` and `availableModelsMatch` only from managed settings (2.1.283 or later), so a committed `.claude/settings.json` or user settings does not apply them. Server-managed settings need Claude for Teams or Enterprise and are set by an Owner or Primary Owner.
 
 | Setting                                                                                                                    | Why                                                                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -130,7 +141,7 @@ settings of sessions that use other agents.
 | `"promptCacheTtl": "1h"`                                                                                                   | Keeps the root cached on API-key setups, where the default is five minutes; frontmatter `cacheTtl` applies only to subagents, so the root needs this setting. It carries a higher cache-write cost.                                     |
 | `"autoCompactWindow": 450000` or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000`                                                  | Compacts the root and every subagent at 450,000 tokens. See below.                                                                                                                                                                      |
 | `"permissions": { "allow": ["Bash(gh pr checks *)", "Bash(gh pr view *)", "Bash(gh run list *)", "Bash(gh run view *)"] }` | The root watches CI through Monitor with read-only `gh` commands, and Monitor commands pass through Bash permission rules. Allow the read commands you want it to run without a prompt.                                                 |
-| `"deniedModels": ["fable"]` in managed settings                                                                            | Blocks Fable-class models so no session or per-call override reaches them. The key is managed-scope only and needs Claude Code 2.1.283 or later. Adjust the entry to the model family you want to block.                                |
+| `"deniedModels": ["fable"]` in managed settings                                                                            | Blocks Fable-class models so no session or per-call override reaches them. The key is managed-only (see the note above the table). Adjust the entry to the model family you want to block.                                              |
 | `CLAUDE_CODE_EFFORT_LEVEL` left unset                                                                                      | The variable overrides every specialist's pinned effort, so leaving it unset lets each specialist run at its own level.                                                                                                                 |
 | `"env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" }` (optional)                                                              | A fallback default for definitions that lack a model. Leave `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset: it forces one model on every subagent and would block Sonnet.                                                                     |
 | T3 Code Queue mode (Settings, General, Follow-up behavior)                                                                 | Messages sent mid-run wait for the turn to finish. Steer interrupts in-flight tools.                                                                                                                                                    |
@@ -173,7 +184,7 @@ This setup has not been observed taking effect in a live session. Watch for the 
 
 ## Hooks
 
-`plugin/hooks/hooks.json` registers four hooks. Each runs in Claude Code's exec form, which spawns
+`plugin/hooks/hooks.json` registers five hooks. Each runs in Claude Code's exec form, which spawns
 `bun` directly with an argument list and no shell:
 
 ```json
@@ -195,18 +206,51 @@ This setup has not been observed taking effect in a live session. Watch for the 
 | --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
 | `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
 | `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
-| `SubagentStart` | none                                                              | `subagent-start` | Records the agent type. It cannot block.                                |
-| `SubagentStop`  | none                                                              | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.    |
+| `PostToolUse`   | `Agent`                                                           | `post-tool-use`  | Records the model a launched specialist started on. It never blocks.    |
+| `SubagentStart` | none                                                              | `subagent-start` | Records a specialist's agent type. It cannot block.                     |
+| `SubagentStop`  | none                                                              | `subagent-stop`  | Records a specialist's effort and transcript. It never blocks.          |
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
 `Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
 the two in step.
 
-`holyclaude assignment verify` combines the three observation sources field by field, the newest
+The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<Role.task>`,
+because only they feed `assignment verify` and the independence rule. An agent with another type,
+an empty one or none (Claude Code's own internal agents, built-in types, other plugins' agents)
+leaves no trace: nothing is written, so a repository that loads holyclaude without using it gains
+no `.holyclaude/` directory and no `.gitignore`. A payload without an agent type still counts when
+the log already holds a holyclaude type for that agent id from its `SubagentStart`. `PostToolUse`
+judges the launched agent by the call's `subagent_type` instead, so only `holyclaude:<Role.task>`
+launches are recorded there.
+
+`SessionStart` injects the core rules because the root may not run as the holyclaude agent: in
+some environments the plugin's `agent` setting is not applied, and the injection is then the root's
+only copy. When the payload's `agent_type` shows the main thread runs as that agent
+(`holyclaude:holyclaude`, or `holyclaude`), its system prompt already carries the same rules, so the
+hook leaves them out and injects only the state summary, which saves about 8,000 characters on every
+start, resume, clear and compaction. A payload that cannot be read gets the rules.
+
+The injected context is capped at 10,000 characters, and the rules are the part that must survive:
+when the rules and the full state summary do not fit together, the summary shrinks first. It shows
+fewer Assignment rows (with a count of the rest), then shorter Intent text, then only the one-line
+pointer to `intent show` and `assignment list`. The rules are cut, from their end with a marker,
+only when they alone do not fit beside that pointer.
+
+`PostToolUse` runs on the `Agent` tool (Claude Code's `Task` tool under its current name). Its
+payload carries the call's `tool_input.subagent_type` and a `tool_response` with the launched
+`agentId` and `resolvedModel`, the model the subagent started on, which may differ from the model
+requested. A background launch (`status: "async_launched"`) and a foreground completion
+(`status: "completed"`) both carry them, so the model is on record before the subagent writes a
+transcript. Other fields in the payload are ignored.
+
+`holyclaude assignment verify` combines the observation sources field by field, the newest
 record winning: the agent type from `SubagentStart`, the effort from `PreToolUse` or `SubagentStop`,
-and the transcript path, which gives the model, from `SubagentStop` or `PreToolUse`. A read-only
-reviewer that never calls a guarded tool therefore verifies completely after it stops. The
-observations log keeps its format: one JSON line per sighting, each with only the fields it saw.
+and the model from `PostToolUse`. When no model was recorded, the model is read from the transcript
+instead, whose path comes from `SubagentStop` or `PreToolUse`. The output's `model_source` says
+which was used: `hook`, `transcript`, or `none` when the model is unobserved. The recorded model is
+a full id such as `claude-sonnet-5-5`, which matches the expected alias (`sonnet`) by family name.
+A read-only reviewer that never calls a guarded tool therefore verifies completely after it stops.
+The observations log keeps its format: one JSON line per sighting, each with only the fields it saw.
 
 `--no-env-file` and `--config` keep Bun from reading the project's `.env` and `bunfig.toml`, which
 would otherwise let the project redirect the state file or preload code into every hook. The config
@@ -223,8 +267,7 @@ in exec form through the mise shim, and 2 processes and 64 ms with the real `bun
 the median of 30 calls.
 
 The `holyclaude` command the root and workers run is the shell wrapper `plugin/scripts/holyclaude`.
-It is not on `PATH`: Claude Code adds only a plugin's `bin/` there, and claude.ai refuses a plugin
-that has one. The agent and skill prompts name it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`,
+It is not on `PATH`: Claude Code adds only a plugin's `bin/` there, and the plugin ships none ([why](docs/DECISIONS.md#no-bin-in-the-plugin)). The agent and skill prompts name it as `"${CLAUDE_PLUGIN_ROOT}/scripts/holyclaude"`,
 which Claude Code replaces with the installed path when it loads them, and the SessionStart hook
 replaces it the same way in the core rules it injects. The wrapper's common path forks nothing (no
 command substitution, only parameter expansion and the `command -v` builtin), which spares Git Bash
@@ -278,7 +321,7 @@ which review Assignments call; it is neither vendored nor wrapped.
 - The `PreToolUse` hook runs only for the tools its matcher lists. Per call it costs about 64 ms with
   the real `bun.exe` on the Windows development machine, and more through a shim or under load; see
   [On Windows](#on-windows).
-- Installing the plugin makes holyclaude the default main-thread agent for sessions where it is enabled.
+- Installing the plugin makes holyclaude the default main-thread agent for sessions where it is enabled, as observed in local sessions; a cloud session did not (see [Cloud sessions](#cloud-sessions)).
 - Reviewer.code, Worker.validation and Reviewer.testing hold Bash under an instruction-only
   no-mutation boundary.
 
@@ -314,6 +357,4 @@ rebuilt `plugin/scripts/holyclaude.js` together with the version change.
 
 ## Third-party material
 
-`plugin/skills/frontend-design` is vendored verbatim, with its `LICENSE.txt` (Apache-2.0), from
-[anthropics/skills](https://github.com/anthropics/skills), path `skills/frontend-design`, at commit
-`dbd4588f9e1033efb41dad4bef2f7947c8993d44`. It is excluded from formatting so it stays byte-identical.
+`plugin/skills/frontend-design` is vendored byte-identical, with its `LICENSE.txt` (Apache-2.0), from [anthropics/skills](https://github.com/anthropics/skills), path `skills/frontend-design`, at commit `dbd4588f9e1033efb41dad4bef2f7947c8993d44`. The same skill is in [anthropics/claude-code](https://github.com/anthropics/claude-code) at `plugins/frontend-design/skills/frontend-design`: that repository's HEAD at verification on 2026-10-15 was `94506ff0d3bd9185f1752da36e968775021fb48f`, and the skill there matches the vendored copy. The directory is excluded from formatting so it stays byte-identical. [docs/DECISIONS.md](docs/DECISIONS.md) records why.

@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 1,
+  "role": "Librarian.lookup",
+  "objective": "Answer from official Claude Code documentation and changelog (code.claude.com/docs, the anthropics/claude-code CHANGELOG) the hook questions listed in the prompt, for Claude Code 2.1.300.",
+  "scope": [
+    "Official Claude Code docs: hooks reference, plugins reference, changelog"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Cite the URL and the quoted line for each answer; say 'not documented' when the docs are silent rather than inferring."
+  ],
+  "acceptance_criteria": [
+    "Each numbered question has an answer with a citation, or 'not documented'."
+  ],
+  "required_evidence": [
+    "answers",
+    "sources"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ffqg8-2dpy",
+  "state": "Succeeded",
+  "result": "Hook docs answers: Agent tool matchable; PostToolUse tool_response carries resolvedModel, totalTokens, totalDurationMs, totalToolUseCount, usage only for foreground calls; background launches return status, agentId, outputFile, resolvedModel. Forks are subagent_type fork via the Agent tool (PreToolUse visibility inferred). SubagentStop can block (reason becomes next instruction), input has agent_type, agent_id, agent_transcript_path, last_assistant_message. onFailure block from 2.1.295 blocks on can't-start/timeout, no effect on Stop/SubagentStop. CLAUDE_ENV_FILE works for main-session Bash; subagents not documented; PowerShell caveat. agent_type/agent_id present in subagent hook input.",
+  "acceptance": {
+    "intent_revision": 1,
+    "rationale": "Each question answered with cited docs/changelog lines or marked not documented/inferred; limits disclosed.",
+    "criteria_evidence": {
+      "Each numbered question has an answer with a citation, or 'not documented'.": "Seven answers with hooks/sub-agents page and changelog citations; fork PreToolUse and subagent CLAUDE_ENV_FILE marked inferred/not documented."
+    },
+    "required_evidence": {
+      "answers": "Seven numbered answers.",
+      "sources": "code.claude.com hooks, sub-agents; raw CHANGELOG."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

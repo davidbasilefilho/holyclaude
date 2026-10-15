@@ -48,6 +48,7 @@ import { booleanFlag, listFlag, stringFlag, type FlagSpec, type Parsed } from ".
 import { nowIso } from "./clock.ts"
 import { NoIntent, StdinMissing, Usage } from "./errors.ts"
 import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
+import { postToolUse } from "./hook/post-tool-use.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
 import { sessionStart } from "./hook/session-start.ts"
 import { subagentStart, subagentStop } from "./hook/subagent.ts"
@@ -627,12 +628,21 @@ const reconcileResolve = cmd({
 const hookSessionStart = cmd({
   path: ["hook", "session-start"],
   usage: "hook session-start",
-  summary: "SessionStart hook: core rules and state as additionalContext",
+  summary:
+    "SessionStart hook: core rules whole, plus a state summary that shrinks to fit, as additionalContext",
+  input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
-  run: () => sessionStart.pipe(Effect.map((text) => ({ text }))),
+  // An unreadable stdin must not silence the hook: without the payload it injects the rules.
+  run: (_args, stdin) =>
+    stdin.pipe(
+      Effect.orElseSucceed(() => ""),
+      Effect.flatMap(sessionStart),
+      Effect.map((text) => ({ text })),
+    ),
 })
 
 const hookPreToolUse = cmd({
@@ -684,6 +694,22 @@ const hookSubagentStop = cmd({
     ),
 })
 
+const hookPostToolUse = cmd({
+  path: ["hook", "post-tool-use"],
+  usage: "hook post-tool-use",
+  summary: "PostToolUse hook on the Agent tool: observe the model a specialist started on",
+  input: "Claude Code hook JSON",
+  root: false,
+  hook: true,
+  flags: {},
+  positionals: 0,
+  run: (_args, stdin) =>
+    stdin.pipe(
+      Effect.flatMap(postToolUse),
+      Effect.map((text) => ({ text })),
+    ),
+})
+
 /** Every command, longest paths first so `reconcile resolve` wins over `reconcile`. */
 export const COMMANDS: ReadonlyArray<Command> = [
   intentShow,
@@ -708,4 +734,5 @@ export const COMMANDS: ReadonlyArray<Command> = [
   hookPreToolUse,
   hookSubagentStart,
   hookSubagentStop,
+  hookPostToolUse,
 ].toSorted((a, b) => b.path.length - a.path.length)
