@@ -59,6 +59,17 @@ describe("a corrupt record file", () => {
   })
 })
 
+describe("an error message", () => {
+  test("is printed whole, however many lines and characters it has", async () => {
+    const command = Array.from({ length: 10 }, (_, line) => `line${line}-${"x".repeat(100)}`).join(
+      "\n",
+    )
+    const { code, err } = await run(command)
+    expect(code).toBe(2)
+    expect(err).toContain(`line9-${"x".repeat(100)}`)
+  })
+})
+
 describe("assignment list --state", () => {
   test("an unknown state is an error that names the valid states", async () => {
     const { code, out, err } = await run("assignment", "list", "--state", "Bogus")

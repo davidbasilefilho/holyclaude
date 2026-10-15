@@ -10,12 +10,14 @@ import { loadRecordState, persist } from "./records.ts"
 /**
  * Reads and validates the project state without locking: one file per record, plus the local worker
  * list and agent ids. A directory with nothing in it is the empty state. A state file of an earlier
- * version that is still waiting to be migrated is read together with the record files.
+ * version that is still waiting to be migrated is read together with the record files. Files are
+ * read whole unless a `limit` is given; a hook that reads a project's state without owning it
+ * passes one, and a file over it fails the load as TooLarge.
  */
-export const loadState = (directory: string) =>
+export const loadState = (directory: string, limit?: number) =>
   Effect.gen(function* () {
     const legacy = yield* readLegacy(directory)
-    const existing = yield* loadRecordState(directory)
+    const existing = yield* loadRecordState(directory, limit)
     return legacy === undefined ? existing : mergeLegacy(legacy, existing)
   })
 

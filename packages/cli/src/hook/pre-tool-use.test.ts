@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { OBSERVATIONS_ROTATE_BYTES, updateState } from "@holyclaude/core"
 import { Effect } from "effect"
 
-import { readObservations } from "../observations.ts"
+import { observationsPath, readObservations } from "../observations.ts"
 import type { ToolInput } from "./input.ts"
 import { denyToolReason, MAX_JUDGED_BYTES } from "./policy.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./pre-tool-use.ts"
@@ -678,6 +679,16 @@ describe("the decision reads only the fields it needs", () => {
     rmSync(directory, { recursive: true, force: true })
   })
 
+  /** The records once at least `count` are in the log: a recording runs beside the verdict. */
+  const recorded = async (count: number) => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const records = await Effect.runPromise(readObservations(directory))
+      if (records.length >= count) return records
+      await Bun.sleep(10)
+    }
+    return Effect.runPromise(readObservations(directory))
+  }
+
   const drift: ReadonlyArray<readonly [string, object]> = [
     ["effort null", { effort: null }],
     ["effort number", { effort: 3 }],
@@ -725,10 +736,52 @@ describe("the decision reads only the fields it needs", () => {
         effort: null,
       }),
     )
-    const records = await Effect.runPromise(readObservations(directory))
+    const records = await recorded(1)
     expect(records).toMatchObject([
       { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:Worker.implementation" },
     ])
+  })
+
+  test("a call by an agent of another plugin reads no log, and a specialist's call does", async () => {
+    const reads = spyOn(Bun, "file")
+    try {
+      await decide(call("Bash", { command: "git status" }, "subagent", { agent_type: "Explore" }))
+      await Bun.sleep(100)
+      expect(reads.mock.calls.map(([path]) => String(path))).not.toContain(
+        observationsPath(directory),
+      )
+      await decide(
+        call("Bash", { command: "git status" }, "subagent", {
+          agent_type: "holyclaude:Worker.implementation",
+        }),
+      )
+      await recorded(1)
+      expect(reads.mock.calls.map(([path]) => String(path))).toContain(observationsPath(directory))
+    } finally {
+      reads.mockRestore()
+    }
+  })
+
+  test("the verdict does not wait for a recording that is held up", async () => {
+    mkdirSync(join(directory, "local"))
+    writeFileSync(observationsPath(directory), "x\n".repeat(OBSERVATIONS_ROTATE_BYTES))
+    // The next append has to rotate the full log, which needs the lock that this holds.
+    const holder = Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.sleep("1500 millis").pipe(Effect.as({ state, value: 0 })),
+      ),
+    )
+    await Bun.sleep(100)
+    const started = performance.now()
+    const verdict = await decide(
+      call("Bash", { command: "git commit -m x" }, "subagent", {
+        agent_type: "holyclaude:Worker.implementation",
+      }),
+    )
+    const waited = performance.now() - started
+    await holder
+    expect(verdict).toBe("deny")
+    expect(waited).toBeLessThan(400)
   })
 
   test("a call by an agent that is not a holyclaude specialist is judged but leaves no trace", async () => {
@@ -1139,7 +1192,7 @@ describe("the worst command at the limit is decided in seconds, not minutes", ()
   })
 })
 
-describe("a deny reason does not echo the call's own text at length", () => {
+describe("a deny reason that echoes the call's own text", () => {
   const long = "a".repeat(500_000)
   const echoing: ReadonlyArray<readonly [string, string]> = [
     ["a git subcommand", `git ${long}`],
@@ -1149,10 +1202,10 @@ describe("a deny reason does not echo the call's own text at length", () => {
     ["a holyclaude subcommand", `holyclaude ${long}`],
   ]
   for (const [name, command] of echoing)
-    test(`${name} is cut`, async () => {
+    test(`${name} is sent whole`, async () => {
       const reason = await reasonOf(call("Bash", { command }, "subagent"))
-      expect(reason?.length).toBeLessThanOrEqual(1003)
-      expect(reason?.endsWith("...")).toBe(true)
+      expect(reason).toContain(long)
+      expect(reason?.endsWith("...")).toBe(false)
     })
 
   test("an ordinary reason is sent whole", async () => {

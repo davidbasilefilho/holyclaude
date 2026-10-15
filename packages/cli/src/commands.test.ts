@@ -138,6 +138,39 @@ describe("reconcile and the clone stamp", () => {
   })
 })
 
+describe("list rows", () => {
+  test("show a long objective whole", async () => {
+    const objective = Array.from({ length: 40 }, (_, word) => `step${word}`).join("  ")
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            assignments: state.assignments.map((row) => ({ ...row, objective })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    const { value } = await runCommand("assignment list")
+    const rows = (value as { assignments: ReadonlyArray<{ objective: string }> }).assignments
+    expect(rows[0]?.objective).toBe(objective.replace(/\s+/g, " "))
+  })
+})
+
+describe("JSON on stdin", () => {
+  test("is accepted at any size, here over 64 KiB", async () => {
+    const requirements = "x".repeat(70 * 1024)
+    const outcome = await Effect.runPromise(
+      command("intent create").run(
+        { positionals: [], flags: {} },
+        Effect.succeed(JSON.stringify({ objective: "o", requirements })),
+      ),
+    )
+    expect(outcome.value).toMatchObject({ requirements })
+  })
+})
+
 describe("order by id", () => {
   test("intent show without an id shows the greatest id, and assignment list is in id order", async () => {
     await Effect.runPromise(

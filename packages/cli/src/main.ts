@@ -23,7 +23,7 @@ const HINTS: Readonly<Record<string, string>> = {
   InsufficientEvidence:
     "Cover exactly the declared labels in criteria_evidence and required_evidence.",
   TooLarge:
-    "Shorten the input to fit the limit, or move away or trim the oversized file the message names.",
+    "A file the command reads is over its read bound (the message names the file and the bound); trim it, move it away, or restore it from version control.",
   StateLocked:
     "Another process holds the state lock; retry in a moment, or delete the lock file named above if none is running.",
   LockLost: "The state was left untouched; rerun the command.",
@@ -70,7 +70,7 @@ const errorFields = (error: unknown) => {
     error instanceof Usage
       ? error.hint
       : (HINTS[tag] ?? "Run `holyclaude --help` for the commands.")
-  return { error: tag, message: message.split("\n").slice(0, 6).join("\n").slice(0, 600), hint }
+  return { error: tag, message, hint }
 }
 
 /**

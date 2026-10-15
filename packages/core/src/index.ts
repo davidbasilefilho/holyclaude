@@ -1,6 +1,6 @@
 export * from "./codec.ts"
 export * from "./errors.ts"
-export { readText } from "./io.ts"
+export { readTail, readText } from "./io.ts"
 export * from "./layout.ts"
 export { breakStaleLock } from "./lock.ts"
 export { readCloneId } from "./local.ts"

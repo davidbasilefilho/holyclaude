@@ -98,7 +98,15 @@ export const unchanged = (state: State, assignment: Assignment): Change<Assignme
   value: assignment,
 })
 
-const duplicate = (ids: ReadonlyArray<string>) => ids.find((id, index) => ids.indexOf(id) !== index)
+/** The first id that an earlier one repeats, found in one pass. */
+const duplicate = (ids: ReadonlyArray<string>) => {
+  const seen = new Set<string>()
+  for (const id of ids) {
+    if (seen.has(id)) return id
+    seen.add(id)
+  }
+  return undefined
+}
 
 /**
  * Domain rules for a decoded state: unique ids and known references. A worker's history may name an
@@ -119,14 +127,17 @@ export const validateState = (state: State) =>
       const repeated = duplicate(ids)
       if (repeated !== undefined) return yield* fail(`Duplicate ${kind} id ${repeated}`)
     }
+    // Sets keep the checks linear, since a repository can commit any number of records.
+    const knownIntents = new Set(intentIds)
+    const knownAssignments = new Set(assignmentIds)
     for (const assignment of state.assignments) {
-      if (!intentIds.includes(assignment.intent_id))
+      if (!knownIntents.has(assignment.intent_id))
         return yield* fail(
           `Assignment ${assignment.id} names unknown intent ${assignment.intent_id}`,
         )
       const { dependencies, related_assignments, independent_from } = assignment.metadata
       const unknown = [...dependencies, ...related_assignments, ...independent_from].find(
-        (id) => !assignmentIds.includes(id),
+        (id) => !knownAssignments.has(id),
       )
       if (unknown !== undefined)
         return yield* fail(`Assignment ${assignment.id} references unknown assignment ${unknown}`)

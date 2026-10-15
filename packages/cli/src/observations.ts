@@ -4,10 +4,10 @@ import { dirname } from "node:path"
 import {
   decodeJsonStrict,
   keepLocalFilesOutOfVersionControl,
-  MAX_LOCAL_BYTES,
+  OBSERVATIONS_READ_BYTES,
   observationsFile,
   previousObservationsFile,
-  readText,
+  readTail,
   refuseSymlinks,
   rotateObservations,
   StateIo,
@@ -56,11 +56,14 @@ export const observationsPath = (directory: string = stateDirPath()): string =>
 // Strict like every persisted file: a record with extra fields is not ours, so it is skipped.
 const decodeLine = decodeJsonStrict(ObservationRecord)
 
-/** Every valid line of one generation of the log; a missing file has none. */
+/**
+ * Every valid line in the last {@link OBSERVATIONS_READ_BYTES} of one generation of the log; a
+ * missing file has none. A generation that follows the rotation is read whole.
+ */
 const readGeneration = (directory: string, path: string) =>
   Effect.gen(function* () {
     yield* refuseSymlinks(directory, path)
-    const text = (yield* readText(path, MAX_LOCAL_BYTES)) ?? ""
+    const text = (yield* readTail(path, OBSERVATIONS_READ_BYTES)) ?? ""
     const records: ObservationRecord[] = []
     for (const line of text.split("\n")) {
       if (line === "") continue
@@ -72,10 +75,11 @@ const readGeneration = (directory: string, path: string) =>
 
 /**
  * Reads every valid line, oldest first: the previous generation of the log, then the current one. A
- * missing file or an unreadable line is skipped. A file is never read through a symbolic link, and
- * one over the local files' cap is TooLarge, since this runs on every specialist tool call and its
- * `transcript` field is later opened as a path. Rotation keeps both generations well under the
- * cap.
+ * missing file or an unreadable line is skipped. A file is never read through a symbolic link,
+ * since the `transcript` field of its records is later opened as a path. Each generation is read
+ * from its end, up to {@link OBSERVATIONS_READ_BYTES}: rotation keeps a log that hooks wrote near 1
+ * MiB per generation, so the bound only matters for a log that was supplied or grew past it, whose
+ * oldest lines go unread.
  */
 export const readObservations = (directory: string = stateDirPath()) =>
   Effect.gen(function* () {
