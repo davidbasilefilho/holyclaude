@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Reviewer.artifact",
+  "objective": "Review the merge-ready bar and ready-for-review rule in the root prompt.",
+  "scope": [
+    "Diff scratchpad/diffs/assignment-0mv9swps9-jn4u.diff; worktree f/plugin/agents/holyclaude.md."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "The definition matches the owner's bar (independent review with no open blockers, every CI check green on the exact head SHA, Pending or Unknown not green, target repo rules first) and the no-draft rule is stated once with its reason.",
+    "Nothing elsewhere in the file contradicts it, including the core rules on merge approval and the CI-watching aggregation; writing bar met.",
+    "Findings reported with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9swps9-jn4u"
+    ],
+    "independent_from": [
+      "assignment-0mv9swps9-jn4u"
+    ]
+  },
+  "id": "assignment-0mv9syk1p-xmyt",
+  "state": "Succeeded",
+  "result": "Gap: B1 review not tied to the same head SHA; B2 green restates CI rule instead of pointing to the Passed gate. Optional: by-default draft sentence, merge-decision wording, precedence stated thrice, length.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "B1 and B2 verified against lines 111, 117, 136-138; taken with O1-O3.",
+    "criteria_evidence": {
+      "The definition matches the owner's bar (independent review with no open blockers, every CI check green on the exact head SHA, Pending or Unknown not green, target repo rules first) and the no-draft rule is stated once with its reason.": "see findings",
+      "Nothing elsewhere in the file contradicts it, including the core rules on merge approval and the CI-watching aggregation; writing bar met.": "see findings",
+      "Findings reported with file:line.": "see findings"
+    },
+    "required_evidence": {
+      "findings": "B1, B2, O1-O4"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

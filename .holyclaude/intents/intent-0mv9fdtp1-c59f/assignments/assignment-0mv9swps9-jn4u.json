@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Worker.implementation",
+  "objective": "Define the default merge-ready bar and ready-for-review PRs in the root prompt.",
+  "scope": [
+    "Worktree worktree f, branch release/0.2.1/docs/merge-ready-bar (main bf2b0fd): plugin/agents/holyclaude.md."
+  ],
+  "constraints": [
+    "Writing bar; replace the existing merge-readiness sentence rather than stack; core-rules block unchanged; no caps; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The Branches and pull requests section states, once and with its reason, that by default a PR is merge-ready when an independent review left no open blockers and every CI check on its exact head SHA is green (Pending or Unknown is not green), and that the target repository's own merge rules come first.",
+    "The same paragraph says holyclaude opens PRs ready for review, not as drafts.",
+    "No other line contradicts these (search for draft, merge readiness, merge-ready).",
+    "fmt and full test pass; wc -c before and after; diff saved."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "sizes"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9swps9-jn4u",
+  "state": "Succeeded",
+  "result": "Merge-ready definition and ready-for-review rule replace the old sentence in Branches and pull requests; no contradiction found; fmt and 1299 tests pass; +434 bytes.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "Verified by review xmyt and, after the repair, re-review 50fi.",
+    "criteria_evidence": {
+      "The Branches and pull requests section states, once and with its reason, that by default a PR is merge-ready when an independent review left no open blockers and every CI check on its exact head SHA is green (Pending or Unknown is not green), and that the target repository's own merge rules come first.": "verified by the review chain ending in 50fi",
+      "The same paragraph says holyclaude opens PRs ready for review, not as drafts.": "verified by the review chain ending in 50fi",
+      "No other line contradicts these (search for draft, merge readiness, merge-ready).": "verified by the review chain ending in 50fi",
+      "fmt and full test pass; wc -c before and after; diff saved.": "verified by the review chain ending in 50fi"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "diff-file": "reported",
+      "sizes": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

@@ -1,0 +1,51 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Reviewer.artifact",
+  "objective": "Narrow re-review of the repaired merge-ready paragraph.",
+  "scope": [
+    "Repair diff scratchpad/diffs/assignment-0mv9t0n3j-x0pj.diff; worktree f/plugin/agents/holyclaude.md."
+  ],
+  "constraints": [
+    "Read-only; judge the changed paragraph; raise only blockers elsewhere."
+  ],
+  "acceptance_criteria": [
+    "B1, B2 and O1-O3 from the first review are fixed and the paragraph matches the owner's bar without contradicting the rest of the file.",
+    "Findings reported with file:line."
+  ],
+  "required_evidence": [
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "prompts"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9t0n3j-x0pj"
+    ],
+    "independent_from": [
+      "assignment-0mv9t0n3j-x0pj",
+      "assignment-0mv9swps9-jn4u",
+      "assignment-0mv9syk1p-xmyt"
+    ]
+  },
+  "id": "assignment-0mv9t2d8a-50fi",
+  "state": "Succeeded",
+  "result": "No blockers; five items met; optional wording notes only.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "Narrow re-review: no blockers.",
+    "criteria_evidence": {
+      "B1, B2 and O1-O3 from the first review are fixed and the paragraph matches the owner's bar without contradicting the rest of the file.": "met at line 167",
+      "Findings reported with file:line.": "met at line 167"
+    },
+    "required_evidence": {
+      "findings": "findings reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
