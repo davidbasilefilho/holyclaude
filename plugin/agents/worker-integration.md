@@ -1,5 +1,5 @@
 ---
-name: Worker.integration
+name: worker-integration
 description: "Use when completed components must be connected across a named integration boundary, and the components are already terminal and accepted. Worker.integration (scoped write) wires the seam and verifies that the connected components work together as specified. Independence DependenciesTerminal: start it only after every dependency is accepted at the current Intent revision."
 model: sonnet
 effort: high

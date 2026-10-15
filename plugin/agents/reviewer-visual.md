@@ -1,5 +1,5 @@
 ---
-name: Reviewer.visual
+name: reviewer-visual
 description: "Use when a rendered interface needs an independent visual and interaction review against the request, after every writer on it is terminal. Reviewer.visual (read-only) inspects the actual rendered interface and affected interactions at relevant viewports and states, and separates material discrepancies from preference. Independence IndependentReview: the reviewer must be independent of the reviewed work across its whole history."
 model: sonnet
 effort: high

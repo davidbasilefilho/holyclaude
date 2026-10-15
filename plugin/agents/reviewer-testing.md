@@ -1,5 +1,5 @@
 ---
-name: Reviewer.testing
+name: reviewer-testing
 description: "Use when an independent assessment is needed of whether the tests cover the changed behavior and the acceptance criteria, after every writer on those paths is terminal. Reviewer.testing (read-only, with a shell to run checks) identifies uncovered criteria and the additional evidence needed. Independence IndependentReview: the reviewer must be independent of the reviewed work across its whole history."
 model: sonnet
 effort: medium

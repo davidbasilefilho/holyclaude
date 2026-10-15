@@ -67,7 +67,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 5. Spawn or resume
 
-- Spawn with the Agent tool: `subagent_type` from the reply (`holyclaude:<Role.task>`), the `model` and `effort` printed, `run_in_background: true`, and a prompt that carries the Assignment id, objective, scope, constraints, ownership paths, acceptance criteria and required-evidence labels, with the task specifics last.
+- Spawn with the Agent tool: `subagent_type` from the reply (`holyclaude:<role-task>`, for example `holyclaude:worker-implementation`), the `model` and `effort` printed, `run_in_background: true`, and a prompt that carries the Assignment id, objective, scope, constraints, ownership paths, acceptance criteria and required-evidence labels, with the task specifics last.
 - For a reuse, call SendMessage to the `agent_id` from `select` with the new Assignment's text. A reuse is a follow-up and is its own Assignment: reserve it first, then bind the same `agent_id` once the message is sent.
 
 ## 6. Bind or roll back

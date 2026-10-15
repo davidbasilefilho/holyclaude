@@ -15,7 +15,7 @@ export type Sighting = { readonly [K in keyof Seen]?: string | undefined }
 
 /**
  * Appends what a hook saw of an agent, unless the log already holds every field of it. Only
- * holyclaude specialists (`agent_type` of `holyclaude:<Role.task>`) are recorded, since only they
+ * holyclaude specialists (`agent_type` of `holyclaude:<role-task>`) are recorded, since only they
  * feed `assignment verify` and the independence rule; any other agent leaves no trace, and so never
  * creates the state directory in a repository that does not use holyclaude. A payload with no agent
  * type is a specialist's when the log already holds the type its start recorded. The payload's own

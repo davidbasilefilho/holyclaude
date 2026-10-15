@@ -1,0 +1,56 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 7,
+  "role": "Worker.operations",
+  "objective": "Bump to 0.2.1 with the repository script.",
+  "scope": [
+    "Worktree worktree g, branch release/0.2.1/chore/version from main bf2b0fd."
+  ],
+  "constraints": [
+    "No git writes; only the version script and the build; nothing under .holyclaude."
+  ],
+  "acceptance_criteria": [
+    "bump-version patch moves 0.2.0 to 0.2.1 in the six version files and the bun.lock workspace entries; bundle rebuilt.",
+    "fmt, lint, typecheck, full test, frozen install and both plugin validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "package.json",
+      "packages/cli/package.json",
+      "packages/core/package.json",
+      "plugin/package.json",
+      "plugin/.claude-plugin/plugin.json",
+      ".claude-plugin/marketplace.json",
+      "bun.lock",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [
+      "release"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9t4aoo-3zns",
+  "state": "Succeeded",
+  "result": "0.2.0 -> 0.2.1 in six files and bun.lock workspaces; bundle one-line change; all gates, frozen install and both validate runs pass.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "Bump evidence verified; independent review follows.",
+    "criteria_evidence": {
+      "bump-version patch moves 0.2.0 to 0.2.1 in the six version files and the bun.lock workspace entries; bundle rebuilt.": "versions listed; gates exit 0",
+      "fmt, lint, typecheck, full test, frozen install and both plugin validate --strict runs pass.": "versions listed; gates exit 0"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "changed-paths": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

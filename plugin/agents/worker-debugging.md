@@ -1,5 +1,5 @@
 ---
-name: Worker.debugging
+name: worker-debugging
 description: "Use when a concrete failure or unexpected behavior needs its cause found and repaired within named ownership paths, and the work it depends on is already terminal and accepted. Worker.debugging (scoped write) reproduces and isolates the cause, repairs it, then verifies the behavior. Independence DependenciesTerminal: start it only after every dependency is accepted at the current Intent revision."
 model: sonnet
 effort: high

@@ -62,7 +62,7 @@ import { Effect, Schema } from "effect"
 import { booleanFlag, listFlag, stringFlag, type FlagSpec, type Parsed } from "./args.ts"
 import { nowIso } from "./clock.ts"
 import { StdinMissing, Usage } from "./errors.ts"
-import { PLUGIN_NAME, rosterFingerprint } from "./fingerprint.ts"
+import { agentType, rosterFingerprint } from "./fingerprint.ts"
 import { postToolUse } from "./hook/post-tool-use.ts"
 import { MAX_HOOK_BYTES, preToolUse } from "./hook/pre-tool-use.ts"
 import { sessionStart } from "./hook/session-start.ts"
@@ -141,7 +141,7 @@ const dispatchInfo = (assignment: Assignment) => {
     id: assignment.id,
     state: assignment.state,
     role: assignment.role,
-    subagent_type: `${PLUGIN_NAME}:${assignment.role}`,
+    subagent_type: agentType(assignment.role),
     model: route.model,
     effort: route.effort,
     rev: assignment.intent_revision,
@@ -777,7 +777,7 @@ const select = cmd({
           ...(selection._tag === "Reuse"
             ? { agent_id: selection.agent_id, reason: selection.reason }
             : {}),
-          subagent_type: `${PLUGIN_NAME}:${assignment.role}`,
+          subagent_type: agentType(assignment.role),
           model: route.model,
           effort: route.effort,
         },
@@ -797,6 +797,7 @@ const routes = cmd({
       value: {
         routes: ROUTES.map((route) => ({
           role: route.role,
+          subagent_type: agentType(route.role),
           mutability: route.mutability,
           capabilities: route.capabilities.length === 0 ? "none" : route.capabilities.join("+"),
           independence: route.independence,

@@ -53,8 +53,8 @@ describe("the routing matrix", () => {
   test("matches each specialist's agent frontmatter", async () => {
     for (const route of ROUTES) {
       const agent = frontmatterOf(await readPlugin(`agents/${route.agent}.md`))
-      expect({ role: agent.name, pin: `${agent.model}/${agent.effort}` }).toEqual({
-        role: route.role,
+      expect({ name: agent.name, pin: `${agent.model}/${agent.effort}` }).toEqual({
+        name: route.agent,
         pin: MATRIX[route.role],
       })
     }

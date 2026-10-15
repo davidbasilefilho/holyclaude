@@ -30,7 +30,7 @@ const START = JSON.stringify({
   cwd: "/project",
   hook_event_name: "SubagentStart",
   agent_id: "agent-1",
-  agent_type: "holyclaude:Reviewer.audit",
+  agent_type: "holyclaude:reviewer-audit",
 })
 
 const STOP = JSON.stringify({
@@ -39,7 +39,7 @@ const STOP = JSON.stringify({
   cwd: "/project",
   hook_event_name: "SubagentStop",
   agent_id: "agent-1",
-  agent_type: "holyclaude:Reviewer.audit",
+  agent_type: "holyclaude:reviewer-audit",
   effort: { level: "medium" },
   agent_transcript_path: "/parent/s1/subagents/agent-agent-1.jsonl",
   last_assistant_message: "done",
@@ -76,7 +76,7 @@ describe("hook subagent-start", () => {
   test("records the agent type and prints nothing", async () => {
     expect(await Effect.runPromise(subagentStart(START))).toBe("")
     expect(await records()).toMatchObject([
-      { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:Reviewer.audit" },
+      { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:reviewer-audit" },
     ])
   })
 
@@ -118,7 +118,7 @@ describe("hook subagent-stop", () => {
       subagentStop(
         JSON.stringify({
           agent_id: "agent-1",
-          agent_type: "holyclaude:Reviewer.audit",
+          agent_type: "holyclaude:reviewer-audit",
           effort: "high",
         }),
       ),
@@ -144,7 +144,7 @@ describe("hook subagent-stop", () => {
     await Effect.runPromise(subagentStop(JSON.stringify(bare)))
     const seen = seenOf(await records(), "agent-1")
     expect(seen).toEqual({
-      agent_type: "holyclaude:Reviewer.audit",
+      agent_type: "holyclaude:reviewer-audit",
       effort: "high",
       transcript: "/t/agent-1.jsonl",
     })
