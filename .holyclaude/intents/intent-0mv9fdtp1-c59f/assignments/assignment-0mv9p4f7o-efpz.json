@@ -39,8 +39,8 @@
     "independent_from": []
   },
   "id": "assignment-0mv9p4f7o-efpz",
-  "state": "Running",
-  "result": null,
+  "state": "Succeeded",
+  "result": "D repair: B1-B6 and O1-O6, O8 applied; core-rules block 9307 bytes (session-start budget has under 20 bytes left); gates pass (1210).",
   "acceptance": null,
   "clone_id": "clone-0mv9fejex-b8cj"
 }

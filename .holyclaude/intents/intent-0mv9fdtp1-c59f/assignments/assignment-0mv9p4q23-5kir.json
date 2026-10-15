@@ -37,8 +37,20 @@
     "independent_from": []
   },
   "id": "assignment-0mv9p4q23-5kir",
-  "state": "Running",
-  "result": null,
-  "acceptance": null,
+  "state": "Succeeded",
+  "result": "openWorktree refuses blank or whitespace paths with InvalidWorktree (empty path); regression tests in worktree.test.ts and commands.test.ts failed before; 1231/0; bundle rebuilt.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Empty --worktree refusal verified by re-review jx8k.",
+    "criteria_evidence": {
+      "assignment reserve --worktree \"\" (or whitespace) is refused with InvalidWorktree and reserves nothing; a regression test fails without the fix.": "verified by re-review jx8k (no-fix run 3 fail; gates pass)",
+      "Bundle rebuilt; fmt, lint, typecheck, full test pass.": "verified by re-review jx8k (no-fix run 3 fail; gates pass)"
+    },
+    "required_evidence": {
+      "checks-run": "reported; repair diff saved",
+      "diff-file": "reported; repair diff saved",
+      "tests-added": "reported; repair diff saved"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

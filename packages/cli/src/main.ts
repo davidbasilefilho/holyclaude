@@ -13,6 +13,7 @@ const HINTS: Readonly<Record<string, string>> = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
   InvalidPath: "Use relative portable paths such as packages/cli/src.",
+  InvalidWorktree: "Give --worktree an existing directory, such as the path of a git worktree.",
   StaleRevision:
     "Reread with `holyclaude intent show`, reassess the work at the live revision, then retry.",
   NoRevision: "Set a valid revision with `holyclaude intent update --material`.",

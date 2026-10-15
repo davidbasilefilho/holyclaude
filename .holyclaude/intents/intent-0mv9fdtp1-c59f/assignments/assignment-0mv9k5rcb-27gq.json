@@ -40,6 +40,20 @@
   "id": "assignment-0mv9k5rcb-27gq",
   "state": "Succeeded",
   "result": "PR7 final repair: SessionStart state load under a 10 s timeoutOption degrading to rules plus state error (regression test fails before); TooLarge hint reworded; state dir resolved before fork, wording fixed; gates pass (1148); bundle rebuilt.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 2 to 5: revisions 3-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #19, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "S1: SessionStart's state load is wrapped in a time bound (about 10 s) that degrades to the rules plus a state error; regression test.": "Met in #19: independent review of that head and CI green on it",
+      "The TooLarge hint in main.ts no longer tells the user to shorten input.": "Met in #19: independent review of that head and CI green on it",
+      "stateDirPath() is resolved in preToolUse before the recording is forked, and the 'never waits' wording in JSDoc and README says the verdict is printed first while the process ends after the bounded recording.": "Met in #19: independent review of that head and CI green on it",
+      "Format, lint, typecheck, test pass; bundle rebuilt with Bun 1.4.3.": "Met in #19: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #19 review",
+      "regression-tests": "Reported by the worker and confirmed by the #19 review",
+      "diff-file": "Reported by the worker and confirmed by the #19 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

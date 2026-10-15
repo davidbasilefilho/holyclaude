@@ -51,7 +51,7 @@ The reply prints the new `id` in state Ready with the `subagent_type`, `model`, 
 
 - acceptance criteria and required-evidence labels are non-empty with no blank label. `intent_revision` records the revision your plan rests on, and reserve checks it against the live one;
 - a ScopedWrite Assignment names at least one ownership path. Paths are relative and portable: each segment is non-empty, and the path avoids absolute forms, `..`, `.`, a trailing dot or space, control characters and any of `:*?"<>|`. `\` becomes `/` and comparison ignores case. Two paths overlap when equal or when one is a directory prefix of the other. Worker.operations names its specific paths, and a dependency install owns the root package.json, the lockfile and node_modules;
-- a writer's paths do not overlap a Running writer; reserve is refused with `DispatchRefused` naming `OwnershipConflict`, so serialize those Assignments yourself. Paths outside the writable roots are refused the same way with `OutsideWritableRoots`;
+- a writer's paths do not overlap a Running writer in the same worktree; reserve is refused with `DispatchRefused` naming `OwnershipConflict`, so serialize those Assignments yourself. Paths outside the writable roots are refused the same way with `OutsideWritableRoots`;
 - every dependency is Succeeded, accepted, in the same Intent and accepted at the same revision;
 - a review Assignment lists the work it must be independent from in `independent_from`.
 
@@ -63,7 +63,7 @@ Librarian.research has no file access, so paste any CLAUDE.md or AGENTS.md rules
 
 ## 4. Reserve
 
-`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the specialist's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`.
+`holyclaude assignment reserve <id>` revalidates the revision, live state and ownership right now, moves the Assignment Ready to Running, and prints `id`, `state`, `subagent_type`, `model`, `effort` and `rev`. Spawn after it succeeds. A stale revision returns `StaleRevision` with the live number. The optional `--capabilities Write,Shell` and repeatable `--root <dir>` default to the specialist's capabilities and the project root; pass them to narrow what you offer, and a requirement the offer misses is refused as `MissingCapability`. For a writer in another git worktree of the repository, add `--worktree <dir>` (an existing directory, else `InvalidWorktree`): its ownership paths and roots resolve against that directory, so writers in different worktrees run in parallel while writers sharing one still conflict. The reservation holds until the Assignment leaves Running.
 
 ## 5. Spawn or resume
 
