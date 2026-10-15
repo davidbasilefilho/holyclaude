@@ -1,5 +1,5 @@
 ---
-name: Librarian.research
+name: librarian-research
 description: "Use when a bounded question needs investigation across authoritative external sources, and the work it depends on is already terminal and accepted. Librarian.research is read-only: it searches and reads official and primary sources and separates sourced facts from inference. Independence DependenciesTerminal: start it only after every dependency is accepted at the current Intent revision."
 model: sonnet
 effort: medium

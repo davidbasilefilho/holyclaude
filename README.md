@@ -230,13 +230,13 @@ A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads 
 `Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
 the two in step.
 
-The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<Role.task>`,
+The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<role-task>`,
 because only they feed `assignment verify` and the independence rule. An agent with another type,
 an empty one or none (Claude Code's own internal agents, built-in types, other plugins' agents)
 leaves no trace: nothing is written, so a repository that loads holyclaude without using it gains
 no `.holyclaude/` directory and no `.gitignore`. A payload without an agent type still counts when
 the log already holds a holyclaude type for that agent id from its `SubagentStart`. `PostToolUse`
-judges the launched agent by the call's `subagent_type` instead, so only `holyclaude:<Role.task>`
+judges the launched agent by the call's `subagent_type` instead, so only `holyclaude:<role-task>`
 launches are recorded there. The payload's type is checked before the log is read, so an agent with another type never causes a read, and the guard's verdict is printed first, then the process ends after the recording, which has its own short time bound.
 
 `SessionStart` injects the core rules because the root may not run as the holyclaude agent: in

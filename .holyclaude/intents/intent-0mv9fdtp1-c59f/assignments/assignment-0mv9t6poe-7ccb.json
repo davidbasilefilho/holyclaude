@@ -33,7 +33,19 @@
     ]
   },
   "id": "assignment-0mv9t6poe-7ccb",
-  "state": "Ready",
-  "result": null,
-  "acceptance": null
+  "state": "Succeeded",
+  "result": "No blockers on #30 at 520f28e; gates, frozen install and validate pass; bundle identical; optional notes on committed records.",
+  "acceptance": {
+    "intent_revision": 7,
+    "rationale": "Independent review of #30: no blockers (superseded by the rename that lands before the bump).",
+    "criteria_evidence": {
+      "Every shipped version string reads 0.2.1 including the bun.lock workspace entries, and the bundle is byte-identical to a fresh build.": "met",
+      "Gates, frozen install and both validate --strict runs pass; findings reported.": "met"
+    },
+    "required_evidence": {
+      "checks-run": "reported",
+      "findings": "reported"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
 }

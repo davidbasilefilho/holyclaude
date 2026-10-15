@@ -10,7 +10,7 @@ import { observe } from "./observe.ts"
  * may differ from the model requested. A background launch and a foreground completion both carry
  * them, so the model is known before the subagent writes a transcript, and `assignment verify`
  * reads it instead of the transcript. Only a launch whose `subagent_type` is a holyclaude
- * specialist (`holyclaude:<Role.task>`) is recorded; any other leaves no trace. It only observes:
+ * specialist (`holyclaude:<role-task>`) is recorded; any other leaves no trace. It only observes:
  * it prints nothing and never blocks, and a payload that does not parse or lacks either field is
  * ignored. Returns "".
  */

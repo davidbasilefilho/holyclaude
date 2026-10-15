@@ -26,7 +26,7 @@ const records = () => Effect.runPromise(readObservations(directory))
 const run = (payload: object | string) =>
   Effect.runPromise(postToolUse(typeof payload === "string" ? payload : JSON.stringify(payload)))
 
-const TYPE = "holyclaude:Worker.implementation"
+const TYPE = "holyclaude:worker-implementation"
 
 /** An Agent call's payload as Claude Code documents it, with fields the hook does not read. */
 const payload = (response: object, input: object = {}) => ({
@@ -99,7 +99,7 @@ describe("launches that are not a holyclaude specialist's", () => {
     ["no subagent type", {}, { subagent_type: undefined }],
     ["an empty subagent type", {}, { subagent_type: "" }],
     ["a built-in type", {}, { subagent_type: "general-purpose" }],
-    ["another plugin's type", {}, { subagent_type: "other:Worker.implementation" }],
+    ["another plugin's type", {}, { subagent_type: "other:worker-implementation" }],
     ["the plugin name without the separator", {}, { subagent_type: "holyclaude" }],
     ["a name that only begins like it", {}, { subagent_type: "holyclaude-x" }],
     ["a non-string type", {}, { subagent_type: 7 }],

@@ -1,5 +1,5 @@
 ---
-name: Explorer.lookup
+name: explorer-lookup
 description: "Use when the root needs one specific source definition, reference or fact from the repository. Explorer.lookup is read-only: it returns the requested facts with relevant paths and supporting evidence. Independence DisjointWrites: it writes nothing, so it can start at once beside any other Assignment."
 model: haiku
 effort: medium

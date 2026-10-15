@@ -1,5 +1,5 @@
 ---
-name: Worker.visual
+name: worker-visual
 description: "Use when a rendered interface or interaction must change and the result has to be judged from what renders. Worker.visual (scoped write) implements the change, inspects the actual interface at relevant viewports and states, exercises the changed interactions and repairs material issues. Independence DisjointWrites: start it only when no running write Assignment overlaps its ownership paths; an independent Reviewer.visual follows once it is terminal."
 model: sonnet
 effort: high

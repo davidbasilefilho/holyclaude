@@ -1,5 +1,5 @@
 ---
-name: Explorer.map
+name: explorer-map
 description: "Use when repository structure or component ownership is unclear and the root needs a source-backed map before assigning work. Explorer.map is read-only: it identifies relevant paths, responsibilities and boundaries and supports the map with source evidence. Independence DisjointWrites: it writes nothing, so it can start at once beside any other Assignment."
 model: haiku
 effort: medium

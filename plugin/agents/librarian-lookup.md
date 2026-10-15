@@ -1,5 +1,5 @@
 ---
-name: Librarian.lookup
+name: librarian-lookup
 description: "Use when a focused question about project documentation, conventions or a library's documented behavior needs an answer from authoritative material. Librarian.lookup is read-only: it answers from project docs and accessible official sources and cites the evidence. Independence DisjointWrites: it writes nothing, so it can start at once beside any other Assignment."
 model: haiku
 effort: medium

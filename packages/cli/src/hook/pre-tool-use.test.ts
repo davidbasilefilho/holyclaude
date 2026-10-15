@@ -732,13 +732,13 @@ describe("the decision reads only the fields it needs", () => {
   test("the observation keeps what it can read when another field is wrong", async () => {
     await decide(
       call("Bash", { command: "git status" }, "subagent", {
-        agent_type: "holyclaude:Worker.implementation",
+        agent_type: "holyclaude:worker-implementation",
         effort: null,
       }),
     )
     const records = await recorded(1)
     expect(records).toMatchObject([
-      { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:Worker.implementation" },
+      { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:worker-implementation" },
     ])
   })
 
@@ -752,7 +752,7 @@ describe("the decision reads only the fields it needs", () => {
       )
       await decide(
         call("Bash", { command: "git status" }, "subagent", {
-          agent_type: "holyclaude:Worker.implementation",
+          agent_type: "holyclaude:worker-implementation",
         }),
       )
       await recorded(1)
@@ -775,7 +775,7 @@ describe("the decision reads only the fields it needs", () => {
     const started = performance.now()
     const verdict = await decide(
       call("Bash", { command: "git commit -m x" }, "subagent", {
-        agent_type: "holyclaude:Worker.implementation",
+        agent_type: "holyclaude:worker-implementation",
       }),
     )
     const waited = performance.now() - started
@@ -802,7 +802,7 @@ describe("the decision reads only the fields it needs", () => {
   })
 
   test("a subagent call whose agent_id is not a string is judged but cannot be observed", async () => {
-    const extra = { agent_id: 7, agent_type: "holyclaude:Worker.implementation" }
+    const extra = { agent_id: 7, agent_type: "holyclaude:worker-implementation" }
     expect(await decide(call("Bash", { command: "git commit -m x" }, "main", extra))).toBe("deny")
     expect(await Effect.runPromise(readObservations(directory))).toEqual([])
   })

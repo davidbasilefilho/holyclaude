@@ -2,7 +2,7 @@ import { findAssignment, readText, routeFor } from "@holyclaude/core"
 import { Effect, Schema } from "effect"
 
 import { NotBound } from "./errors.ts"
-import { PLUGIN_NAME } from "./fingerprint.ts"
+import { agentType } from "./fingerprint.ts"
 import { latestOverride, readObservations, seenOf } from "./observations.ts"
 import { loadStateFile } from "./state.ts"
 
@@ -66,7 +66,7 @@ export const verifyAssignment = (id: string) =>
     const expected = {
       model: override?.model ?? route.model,
       effort: override?.effort ?? route.effort,
-      agent_type: `${PLUGIN_NAME}:${assignment.role}`,
+      agent_type: agentType(assignment.role),
     }
     const seen = seenOf(records, agentId)
     const models =
@@ -98,7 +98,7 @@ export const verifyAssignment = (id: string) =>
         status: compare(
           expected.agent_type,
           seen.agent_type,
-          (want, got) => got === want || got.endsWith(`:${assignment.role}`),
+          (want, got) => got === want || got.endsWith(`:${route.agent}`),
         ),
       },
     ]

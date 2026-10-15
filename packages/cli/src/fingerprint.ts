@@ -1,9 +1,17 @@
 import { join } from "node:path"
 
+import { routeFor, type Role } from "@holyclaude/core"
 import { Effect } from "effect"
 
-/** The plugin name agents are addressed under: `holyclaude:<Role.task>`. */
+/** The plugin name agents are addressed under: `holyclaude:<role-task>`. */
 export const PLUGIN_NAME = "holyclaude"
+
+/**
+ * The `subagent_type` of a role's specialist: the plugin name and the agent file's name, so
+ * `Worker.implementation` is `holyclaude:worker-implementation`. The agent name is limited to
+ * letters, digits and hyphens, which a role identifier is not.
+ */
+export const agentType = (role: Role) => `${PLUGIN_NAME}:${routeFor(role).agent}`
 
 /** Plugin root candidates: the exported variable, the bundle's parent, the repository's plugin. */
 const rootCandidates = (): ReadonlyArray<string> => [

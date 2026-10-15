@@ -1,0 +1,40 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 8,
+  "role": "Reviewer.code",
+  "objective": "Independently review the agent-name fix.",
+  "scope": [
+    "Branch release/0.2.1/fix/agent-names in worktree h against main 3aa88d4 (committed by the root)."
+  ],
+  "constraints": [
+    "Read-only; scratch work in the scratchpad."
+  ],
+  "acceptance_criteria": [
+    "Every specialist name is valid for claude.ai and equals its file name; dispatch, routes, verify and hooks agree on holyclaude:<kebab>; role values in records unchanged; no holyclaude:<Role.task> remains.",
+    "Tests would fail without the change; gates, validate and bundle-equals-fresh-build pass; findings reported."
+  ],
+  "required_evidence": [
+    "code-review-run",
+    "checks-run",
+    "findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [
+      "agents"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9ta70t-f783"
+    ],
+    "independent_from": [
+      "assignment-0mv9ta70t-f783"
+    ]
+  },
+  "id": "assignment-0mv9teu4g-znxc",
+  "state": "Ready",
+  "result": null,
+  "acceptance": null
+}

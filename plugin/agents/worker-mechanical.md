@@ -1,5 +1,5 @@
 ---
-name: Worker.mechanical
+name: worker-mechanical
 description: "Use when a source transformation is fully specified and must be applied consistently across the files in the Assignment's ownership paths, such as a rename, a signature change at every call site or a codemod. Worker.mechanical (scoped write) applies the transformation and checks the resulting changes. Independence DisjointWrites: start it only when no running write Assignment overlaps its ownership paths."
 model: haiku
 effort: high

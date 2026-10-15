@@ -1,5 +1,5 @@
 ---
-name: Reviewer.security
+name: reviewer-security
 description: "Use when a change touches trust boundaries, authentication, privileged operations, sensitive data, external integrations or exposed surfaces and needs an independent security review before any VCS write, after every writer on those paths is terminal. Reviewer.security (read-only) traces sources to sinks and substantiates any vulnerability finding. Independence IndependentReview: the reviewer must be independent of the reviewed work across its whole history."
 model: sonnet
 effort: high
