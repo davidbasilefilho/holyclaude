@@ -1,5 +1,5 @@
 ---
-name: Explorer.trace
+name: explorer-trace
 description: "Use when the root needs a concrete behavior explained across its components or runtime path, and the work it depends on is already terminal and accepted. Explorer.trace is read-only: it follows the behavior end to end and identifies the contracts and evidence along the path. Independence DependenciesTerminal: start it only after every dependency is accepted at the current Intent revision."
 model: sonnet
 effort: medium

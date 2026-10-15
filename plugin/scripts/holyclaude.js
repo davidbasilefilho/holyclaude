@@ -8671,6 +8671,7 @@ var nowIso = currentTimeMillis2.pipe(map4((ms) => new Date(ms).toISOString()));
 // src/fingerprint.ts
 import { join as join5 } from "path";
 var PLUGIN_NAME = "holyclaude";
+var agentType = (role) => `${PLUGIN_NAME}:${routeFor(role).agent}`;
 var rootCandidates = () => [
   ...process.env["CLAUDE_PLUGIN_ROOT"] ? [process.env["CLAUDE_PLUGIN_ROOT"]] : [],
   join5(import.meta.dir, ".."),
@@ -11415,7 +11416,7 @@ var verifyAssignment = (id) => gen2(function* () {
   const expected = {
     model: override?.model ?? route.model,
     effort: override?.effort ?? route.effort,
-    agent_type: `${PLUGIN_NAME}:${assignment.role}`
+    agent_type: agentType(assignment.role)
   };
   const seen = seenOf(records, agentId);
   const models = seen.model !== undefined || seen.transcript === undefined ? [] : yield* transcriptModels(seen.transcript);
@@ -11438,7 +11439,7 @@ var verifyAssignment = (id) => gen2(function* () {
       field: "agent_type",
       expected: expected.agent_type,
       observed: seen.agent_type ?? "unobserved",
-      status: compare(expected.agent_type, seen.agent_type, (want, got) => got === want || got.endsWith(`:${assignment.role}`))
+      status: compare(expected.agent_type, seen.agent_type, (want, got) => got === want || got.endsWith(`:${route.agent}`))
     }
   ];
   const verdict = rows.some((r) => r.status === "mismatch") ? "mismatch" : rows.some((r) => r.status === "unobserved") ? "incomplete" : "ok";
@@ -11485,7 +11486,7 @@ var dispatchInfo = (assignment) => {
     id: assignment.id,
     state: assignment.state,
     role: assignment.role,
-    subagent_type: `${PLUGIN_NAME}:${assignment.role}`,
+    subagent_type: agentType(assignment.role),
     model: route.model,
     effort: route.effort,
     rev: assignment.intent_revision
@@ -11888,7 +11889,7 @@ var select = cmd({
       value: {
         action: selection._tag === "Reuse" ? "reuse" : "spawn",
         ...selection._tag === "Reuse" ? { agent_id: selection.agent_id, reason: selection.reason } : {},
-        subagent_type: `${PLUGIN_NAME}:${assignment.role}`,
+        subagent_type: agentType(assignment.role),
         model: route.model,
         effort: route.effort
       }
@@ -11906,6 +11907,7 @@ var routes2 = cmd({
     value: {
       routes: ROUTES.map((route) => ({
         role: route.role,
+        subagent_type: agentType(route.role),
         mutability: route.mutability,
         capabilities: route.capabilities.length === 0 ? "none" : route.capabilities.join("+"),
         independence: route.independence,

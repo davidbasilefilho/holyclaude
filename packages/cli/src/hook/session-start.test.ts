@@ -461,7 +461,7 @@ describe("the plugin root in injected text", () => {
         { agent_type: "general-purpose" },
         { agent_type: "other:holyclaude" },
         { agent_type: "holyclaude-x" },
-        { agent_type: "holyclaude:Worker.x" },
+        { agent_type: "holyclaude:worker-x" },
         { agent_type: "holyclaude:holyclaude-x" },
         "",
         "{",

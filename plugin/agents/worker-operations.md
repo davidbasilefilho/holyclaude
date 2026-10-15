@@ -1,5 +1,5 @@
 ---
-name: Worker.operations
+name: worker-operations
 description: "Use when a specified local build or operational task must be run and its observable result reported, including starting or reusing the session's one shared dev server. Worker.operations runs the operation inside named paths, makes no VCS writes and does not observe CI. Independence DisjointWrites: start it only when no running write Assignment overlaps the paths it owns."
 model: haiku
 effort: high

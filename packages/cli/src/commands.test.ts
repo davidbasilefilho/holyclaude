@@ -968,3 +968,44 @@ describe("reconcile and a closed Intent", () => {
     expect((await runCommand("reconcile")).value).not.toHaveProperty("closed_with_open_work")
   })
 })
+
+describe("the subagent type a dispatch prints", () => {
+  const agentName = async (file: string) => {
+    const text = await Bun.file(
+      join(import.meta.dir, "..", "..", "..", "plugin", "agents", file),
+    ).text()
+    return (Bun.YAML.parse(text.split("---\n", 3)[1] ?? "") as { name: string }).name
+  }
+
+  test("routes prints, for every role, the plugin type of the agent whose file name is that role in kebab case", async () => {
+    const { value } = await runCommand("routes")
+    const rows = (value as { routes: Array<{ role: string; subagent_type: string }> }).routes
+    expect(rows).toHaveLength(18)
+    for (const { role, subagent_type } of rows) {
+      const file = `${role.toLowerCase().replace(".", "-")}.md`
+      expect({ role, subagent_type }).toEqual({
+        role,
+        subagent_type: `holyclaude:${await agentName(file)}`,
+      })
+    }
+  })
+
+  test("reserve keeps the role in the record and prints the type derived from it", async () => {
+    await Effect.runPromise(
+      updateState(directory, (state) =>
+        Effect.succeed({
+          state: {
+            ...state,
+            assignments: state.assignments.map((row) => ({ ...row, state: "Ready" as const })),
+          },
+          value: 0,
+        }),
+      ),
+    )
+    const { value } = await runCommand("assignment reserve", ["assignment-0001"], { root: ["src"] })
+    expect(value).toMatchObject({
+      role: "Worker.implementation",
+      subagent_type: "holyclaude:worker-implementation",
+    })
+  })
+})

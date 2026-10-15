@@ -1,5 +1,5 @@
 ---
-name: Reviewer.artifact
+name: reviewer-artifact
 description: "Use when an artifact (a document, page, configuration, generated file or other deliverable) needs an independent check against its stated acceptance criteria, after every writer on it is terminal. Reviewer.artifact (read-only) compares the artifact with its criteria and reports evidence-backed gaps for correctness and completeness. Independence IndependentReview: the reviewer must be independent of the reviewed work across its whole history."
 model: haiku
 effort: high

@@ -1,5 +1,5 @@
 ---
-name: Reviewer.code
+name: reviewer-code
 description: "Use when code that changes behavior needs an independent review for correctness and regressions against the repository's mergeability bar, after every writer on those paths is terminal. Reviewer.code (read-only) starts with the built-in /code-review skill, then reviews behavior, integration, maintainability, error paths and compatibility and substantiates true blockers. Independence IndependentReview: the reviewer must be independent of the reviewed work across its whole history."
 model: sonnet
 effort: high

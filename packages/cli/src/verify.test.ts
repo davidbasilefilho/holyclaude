@@ -89,7 +89,7 @@ describe("verify combines what the three hooks saw", () => {
   test("a reviewer that never called a guarded tool is complete after SubagentStart and SubagentStop", async () => {
     writeTranscript("claude-haiku-5-5")
     writeObservations(
-      observed({ agent_type: "holyclaude:Reviewer.audit" }),
+      observed({ agent_type: "holyclaude:reviewer-audit" }),
       observed({ effort: "high", transcript }),
     )
     expect(await verify()).toEqual({
@@ -101,7 +101,7 @@ describe("verify combines what the three hooks saw", () => {
   })
 
   test("SubagentStart alone is incomplete: effort and model are still unobserved", async () => {
-    writeObservations(observed({ agent_type: "holyclaude:Reviewer.audit" }))
+    writeObservations(observed({ agent_type: "holyclaude:reviewer-audit" }))
     expect(await verify()).toEqual({
       verdict: "incomplete",
       status: { model: "unobserved", effort: "unobserved", agent_type: "match" },
@@ -113,7 +113,7 @@ describe("verify combines what the three hooks saw", () => {
   test("a PreToolUse record alone still completes, as before the lifecycle hooks", async () => {
     writeTranscript("claude-haiku-5-5")
     writeObservations(
-      observed({ agent_type: "holyclaude:Reviewer.audit", effort: "high", transcript }),
+      observed({ agent_type: "holyclaude:reviewer-audit", effort: "high", transcript }),
     )
     expect((await verify()).verdict).toBe("ok")
   })
@@ -122,7 +122,7 @@ describe("verify combines what the three hooks saw", () => {
     writeTranscript("claude-haiku-5-5")
     writeObservations(
       observed({
-        agent_type: "holyclaude:Reviewer.audit",
+        agent_type: "holyclaude:reviewer-audit",
         effort: "low",
         transcript: "stale.jsonl",
       }),
@@ -134,7 +134,7 @@ describe("verify combines what the three hooks saw", () => {
   test("a wrong effort reported at stop is a mismatch, exit code 3", async () => {
     writeTranscript("claude-haiku-5-5")
     writeObservations(
-      observed({ agent_type: "holyclaude:Reviewer.audit" }),
+      observed({ agent_type: "holyclaude:reviewer-audit" }),
       observed({ effort: "low", transcript }),
     )
     expect(await verify()).toEqual({
@@ -148,7 +148,7 @@ describe("verify combines what the three hooks saw", () => {
   test("a wrong model in the transcript is a mismatch", async () => {
     writeTranscript("claude-sonnet-5-5")
     writeObservations(
-      observed({ agent_type: "holyclaude:Reviewer.audit" }),
+      observed({ agent_type: "holyclaude:reviewer-audit" }),
       observed({ effort: "high", transcript }),
     )
     expect((await verify()).status["model"]).toBe("mismatch")
@@ -156,7 +156,7 @@ describe("verify combines what the three hooks saw", () => {
 
   test("another agent's records are not mixed in", async () => {
     writeObservations({
-      ...observed({ agent_type: "holyclaude:Reviewer.audit", effort: "high" }),
+      ...observed({ agent_type: "holyclaude:reviewer-audit", effort: "high" }),
       agent_id: "agent-2",
     })
     expect(await verify()).toMatchObject({ verdict: "incomplete" })
@@ -164,7 +164,7 @@ describe("verify combines what the three hooks saw", () => {
 })
 
 describe("the model comes from the PostToolUse record when there is one", () => {
-  const REVIEWER = { agent_type: "holyclaude:Reviewer.audit", effort: "high" }
+  const REVIEWER = { agent_type: "holyclaude:reviewer-audit", effort: "high" }
 
   test("a full model id matches the expected alias, with no transcript at all", async () => {
     writeObservations(observed({ ...REVIEWER, model: "claude-haiku-5-5" }))

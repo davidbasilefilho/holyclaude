@@ -1,0 +1,45 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 8,
+  "role": "Worker.implementation",
+  "objective": "Rename the specialist agents to valid kebab names so claude.ai loads them.",
+  "scope": [
+    "Worktree worktree h, branch release/0.2.1/fix/agent-names from main 3aa88d4: plugin/agents, plugin/skills, packages, scripts, README.md, plugin/scripts/holyclaude.js."
+  ],
+  "constraints": [
+    "Role identifiers in Intent and Assignment records stay as they are (no record schema change); core-rules block budget respected; no git writes."
+  ],
+  "acceptance_criteria": [
+    "Every specialist agent's frontmatter name equals its kebab file name (explorer-lookup ... worker-visual); dispatch, routes, hooks, verify and select use holyclaude:<kebab> as the agent type.",
+    "The root prompt's tools list, specialist table and skills reference the new agent types; no `holyclaude:<Role.task>` agent type remains anywhere.",
+    "A test fails when any plugin agent name breaks the claude.ai rule (letters, digits, hyphens; alphanumeric at both ends).",
+    "Bundle rebuilt; fmt, lint, typecheck, full test and both validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin",
+      "packages",
+      "scripts",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "agents"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ta70t-f783",
+  "state": "Succeeded",
+  "result": "18 agents renamed to kebab; agentType(role) derives holyclaude:<route.agent>; routes prints subagent_type; verify expects kebab; prompts, skill, README updated; agent-names test (18 fail before); 1321/0; validate passes; core block size unchanged.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

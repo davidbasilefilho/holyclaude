@@ -1,5 +1,5 @@
 ---
-name: Worker.implementation
+name: worker-implementation
 description: "Use when an accepted feature or behavior is ready to be built within named ownership paths. Worker.implementation (scoped write) delivers it as a cohesive, scoped change with real checks and regression evidence. Independence DisjointWrites: start it only when no running write Assignment overlaps its ownership paths; independent review follows once it is terminal."
 model: sonnet
 effort: high
