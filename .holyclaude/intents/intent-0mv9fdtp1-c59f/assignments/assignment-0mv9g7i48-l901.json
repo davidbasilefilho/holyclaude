@@ -1,0 +1,41 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review PR3's rewrite of the holyclaude root's core rules (plugin/agents/holyclaude.md) against the writing bar, the added behaviors, and the rules it replaced.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9fytyh-9ifu.diff (full change vs origin/main)",
+    "Worktree /home/user/wt/pr3, file plugin/agents/holyclaude.md; base text: origin/main version of the same file"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Every rule in the base core-rules block is still stated (possibly merged), or its removal is justified because another section or skill owns it; any lost rule is a blocker.",
+    "Each added behavior is stated clearly and without contradiction: solo root, user instruction wins, ask last / re-ask after resume / acknowledge new instruction, classifier denial, repairs, per-deliverable report and hypotheses, screenshot delivery.",
+    "The block stays standalone and coherent when injected alone, and does not contradict the later sections (Working the way, Acceptance in detail, Committing, CI watching, Asking).",
+    "Writing bar: redundant, obsolete, conflicting, over-long or capital-emphasis text is a finding; blockers separated from optional."
+  ],
+  "required_evidence": [
+    "lost-rules",
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9fvep8-erji",
+      "assignment-0mv9fytyh-9ifu"
+    ]
+  },
+  "id": "assignment-0mv9g7i48-l901",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

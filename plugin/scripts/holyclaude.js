@@ -8194,6 +8194,8 @@ var observe = (agentId, sighting) => gen2(function* () {
     ...sighting.transcript ? { transcript: sighting.transcript } : {}
   };
   const known = seenOf(yield* readObservations(), agentId);
+  if (!(sighting.agent_type || known.agent_type)?.startsWith(`${PLUGIN_NAME}:`))
+    return;
   const keys = Object.keys(seen);
   if (keys.every((key) => seen[key] === known[key]))
     return;
@@ -10600,6 +10602,7 @@ var toon = (value) => `${encode2(value)}
 `;
 
 // src/hook/session-start.ts
+var MAIN_AGENT_TYPES = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME];
 var CAP = 1e4;
 var RULES_START = "<!-- holyclaude:core-rules:start -->";
 var RULES_END = "<!-- holyclaude:core-rules:end -->";
@@ -10693,14 +10696,18 @@ var extractRules = (agentFile, root) => {
   const rules = agentFile.slice(start + RULES_START.length, end).trim();
   return root === undefined ? rules : rules.replaceAll(PLUGIN_ROOT_VAR, () => root);
 };
-var sessionStart = gen2(function* () {
+var sessionStart = (stdin) => gen2(function* () {
   const root = yield* pluginRoot;
   if (root === undefined)
     return "";
   const file = Bun.file(join6(root, "agents", "holyclaude.md"));
   if (!(yield* tryPromise2(() => file.exists())))
     return "";
-  const rules = extractRules(yield* tryPromise2(() => file.text()), root);
+  const input = yield* decodeHookInput(stdin).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "");
+  const rules = runsAsMainAgent ? undefined : extractRules(yield* tryPromise2(() => file.text()), root);
   const summary = yield* loadState(stateDirPath()).pipe(map4(summaryOf), catch_2((error) => succeed5(brokenSummary(error.message))));
   const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`);
   return JSON.stringify({
@@ -10720,6 +10727,7 @@ var record2 = (stdin, sighting) => gen2(function* () {
 });
 var subagentStart = (stdin) => record2(stdin, (input) => ({ agent_type: input.agent_type }));
 var subagentStop = (stdin) => record2(stdin, (input) => ({
+  agent_type: input.agent_type,
   effort: effortOf(input),
   transcript: input.agent_transcript_path
 }));
@@ -11177,11 +11185,13 @@ var hookSessionStart = cmd({
   path: ["hook", "session-start"],
   usage: "hook session-start",
   summary: "SessionStart hook: core rules and state as additionalContext",
+  input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
-  run: () => sessionStart.pipe(map4((text) => ({ text })))
+  run: (_args, stdin) => stdin.pipe(orElseSucceed2(() => ""), flatMap2(sessionStart), map4((text) => ({ text })))
 });
 var hookPreToolUse = cmd({
   path: ["hook", "pre-tool-use"],

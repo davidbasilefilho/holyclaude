@@ -195,12 +195,26 @@ This setup has not been observed taking effect in a live session. Watch for the 
 | --------------- | ----------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
 | `SessionStart`  | `startup\|resume\|clear\|compact`                                 | `session-start`  | Injects the core rules and state as additional context.                 |
 | `PreToolUse`    | `Bash\|PowerShell\|Monitor\|Write\|Edit\|MultiEdit\|NotebookEdit` | `pre-tool-use`   | Guards specialists' shell and file-write calls, and records the effort. |
-| `SubagentStart` | none                                                              | `subagent-start` | Records the agent type. It cannot block.                                |
-| `SubagentStop`  | none                                                              | `subagent-stop`  | Records the effort and the agent's transcript path. It never blocks.    |
+| `SubagentStart` | none                                                              | `subagent-start` | Records a specialist's agent type. It cannot block.                     |
+| `SubagentStop`  | none                                                              | `subagent-stop`  | Records a specialist's effort and transcript. It never blocks.          |
 
 A tool the `PreToolUse` matcher does not list skips the hook entirely, so reads such as `Read`,
 `Grep` and `Glob` cost no process. The matcher lists every tool the guard judges, and a test keeps
 the two in step.
+
+The hooks record only holyclaude specialists, the agents whose `agent_type` is `holyclaude:<Role.task>`,
+because only they feed `assignment verify` and the independence rule. An agent with another type,
+an empty one or none (Claude Code's own internal agents, built-in types, other plugins' agents)
+leaves no trace: nothing is written, so a repository that loads holyclaude without using it gains
+no `.holyclaude/` directory and no `.gitignore`. A payload without an agent type still counts when
+the log already holds a holyclaude type for that agent id from its `SubagentStart`.
+
+`SessionStart` injects the core rules because the root may not run as the holyclaude agent: in
+some environments the plugin's `agent` setting is not applied, and the injection is then the root's
+only copy. When the payload's `agent_type` shows the main thread runs as that agent
+(`holyclaude:holyclaude`, or `holyclaude`), its system prompt already carries the same rules, so the
+hook leaves them out and injects only the state summary, which saves about 8,000 characters on every
+start, resume, clear and compaction. A payload that cannot be read gets the rules.
 
 `holyclaude assignment verify` combines the three observation sources field by field, the newest
 record winning: the agent type from `SubagentStart`, the effort from `PreToolUse` or `SubagentStop`,

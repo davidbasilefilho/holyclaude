@@ -1,0 +1,39 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.artifact",
+  "objective": "Independently review PR5's docs (README Cloud sessions section, Third-party material paragraph, new docs/DECISIONS.md) against their acceptance criteria and the facts given.",
+  "scope": [
+    "Diff file scratchpad/diffs/assignment-0mv9g2wfu-rkz8.diff",
+    "Worktree /home/user/wt/pr5 (README.md, docs/DECISIONS.md), base origin/main"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "Every documented claim matches the facts listed in the prompt; every observed claim is marked observed; inferences presented as facts are findings.",
+    "DECISIONS.md covers each standing decision with its reason, states the size-cap decision as content limits removed and input-safety bounds kept, and records frontend-design provenance accurately (the claude-code hash is the repository HEAD at verification, not necessarily the last commit touching the skill).",
+    "Nothing from any audited third-party repository appears.",
+    "Redundant, obsolete, conflicting or over-long text is reported as findings, blockers separated from optional."
+  ],
+  "required_evidence": [
+    "blockers",
+    "optional-findings"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9g2wfu-rkz8"
+    ]
+  },
+  "id": "assignment-0mv9g5n31-5je4",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

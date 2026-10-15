@@ -1,0 +1,49 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR6 repair (worktree /home/user/wt/pr6): close the guard's bypasses found in review and harden the CI step.",
+  "scope": [
+    "scripts/architecture.test.ts",
+    ".github/workflows/ci.yml"
+  ],
+  "constraints": [
+    "Follow the ship brief.",
+    "Keep the bunx pin (no new devDependency).",
+    "AGENTS.md stays as is unless the allowlist changes."
+  ],
+  "acceptance_criteria": [
+    "Bare builtin specifiers (fs, fs/promises, path, os, child_process and any other Node builtin, detected with isBuiltin from node:module or an equivalent) are treated as node: imports and checked against the allowlist, so `import { readFileSync } from \"fs\"` fails.",
+    "An import whose braces span lines and contain comments is parsed (comments stripped before matching), with a sanity assertion that the scan parsed imports from the tree.",
+    "The scan also covers plugin/ and .mts/.cts files, skipping node_modules and the generated bundle.",
+    "The CI validate step runs right after dependency install (before format), with DISABLE_AUTOUPDATER=1 in its env.",
+    "Each new rule is shown red on a temporary violation and green on the tree; format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "red-green-proof",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "scripts/architecture.test.ts",
+      ".github/workflows/ci.yml",
+      "AGENTS.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9fvesj-g88x",
+      "assignment-0mv9g0mfs-rz3c"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9g62pu-ktw0",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

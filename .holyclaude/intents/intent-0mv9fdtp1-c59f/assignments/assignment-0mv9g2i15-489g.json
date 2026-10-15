@@ -1,0 +1,54 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Reviewer.security",
+  "objective": "Independent security review of PR1 (hook observation gating and SessionStart stdin handling) and PR6 (CI step fetching Claude Code via bunx; architecture guard).",
+  "scope": [
+    "PR1 diff scratchpad/diffs/assignment-0mv9fvem5-zb5b.diff (worktree /home/user/wt/pr1)",
+    "PR6 diff scratchpad/diffs/assignment-0mv9fvesj-g88x.diff (worktree /home/user/wt/pr6)",
+    "Base origin/main"
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "acceptance_criteria": [
+    "PR1: confirms the PreToolUse guard's allow/deny decisions are unchanged for every agent (only recording changed), that a payload cannot use a crafted agent_type to suppress the core rules or skew verify in a way that matters, and that the new SessionStart stdin read is bounded and fails safe.",
+    "PR6: assesses the supply-chain exposure of fetching a pinned npm package in CI (version pin vs integrity, permissions of the job, token exposure via persist-credentials, network), and whether the guard test reads only repo files.",
+    "Each finding traced source to sink with severity, or stated as none."
+  ],
+  "required_evidence": [
+    "pr1-findings",
+    "pr6-findings",
+    "severity"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": [
+      "assignment-0mv9fvem5-zb5b",
+      "assignment-0mv9fvesj-g88x"
+    ]
+  },
+  "id": "assignment-0mv9g2i15-489g",
+  "state": "Succeeded",
+  "result": "Security review PR1+PR6: no finding at medium or above. PR1: guard decisions unchanged, payloads only from Claude Code, rule omission fails toward injecting, verify tightened; L1 specialist without agent_type on start loses observation (documented to be sent); I1 bare holyclaude name acceptable but strict qualified name preferred; I2 stdin slice buffering unconfirmed. PR6: pinned bunx fetch lacks integrity hash (low; read-only token, pull_request trigger, persist-credentials false); guard reads only repo files.",
+  "acceptance": {
+    "intent_revision": 2,
+    "rationale": "Traced source to sink for each concern from the diffs and code; limits of reading stated.",
+    "criteria_evidence": {
+      "PR1: confirms the PreToolUse guard's allow/deny decisions are unchanged for every agent (only recording changed), that a payload cannot use a crafted agent_type to suppress the core rules or skew verify in a way that matters, and that the new SessionStart stdin read is bounded and fails safe.": "policy.ts/pre-tool-use.ts untouched, reason computed before observe; omission needs exact names, failures inject rules; verify tighter.",
+      "PR6: assesses the supply-chain exposure of fetching a pinned npm package in CI (version pin vs integrity, permissions of the job, token exposure via persist-credentials, network), and whether the guard test reads only repo files.": "Low: no integrity hash; contents read, pull_request, persist-credentials false; guard reads repo .ts only.",
+      "Each finding traced source to sink with severity, or stated as none.": "L1, I1, I2, PR6 low each traced with severity."
+    },
+    "required_evidence": {
+      "pr1-findings": "L1, I1, I2; guard unchanged.",
+      "pr6-findings": "pinned fetch without integrity (low); guard repo-only.",
+      "severity": "No medium or higher; no blockers."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

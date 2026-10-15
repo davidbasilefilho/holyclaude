@@ -1,0 +1,47 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 2,
+  "role": "Worker.implementation",
+  "objective": "PR6 (worktree /home/user/wt/pr6, branch release/0.2.0/ci/validate-and-guard): CI validates the plugin and marketplace with claude plugin validate --strict, and an architecture guard test enforces the Bun-API, Bun Shell and layering rules, with AGENTS.md's Bun line reconciled.",
+  "scope": [
+    ".github/workflows/ci.yml",
+    "scripts/architecture.test.ts (new)",
+    "AGENTS.md: only the 'Prefer Bun APIs over Node equivalents.' line"
+  ],
+  "constraints": [
+    "Follow the ship brief and AGENTS.md.",
+    "Pin the Claude Code CLI version used in CI to 2.1.300 and run it without credentials; prove locally that it validates with an empty HOME.",
+    "The AGENTS.md edit is exactly one line, approved by the user: 'Prefer Bun APIs over Node equivalents; where Bun has none (path handling, rename, mkdir, readdir, lstat, exclusive open, append, rm, hostname), use node: and keep scripts/architecture.test.ts in step.' (adjust the list to match the allowlist you end with)."
+  ],
+  "acceptance_criteria": [
+    "CI runs claude plugin validate --strict on plugin/ and on the repository root (marketplace) and fails the job on a warning.",
+    "scripts/architecture.test.ts scans every .ts file under packages/ and scripts/ and fails on: a named import from a node: module not on its allowlist (each entry carries its reason; test files may have a few extra entries for temp dirs and symlink fixtures); node:child_process, spawn, spawnSync or Bun.spawn; packages/core importing from packages/cli, plugin/ or scripts/.",
+    "The guard is shown red on a deliberate violation (in a temporary copy or a temporary file you remove) and green on the tree.",
+    "Format, lint, typecheck and test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "red-green-proof",
+    "validate-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      ".github/workflows/ci.yml",
+      "scripts/architecture.test.ts",
+      "AGENTS.md"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9fvesj-g88x",
+  "state": "Succeeded",
+  "result": "PR6 writer: ci.yml step validates plugin and marketplace with bunx @anthropic-ai/claude-code@2.1.300 plugin validate --strict (empty HOME passes; strict fails on a warning, shown). scripts/architecture.test.ts: allowlisted node: imports with reasons, bans child_process/spawn/Bun.spawn, core layering; red on deliberate violations, green on tree (4 tests). AGENTS.md one line incl. stat. Gaps: bare builtin imports without node: not flagged; spawn( text check may false-positive. Gates: oxfmt, oxlint, tsc --noEmit (bun check unavailable on 1.4.2), bun test 1104 pass.",
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

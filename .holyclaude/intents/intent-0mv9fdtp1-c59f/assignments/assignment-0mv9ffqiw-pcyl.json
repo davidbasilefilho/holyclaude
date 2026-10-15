@@ -1,0 +1,44 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 1,
+  "role": "Librarian.lookup",
+  "objective": "Answer from official Claude Code documentation and changelog the subagent, settings and cloud-session questions listed in the prompt, for Claude Code 2.1.300.",
+  "scope": [
+    "Official Claude Code docs: subagents, settings, plugins reference, Claude Code on the web, changelog"
+  ],
+  "constraints": [
+    "Read-only.",
+    "Cite the URL and the quoted line for each answer; say 'not documented' when the docs are silent rather than inferring."
+  ],
+  "acceptance_criteria": [
+    "Each numbered question has an answer with a citation, or 'not documented'."
+  ],
+  "required_evidence": [
+    "answers",
+    "sources"
+  ],
+  "mutability": "ReadOnly",
+  "metadata": {
+    "ownership_paths": [],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9ffqiw-pcyl",
+  "state": "Succeeded",
+  "result": "Docs answers: autoCompactWindow subagent-only (100000-1000000, >=2.1.296, no effect on main-thread agent, env CLAUDE_CODE_AUTO_COMPACT_WINDOW overrides); plugin settings agent key supported, cloud behavior not documented; cloud sessions do not read ~/.claude/settings.json, read repo .claude/settings.json only in single-repo sessions, env vars on the environment; setup-script settings.json write not documented; deniedModels managed-only (>=2.1.283), server-managed needs Team/Enterprise; /code-review subagent type/model and deny interaction not documented; claude plugin eval exists (>=2.1.269), real model cost, --max-cost-usd; bin/ on PATH and claude.ai/Cowork refuse plugins with bin/.",
+  "acceptance": {
+    "intent_revision": 1,
+    "rationale": "Each of the seven questions is answered with a cited docs URL and quoted line or explicitly marked not documented; fetches were real WebFetch calls; limits (summarized fetch, partial changelog) are disclosed.",
+    "criteria_evidence": {
+      "Each numbered question has an answer with a citation, or 'not documented'.": "Q1,3,6,7 answered with citations; Q2,4 partly with citations and the gaps marked not documented; Q5 not documented."
+    },
+    "required_evidence": {
+      "answers": "Seven numbered answers in the report.",
+      "sources": "code.claude.com sub-agents, plugins-reference, settings, cloud-environments, settings-reference, model-config, server-managed-settings, commands, permissions, plugin-evals; raw CHANGELOG."
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}
