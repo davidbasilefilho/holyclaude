@@ -142,7 +142,7 @@ describe("closeIntent and reopenIntent", () => {
       reserve(
         reopened,
         { assignment_id: "assignment-Ready", capabilities: ["Write"] },
-        { projectRoot: "/p", writableRoots: ["/p"] },
+        { projectRoot: "/p", writableRoots: ["/p"], worktree: "w" },
       ),
     )
     expect(refused).toMatchObject({ _tag: "StaleRevision", given: 1, live: 2 })
@@ -182,7 +182,7 @@ describe("a closed Intent", () => {
         reserve(
           closed,
           { assignment_id: "assignment-Ready", capabilities: ["Write"] },
-          { projectRoot: "/p", writableRoots: ["/p"] },
+          { projectRoot: "/p", writableRoots: ["/p"], worktree: "w" },
         ),
       ),
     ).toMatchObject(closedError)

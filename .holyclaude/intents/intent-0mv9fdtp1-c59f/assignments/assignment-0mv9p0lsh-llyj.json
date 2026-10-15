@@ -1,0 +1,57 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Remove the repeated intent-lifecycle rules so each lives once, in the root prompt.",
+  "scope": [
+    "Worktree worktree a: plugin/agents/holyclaude.md, plugin/skills/assignments/SKILL.md, README.md (uncommitted A changes already present)."
+  ],
+  "constraints": [
+    "Prose only; writing bar; no new rules; no git writes."
+  ],
+  "acceptance_criteria": [
+    "The pull-before-closing rule with its reason and the carry-forward policy (rationale says why the work holds; validation Assignment when the change touched the work's files) each appear once, in plugin/agents/holyclaude.md.",
+    "SKILL.md keeps only the command shapes and inputs for accept --carry-forward, intent close --allow-unaccepted and reopen, pointing to the root prompt for policy where needed; README keeps only the user-facing behavior.",
+    "fmt and full test pass; wc -c before and after per file."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "diff-file",
+    "sizes"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "plugin/agents/holyclaude.md",
+      "plugin/skills/assignments/SKILL.md",
+      "README.md"
+    ],
+    "symbols": [],
+    "domains": [
+      "intent-lifecycle"
+    ],
+    "dependencies": [],
+    "related_assignments": [
+      "assignment-0mv9oe510-ghwq"
+    ],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9p0lsh-llyj",
+  "state": "Succeeded",
+  "result": "Policies now once in holyclaude.md; SKILL.md -376 and README -249 bytes with command shapes and behavior only; fmt and 1229 tests pass.",
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "De-duplication verified by re-review 7aij; its one blocker (continue-work) fixed and re-reviewed (rxdn).",
+    "criteria_evidence": {
+      "The pull-before-closing rule with its reason and the carry-forward policy (rationale says why the work holds; validation Assignment when the change touched the work's files) each appear once, in plugin/agents/holyclaude.md.": "verified by re-reviews 7aij and rxdn",
+      "SKILL.md keeps only the command shapes and inputs for accept --carry-forward, intent close --allow-unaccepted and reopen, pointing to the root prompt for policy where needed; README keeps only the user-facing behavior.": "verified by re-reviews 7aij and rxdn",
+      "fmt and full test pass; wc -c before and after per file.": "verified by re-reviews 7aij and rxdn"
+    },
+    "required_evidence": {
+      "checks-run": "reported; repair diff saved",
+      "diff-file": "reported; repair diff saved",
+      "sizes": "reported; repair diff saved"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

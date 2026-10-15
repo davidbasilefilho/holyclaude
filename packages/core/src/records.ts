@@ -7,7 +7,7 @@ import { CorruptRecord, StateIo } from "./errors.ts"
 import { commitFile, encodeJson, readJson } from "./files.ts"
 import { attempt, hasCode } from "./io.ts"
 import { assignmentFile, intentFile } from "./layout.ts"
-import { readAgents, readWorkers, writeLocal } from "./local.ts"
+import { readAgents, readWorkers, readWorktrees, writeLocal } from "./local.ts"
 import type { Lock } from "./lock.ts"
 import { Assignment } from "./model/assignment.ts"
 import { sortedById } from "./model/ids.ts"
@@ -16,10 +16,11 @@ import { validateState, type State } from "./model/state.ts"
 import { refuseSymlinks } from "./safety.ts"
 
 /**
- * The committed form of an Assignment. `agent_id` names a subagent of one session on one machine,
- * so it is kept in a local file and never written to the record.
+ * The committed form of an Assignment. `agent_id` names a subagent of one session on one machine
+ * and `worktree` keys a directory of this machine, so both are kept in local files and never
+ * written to the record.
  */
-const AssignmentRecord = Assignment.mapFields(Struct.omit(["agent_id"]))
+const AssignmentRecord = Assignment.mapFields(Struct.omit(["agent_id", "worktree"]))
 
 const segments = (relative: string) => relative.split(/[\\/]/)
 
@@ -127,11 +128,16 @@ export const loadRecordState = (directory: string, limit?: number) =>
     }
     const intents = sortedById(yield* readIntents(directory, limit))
     const agents = yield* readAgents(directory, limit)
+    const worktrees = yield* readWorktrees(directory, limit)
     const assignments = sortedById(yield* readAssignments(directory, limit)).map(
-      (record): Assignment => ({
-        ...record,
-        agent_id: agents[record.id] ?? null,
-      }),
+      (record): Assignment => {
+        const worktree = record.state === "Running" ? worktrees[record.id] : undefined
+        return {
+          ...record,
+          agent_id: agents[record.id] ?? null,
+          ...(worktree === undefined ? {} : { worktree }),
+        }
+      },
     )
     const workers = yield* readWorkers(directory, limit)
     return yield* validateState({ version: 1, intents, assignments, workers })

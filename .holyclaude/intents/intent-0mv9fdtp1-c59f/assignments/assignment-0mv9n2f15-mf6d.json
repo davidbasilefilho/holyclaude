@@ -1,0 +1,55 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 4,
+  "role": "Worker.operations",
+  "objective": "Version bump (worktree pr10, branch release/0.2.0/chore/version): set 0.2.0 in every version file with the repository's own task and rebuild the bundle, then run the gates.",
+  "scope": [
+    "The six version files the bump script edits",
+    "plugin/scripts/holyclaude.js"
+  ],
+  "constraints": [
+    "Use `bunx bun@1.4.3 scripts/bump-version.ts minor` and the build command from mise.toml; edit nothing by hand.",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "Every version file reads 0.2.0 (list them with their values).",
+    "Bundle rebuilt with Bun 1.4.3; format, lint, typecheck, full test and both plugin validate --strict runs pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "package.json",
+      "packages/cli/package.json",
+      "packages/core/package.json",
+      "plugin/package.json",
+      "plugin/.claude-plugin/plugin.json",
+      ".claude-plugin/marketplace.json",
+      "plugin/scripts/holyclaude.js"
+    ],
+    "symbols": [],
+    "domains": [],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9n2f15-mf6d",
+  "state": "Succeeded",
+  "result": "Version 0.1.0 -> 0.2.0 in six manifests via bump-version.ts; bundle rebuilt with bun 1.4.3; fmt, lint, typecheck, 1210 tests and both validate --strict runs pass.",
+  "acceptance": {
+    "intent_revision": 4,
+    "rationale": "Root verified the 7-file diff: one version line each, bundle 1-line.",
+    "criteria_evidence": {
+      "Every version file reads 0.2.0 (list them with their values).": "package.json, packages/cli, packages/core, plugin/package.json, plugin.json, marketplace.json all 0.2.0 (root-verified diff)",
+      "Bundle rebuilt with Bun 1.4.3; format, lint, typecheck, full test and both plugin validate --strict runs pass.": "all exit 0; 1210 pass 0 fail; validate passed for plugin and ."
+    },
+    "required_evidence": {
+      "checks-run": "oxfmt, oxlint, bun check, bun test, validate --strict x2: exit 0",
+      "changed-paths": "7 files within ownership paths"
+    }
+  },
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

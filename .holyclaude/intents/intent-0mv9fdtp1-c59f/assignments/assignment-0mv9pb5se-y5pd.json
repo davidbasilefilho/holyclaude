@@ -1,0 +1,52 @@
+{
+  "intent_id": "intent-0mv9fdtp1-c59f",
+  "intent_revision": 5,
+  "role": "Worker.implementation",
+  "objective": "Build feat/named-records: slugged directory and file names for Intent and Assignment records.",
+  "scope": [
+    "Worktree worktree e, branch release/0.2.0/feat/named-records, based on release/0.2.0/fix/intent-lifecycle (PR #24, fe10dbb)."
+  ],
+  "constraints": [
+    "Never run the new CLI against the main checkout/.holyclaude: the installed 0.1.x CLI rejects slugged paths as corrupt. Test renames only in fixture directories under the scratchpad or test temp dirs.",
+    "Open Intents keep omitting state. No other record schema change. Slug length is path safety, not a content cap.",
+    "No git writes."
+  ],
+  "acceptance_criteria": [
+    "Layout: .holyclaude/intents/<slug>-<intent-id>/intent.json and .holyclaude/intents/<slug>-<intent-id>/assignments/<slug>-<assignment-id>.json, slug from the record's own objective: lowercase, accents folded to ASCII, every non letter/digit run becomes '-', trimmed, cut at a word boundary around 40 characters; an empty slug leaves just the id; a slug never contains a separator or '..'; symlinks still refused.",
+    "The id stays the key: the loader takes the id from the end of the name (kind-<time>-<random>), the record's id must equal it, an Assignment's intent_id must equal its folder's id part; names without a slug (legacy ids such as intent-0001) still load.",
+    "When an objective changes, the directory or file is renamed in one move under the existing lock (git sees a rename); two paths holding the same id fail with an error naming both.",
+    "The root prompt's staging rule matches the Intent's directory by its id, and intent list prints each Intent's path.",
+    "README says collaborators need 0.2.0 (0.1.x reads slugged records as corrupt) and no longer promises that 0.1.x reads open Intents.",
+    "Tests: slug cases (accents incl. Portuguese, empty, long, separators), rename on update, legacy names, trailing-id matching, duplicate id across two paths, and a 0.1.0-style mismatch reported as corrupt; bundle rebuilt; fmt, lint, typecheck, full test pass."
+  ],
+  "required_evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "tests-added"
+  ],
+  "mutability": "ScopedWrite",
+  "metadata": {
+    "ownership_paths": [
+      "packages/core/src",
+      "packages/cli/src",
+      "plugin/scripts/holyclaude.js",
+      "plugin/agents/holyclaude.md",
+      "plugin/skills",
+      "README.md",
+      "scripts"
+    ],
+    "symbols": [],
+    "domains": [
+      "records"
+    ],
+    "dependencies": [],
+    "related_assignments": [],
+    "independent_from": []
+  },
+  "id": "assignment-0mv9pb5se-y5pd",
+  "state": "Running",
+  "result": null,
+  "acceptance": null,
+  "clone_id": "clone-0mv9fejex-b8cj"
+}

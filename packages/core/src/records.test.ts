@@ -387,7 +387,7 @@ describe("the clone stamp", () => {
     reserve(
       state,
       { assignment_id: FIRST, capabilities: ["Write"] },
-      { projectRoot: directory, writableRoots: [directory] },
+      { projectRoot: directory, writableRoots: [directory], worktree: "w" },
     ).pipe(Effect.map(({ state: next }) => ({ state: next, value: "reserved" })))
 
   test("a row entering Running is stamped with this clone's id, created on first use", async () => {

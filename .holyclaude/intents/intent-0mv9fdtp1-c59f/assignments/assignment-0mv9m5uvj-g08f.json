@@ -50,6 +50,25 @@
   "id": "assignment-0mv9m5uvj-g08f",
   "state": "Succeeded",
   "result": "PR8 repair: create sets in use and reports in_use/replaced; open Intents omit state on disk; local/.gitignore re-asserted; stored choice read only without --intent, unreadable counts as none; reopen resolves the only closed Intent; conflicting targets are usage errors; pointer names --all; hints and prose fixes; 13 regression tests fail on 258ab95; gates pass (1210); bundle rebuilt.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "Carried forward from revision 3 to 5: revisions 4-5 added scope (Intent decisions, stack rules, the lifecycle, worktree, tooling, docs and named-record fixes) and changed no requirement this work was built against. Its work shipped in #21, whose head was independently reviewed and is green in CI.",
+    "criteria_evidence": {
+      "intent create sets the new Intent in use on this clone and prints which Intent is now in use and which one it replaced.": "Met in #21: independent review of that head and CI green on it",
+      "Open Intents omit the state field on disk; only a closed Intent writes state, close_reason and closed_at.": "Met in #21: independent review of that head and CI green on it",
+      "An existing local/.gitignore is rewritten to * unless it already is.": "Met in #21: independent review of that head and CI green on it",
+      "activeIntent reads the stored choice only when no --intent is given and treats an unreadable choice as none.": "Met in #21: independent review of that head and CI green on it",
+      "intent reopen resolves among closed Intents (or requires --intent, documented).": "Met in #21: independent review of that head and CI green on it",
+      "Conflicting targets (--intent with a positional id or a JSON id) are a usage error.": "Met in #21: independent review of that head and CI green on it",
+      "SessionStart pointer names assignment list --all; stale open() JSDoc fixed; NoActiveIntent hint covers zero open Intents.": "Met in #21: independent review of that head and CI green on it",
+      "Handoff no longer suggests intent use and adds intent list to its gather list; continue-work asks only when several are open and none is in use; assignments skill has an intent use bullet and notes positional and JSON id precedence; README notes active-intent.json is replaced, not appended, and the zero-open message; reviewer-artifact line names obsolescence; bar wording 'so no copy of a rule can drift from the original' in all three copies.": "Met in #21: independent review of that head and CI green on it",
+      "Regression tests for each behavior change fail before and pass after; gates pass; bundle rebuilt with Bun 1.4.3.": "Met in #21: independent review of that head and CI green on it"
+    },
+    "required_evidence": {
+      "checks-run": "Reported by the worker and confirmed by the #21 review",
+      "regression-tests": "Reported by the worker and confirmed by the #21 review",
+      "diff-file": "Reported by the worker and confirmed by the #21 review"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
