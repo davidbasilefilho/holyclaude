@@ -628,11 +628,19 @@ const hookSessionStart = cmd({
   path: ["hook", "session-start"],
   usage: "hook session-start",
   summary: "SessionStart hook: core rules and state as additionalContext",
+  input: "Claude Code hook JSON",
   root: false,
   hook: true,
+  stdinLimit: MAX_HOOK_BYTES,
   flags: {},
   positionals: 0,
-  run: () => sessionStart.pipe(Effect.map((text) => ({ text }))),
+  // An unreadable stdin must not silence the hook: without the payload it injects the rules.
+  run: (_args, stdin) =>
+    stdin.pipe(
+      Effect.orElseSucceed(() => ""),
+      Effect.flatMap(sessionStart),
+      Effect.map((text) => ({ text })),
+    ),
 })
 
 const hookPreToolUse = cmd({

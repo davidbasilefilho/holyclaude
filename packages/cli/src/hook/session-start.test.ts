@@ -170,9 +170,51 @@ describe("the plugin root in injected text", () => {
     copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
     process.env["CLAUDE_PLUGIN_ROOT"] = root
     process.env["HOLYCLAUDE_STATE_DIR"] = join(base, ".holyclaude")
-    const output = JSON.parse(await Effect.runPromise(sessionStart))
+    const output = JSON.parse(await Effect.runPromise(sessionStart("")))
     const context: string = output.hookSpecificOutput.additionalContext
     expect(context).not.toContain("${CLAUDE_PLUGIN_ROOT}")
     expect(context).toContain(`"${root}/scripts/holyclaude"`)
+  })
+
+  describe("by the agent the main thread runs as", () => {
+    const start = async (payload: object | string) => {
+      if (base !== "") rmSync(base, { recursive: true, force: true })
+      base = mkdtempSync(join(tmpdir(), "holyclaude-session-start-"))
+      const root = join(base, "plugin")
+      mkdirSync(join(root, "agents"), { recursive: true })
+      copyFileSync(AGENT, join(root, "agents", "holyclaude.md"))
+      process.env["CLAUDE_PLUGIN_ROOT"] = root
+      process.env["HOLYCLAUDE_STATE_DIR"] = join(base, ".holyclaude")
+      const stdin = typeof payload === "string" ? payload : JSON.stringify(payload)
+      const output = JSON.parse(await Effect.runPromise(sessionStart(stdin)))
+      // The rules as injected, with the plugin root substituted, are what a context must or must not hold.
+      const rules = extractRules(await Bun.file(AGENT).text(), root) ?? ""
+      return { context: output.hookSpecificOutput.additionalContext as string, rules }
+    }
+
+    test("the holyclaude agent, qualified or bare, gets the state summary without the rules", async () => {
+      for (const agent_type of ["holyclaude:holyclaude", "holyclaude"]) {
+        const { context, rules } = await start({ hook_event_name: "SessionStart", agent_type })
+        expect(rules.length).toBeGreaterThan(1000)
+        expect(context).toStartWith("State:")
+        expect(context).not.toContain(rules.slice(0, 200))
+      }
+    })
+
+    test("any other session, or an unreadable payload, gets the rules and the summary", async () => {
+      const others: Array<object | string> = [
+        {},
+        { agent_type: "" },
+        { agent_type: "general-purpose" },
+        { agent_type: "other:holyclaude" },
+        "",
+        "{",
+      ]
+      for (const payload of others) {
+        const { context, rules } = await start(payload)
+        expect(context).toContain(rules)
+        expect(context).toContain("State:")
+      }
+    })
   })
 })

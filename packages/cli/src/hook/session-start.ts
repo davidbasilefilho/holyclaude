@@ -10,8 +10,16 @@ import {
 } from "@holyclaude/core"
 import { Effect } from "effect"
 
-import { pluginRoot } from "../fingerprint.ts"
+import { PLUGIN_NAME, pluginRoot } from "../fingerprint.ts"
 import { toon } from "../toon.ts"
+import { decodeHookInput } from "./input.ts"
+
+/**
+ * The `agent_type` a SessionStart payload shows when the main thread runs as the holyclaude agent:
+ * the plugin-qualified name, or the bare one. That agent's system prompt already carries the core
+ * rules.
+ */
+const MAIN_AGENT_TYPES: ReadonlyArray<string> = [`${PLUGIN_NAME}:${PLUGIN_NAME}`, PLUGIN_NAME]
 
 /** SessionStart `additionalContext` is capped at this many characters. */
 const CAP = 10_000
@@ -139,21 +147,28 @@ export const extractRules = (agentFile: string, root?: string): string | undefin
 
 /**
  * The SessionStart hook: the core rules from the root agent file plus a TOON summary of the
- * authoritative state, as `additionalContext` within the 10,000 character cap. Emits nothing when
- * the agent file is absent.
+ * authoritative state, as `additionalContext` within the 10,000 character cap. When the payload
+ * shows the main thread already runs as the holyclaude agent, the rules are left out, since its
+ * system prompt carries them; any other payload, or one that cannot be read, gets them, because
+ * then this is the root's only copy. Emits nothing when the agent file is absent.
  */
-export const sessionStart = Effect.gen(function* () {
-  const root = yield* pluginRoot
-  if (root === undefined) return ""
-  const file = Bun.file(join(root, "agents", "holyclaude.md"))
-  if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
-  const rules = extractRules(yield* Effect.tryPromise(() => file.text()), root)
-  const summary = yield* loadState(stateDirPath()).pipe(
-    Effect.map(summaryOf),
-    Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
-  )
-  const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)
-  return JSON.stringify({
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
+export const sessionStart = (stdin: string) =>
+  Effect.gen(function* () {
+    const root = yield* pluginRoot
+    if (root === undefined) return ""
+    const file = Bun.file(join(root, "agents", "holyclaude.md"))
+    if (!(yield* Effect.tryPromise(() => file.exists()))) return ""
+    const input = yield* decodeHookInput(stdin).pipe(Effect.orElseSucceed(() => undefined))
+    const runsAsMainAgent = MAIN_AGENT_TYPES.includes(input?.agent_type ?? "")
+    const rules = runsAsMainAgent
+      ? undefined
+      : extractRules(yield* Effect.tryPromise(() => file.text()), root)
+    const summary = yield* loadState(stateDirPath()).pipe(
+      Effect.map(summaryOf),
+      Effect.catch((error) => Effect.succeed(brokenSummary(error.message))),
+    )
+    const additionalContext = composeContext(rules, summary, `"${root}/scripts/holyclaude"`)
+    return JSON.stringify({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
+    })
   })
-})

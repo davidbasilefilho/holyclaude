@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -729,6 +729,23 @@ describe("the decision reads only the fields it needs", () => {
     expect(records).toMatchObject([
       { kind: "observed", agent_id: "agent-1", agent_type: "holyclaude:Worker.implementation" },
     ])
+  })
+
+  test("a call by an agent that is not a holyclaude specialist is judged but leaves no trace", async () => {
+    for (const extra of [
+      {},
+      { agent_type: "" },
+      { agent_type: "Explore" },
+      { agent_type: "x:y" },
+    ]) {
+      expect(await decide(call("Bash", { command: "git commit -m x" }, "subagent", extra))).toBe(
+        "deny",
+      )
+      expect(await decide(call("Bash", { command: "git status" }, "subagent", extra))).toBe("allow")
+    }
+    expect(await Effect.runPromise(readObservations(directory))).toEqual([])
+    expect(existsSync(join(directory, "local"))).toBe(false)
+    expect(existsSync(join(directory, ".gitignore"))).toBe(false)
   })
 
   test("a subagent call whose agent_id is not a string is judged but cannot be observed", async () => {
