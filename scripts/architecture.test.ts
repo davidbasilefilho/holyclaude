@@ -53,6 +53,8 @@ const testExtras: Allowlist = {
   "node:fs": {
     appendFileSync: fixtureReason,
     copyFileSync: fixtureReason,
+    existsSync:
+      "no Bun equivalent: synchronous existence check in test assertions, where Bun.file().exists() is async",
     mkdirSync: "no Bun equivalent: create a fixture directory tree",
     mkdtempSync: "no Bun equivalent: unique temporary directory",
     readFileSync: migrateReason,
