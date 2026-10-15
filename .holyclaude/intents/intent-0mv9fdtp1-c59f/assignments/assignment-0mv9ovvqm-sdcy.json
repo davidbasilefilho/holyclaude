@@ -45,6 +45,23 @@
   "id": "assignment-0mv9ovvqm-sdcy",
   "state": "Succeeded",
   "result": "D built: reviewer-artifact first review whole, re-review on repair diff and touched sections (blockers outside only); root prompt and skill re-review targets changed lines and names the diff; README two observed cloud bullets; CI watching REST forms with GraphQL-only mergeStateStatus and threads Unknown when blocked, Monitor polling fallback; objective guidance. Gates pass (1210). Open: legacy commit statuses not read; gh api allow rule not added.",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "D prose verified through review oyxib and narrow re-reviews qy6w, 2nmh, 5sf2; final pass has no blockers; REST reads run live on PR 23.",
+    "criteria_evidence": {
+      "Reviewer.artifact reads the whole artifact on a first review; on a re-review it reads the repair's diff and the sections that diff touches, and raises anything outside only if it is a blocker.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "The root prompt and the assignments skill say a re-review targets the repair's changed lines and the re-review Assignment names the diff.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "README Cloud sessions gains two observed bullets: gh GraphQL is blocked and gh api (REST) works; a PR activity subscription can stop delivering partway through, so fall back to polling.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "The root prompt's CI watching uses gh api REST forms (PR head SHA, check runs for that SHA, mergeable and mergeable_state, reviews); it says mergeStateStatus and unresolved review threads exist only in GraphQL, so where GraphQL is blocked those read Unknown, never passed; the fallback for a dropped subscription is polling with Monitor.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "The root prompt and the assignments skill say an objective is one short sentence naming the outcome, with detail in requirements (Intent) or scope and criteria (Assignment); guidance only.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "fmt, lint, typecheck and full test pass.": "verified by the review chain ending in 5sf2 (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; diff files saved",
+      "changed-paths": "reported by the writer; diff files saved",
+      "diff-file": "reported by the writer; diff files saved",
+      "sizes": "reported by the writer; diff files saved"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }

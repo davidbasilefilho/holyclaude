@@ -45,8 +45,8 @@
     "independent_from": []
   },
   "id": "assignment-0mv9pb5se-y5pd",
-  "state": "Running",
-  "result": null,
+  "state": "Succeeded",
+  "result": "E built: slug.ts (NFKD fold, [a-z0-9-], 40-char word cut), id matched at the end of names, CorruptRecord for mismatches and duplicate ids naming both paths, rename under the lock on write (directory moves with its Assignments), legacy names load, intent list path column, staging rule matches *<intent-id>/ byte-neutral, README compatibility note. 1256/0; bundle rebuilt.",
   "acceptance": null,
   "clone_id": "clone-0mv9fejex-b8cj"
 }

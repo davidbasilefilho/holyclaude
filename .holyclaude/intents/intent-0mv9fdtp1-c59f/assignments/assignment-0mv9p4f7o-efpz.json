@@ -41,6 +41,19 @@
   "id": "assignment-0mv9p4f7o-efpz",
   "state": "Succeeded",
   "result": "D repair: B1-B6 and O1-O6, O8 applied; core-rules block 9307 bytes (session-start budget has under 20 bytes left); gates pass (1210).",
-  "acceptance": null,
+  "acceptance": {
+    "intent_revision": 5,
+    "rationale": "D prose verified through review oyxib and narrow re-reviews qy6w, 2nmh, 5sf2; final pass has no blockers; REST reads run live on PR 23.",
+    "criteria_evidence": {
+      "B1-B6 fixed as specified in the brief.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "O1-O6 and O8 fixed as specified.": "verified by the review chain ending in 5sf2 (no blockers)",
+      "fmt and full test pass; wc -c before and after per file; a repair-only diff saved.": "verified by the review chain ending in 5sf2 (no blockers)"
+    },
+    "required_evidence": {
+      "checks-run": "reported by the writer; diff files saved",
+      "diff-file": "reported by the writer; diff files saved",
+      "sizes": "reported by the writer; diff files saved"
+    }
+  },
   "clone_id": "clone-0mv9fejex-b8cj"
 }
