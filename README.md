@@ -387,16 +387,17 @@ mise run build   # rebuilds plugin/scripts/holyclaude.js after core or cli chang
 | `typecheck`                               | Type-check the repository                                            |
 | `test`                                    | Run the test suite                                                   |
 | `build`                                   | Bundle the CLI into `plugin/scripts/holyclaude.js`                   |
-| `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the version in all six places and print the old and new version |
+| `bump:minor`, `bump:patch`, `bump:hotfix` | Bump the six version files and `bun.lock`, print old and new version |
 
 Versions follow `0.X.Y-Z`: `X` is the minor, `Y` the patch and `Z` an optional hotfix. A bump
 resets the later positions, so from `0.3.2-1` a minor bump gives `0.4.0`, a patch bump gives
 `0.3.3` and a hotfix bump gives `0.3.2-2`. The version appears in the root, `packages/cli`,
 `packages/core` and `plugin` `package.json` files, in `plugin/.claude-plugin/plugin.json` and in
 `.claude-plugin/marketplace.json`, and the six stay identical. Claude Code only sees a plugin update when
-the version string changes. The bump tasks refuse to run when the six disagree. After a successful bump they
-run `build`, because the CLI reads its version from `packages/cli/package.json` at build time; commit the
-rebuilt `plugin/scripts/holyclaude.js` together with the version change.
+the version string changes. The bump tasks refuse to run, writing nothing, when the six disagree or when
+`bun.lock` is missing or has no workspace version. After a successful bump they run `build`, because the
+CLI reads its version from `packages/cli/package.json` at build time; commit the rebuilt
+`plugin/scripts/holyclaude.js` together with the version change.
 
 ## Third-party material
 
