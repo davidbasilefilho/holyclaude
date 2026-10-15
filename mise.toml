@@ -3,19 +3,19 @@ bun = "1.4.3"
 
 [tasks.fmt]
 description = "Format the repository in place"
-run = "bunx oxfmt --write"
+run = "bun run oxfmt --write"
 
 [tasks."fmt:readonly"]
 description = "Check formatting without writing"
-run = "bunx oxfmt --check"
+run = "bun run oxfmt --check"
 
 [tasks.lint]
 description = "Lint the repository and apply fixes"
-run = "bunx oxlint --fix"
+run = "bun run oxlint --fix"
 
 [tasks."lint:readonly"]
 description = "Lint the repository without fixing"
-run = "bunx oxlint"
+run = "bun run oxlint"
 
 [tasks.typecheck]
 description = "Type-check the repository"
@@ -31,13 +31,13 @@ dir = "{{config_root}}/packages/cli"
 run = "bun build src/main.ts --target bun --outfile ../../plugin/scripts/holyclaude.js"
 
 [tasks."bump:minor"]
-description = "Bump the minor version in all six version files and reset patch and hotfix"
+description = "Bump the minor version in the six version files and bun.lock, and reset patch and hotfix"
 run = ["bun scripts/bump-version.ts minor", { task = "build" }]
 
 [tasks."bump:patch"]
-description = "Bump the patch version in all six version files and reset hotfix"
+description = "Bump the patch version in the six version files and bun.lock, and reset hotfix"
 run = ["bun scripts/bump-version.ts patch", { task = "build" }]
 
 [tasks."bump:hotfix"]
-description = "Bump the hotfix version in all six version files"
+description = "Bump the hotfix version in the six version files and bun.lock"
 run = ["bun scripts/bump-version.ts hotfix", { task = "build" }]

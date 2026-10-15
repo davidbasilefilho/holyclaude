@@ -16,6 +16,7 @@
     "test": "mise run test"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "2.1.300",
     "@holyclaude/core": "workspace:*",
     "@types/bun": "^1.0.0",
     "effect": "^4.0.0",

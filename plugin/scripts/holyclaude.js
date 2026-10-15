@@ -7352,6 +7352,12 @@ class InvalidPath extends TaggedError2("InvalidPath") {
   }
 }
 
+class InvalidWorktree extends TaggedError2("InvalidWorktree") {
+  get message() {
+    return `Invalid worktree "${this.path}": ${this.reason}`;
+  }
+}
+
 class StaleRevision extends TaggedError2("StaleRevision") {
   get message() {
     return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
@@ -7818,15 +7824,18 @@ var Worker = Struct({
 // ../core/src/local.ts
 var WorkersFile = Struct({ workers: ArraySchema(Worker) });
 var AgentsFile = Record(AssignmentId, Id);
+var WorktreesFile = Record(AssignmentId, Text);
 var CloneFile = Struct({ clone_id: CloneId });
 var ActiveIntentFile = Struct({ intent_id: IntentId });
 var workersPath = (directory) => localFile(directory, "workers.json");
 var agentsPath = (directory) => localFile(directory, "agents.json");
+var worktreesPath = (directory) => localFile(directory, "worktrees.json");
 var clonePath = (directory) => localFile(directory, "clone.json");
 var activeIntentPath = (directory) => localFile(directory, "active-intent.json");
 var readLocal = (schema, directory, path, limit) => refuseSymlinks(directory, path).pipe(andThen2(readJson(schema, path, limit)));
 var readWorkers = (directory, limit) => readLocal(WorkersFile, directory, workersPath(directory), limit).pipe(map4((file) => file?.workers ?? []));
 var readAgents = (directory, limit) => readLocal(AgentsFile, directory, agentsPath(directory), limit).pipe(map4((file) => file ?? {}));
+var readWorktrees = (directory, limit) => readLocal(WorktreesFile, directory, worktreesPath(directory), limit).pipe(map4((file) => file ?? {}));
 var readActiveIntent = (directory, limit) => readLocal(ActiveIntentFile, directory, activeIntentPath(directory), limit).pipe(map4((file) => file?.intent_id));
 var writeActiveIntent = (directory, intentId, lock) => encodeJson(ActiveIntentFile, { intent_id: intentId }).pipe(flatMap2((content) => commitFile(activeIntentPath(directory), content, lock)));
 var readCloneId = (directory) => readLocal(CloneFile, directory, clonePath(directory)).pipe(map4((file) => file?.clone_id));
@@ -7862,6 +7871,15 @@ var writeLocal = (directory, before, after, lock) => gen2(function* () {
   const agentsBefore = yield* encodeJson(AgentsFile, sortedKeys(stored));
   if (agents !== agentsBefore)
     yield* commitFile(agentsFile, agents, lock);
+  const worktreesFile = worktreesPath(directory);
+  const keys = yield* readWorktrees(directory);
+  const inState = new Set(after.assignments.map((row) => row.id));
+  const held = after.assignments.flatMap((row) => row.state === "Running" && row.worktree !== undefined ? [[row.id, row.worktree]] : []);
+  const kept = Object.entries(keys).filter(([id]) => !inState.has(id));
+  const worktrees = yield* encodeJson(WorktreesFile, sortedKeys({ ...Object.fromEntries(kept), ...Object.fromEntries(held) }));
+  const worktreesBefore = yield* encodeJson(WorktreesFile, sortedKeys(keys));
+  if (worktrees !== worktreesBefore)
+    yield* commitFile(worktreesFile, worktrees, lock);
 });
 // ../core/src/observations.ts
 var rotateObservations = (directory) => {
@@ -7956,7 +7974,8 @@ var Assignment = Struct({
   agent_id: NullOr(Id),
   result: NullOr(Text),
   acceptance: NullOr(AcceptanceRecord),
-  clone_id: optionalKey2(CloneId)
+  clone_id: optionalKey2(CloneId),
+  worktree: optionalKey2(Text)
 });
 var isOpenAssignment = (assignment) => assignment.state === "Ready" || assignment.state === "Running" || assignment.state === "Succeeded" && assignment.acceptance === null;
 var isTerminal = (assignment) => assignment.state === "Succeeded" || assignment.state === "Failed" || assignment.state === "Cancelled";
@@ -8065,7 +8084,7 @@ var validateState = (state) => gen2(function* () {
 // ../core/src/records.ts
 import { readdir } from "fs/promises";
 import { dirname, join as join3, relative as relative3 } from "path";
-var AssignmentRecord = Assignment.mapFields(omit2(["agent_id"]));
+var AssignmentRecord = Assignment.mapFields(omit2(["agent_id", "worktree"]));
 var leaf = (path) => relative3(dirname(path), path);
 var withoutBackslash = (path, names) => names.some((name) => name.includes("\\")) ? fail5(new CorruptRecord({
   path,
@@ -8138,10 +8157,15 @@ var loadOnce = (directory, limit) => gen2(function* () {
       });
   }
   const agents = yield* readAgents(directory, limit);
-  const assignments = sortedById(stored.map(({ record }) => record)).map((record) => ({
-    ...record,
-    agent_id: agents[record.id] ?? null
-  }));
+  const worktrees = yield* readWorktrees(directory, limit);
+  const assignments = sortedById(stored.map(({ record }) => record)).map((record) => {
+    const worktree = record.state === "Running" ? worktrees[record.id] : undefined;
+    return {
+      ...record,
+      agent_id: agents[record.id] ?? null,
+      ...worktree === undefined ? {} : { worktree }
+    };
+  });
   const workers = yield* readWorkers(directory, limit);
   const state = yield* validateState({
     version: 1,
@@ -8332,6 +8356,20 @@ var updateState = (directory, transition) => withStateLock(directory, (lock) => 
     yield* persist(directory, before, yield* stampClone(cloneId, before.state, state), lock);
   return value;
 }));
+// ../core/src/worktree.ts
+import { realpath, stat as stat2 } from "fs/promises";
+import { resolve as resolve4 } from "path";
+var openWorktree = (path) => gen2(function* () {
+  if (path.trim() === "")
+    return yield* new InvalidWorktree({ path, reason: "empty path" });
+  const root = resolve4(path);
+  const info = yield* attempt(() => stat2(root)).pipe(catch_2((cause) => fail5(hasCode(cause, "ENOENT") || hasCode(cause, "ENOTDIR") ? new InvalidWorktree({ path, reason: "no such directory" }) : new StateIo({ path, cause }))));
+  if (!info.isDirectory())
+    return yield* new InvalidWorktree({ path, reason: "not a directory" });
+  const real = yield* io(root, () => realpath(root));
+  const key = new Bun.CryptoHasher("sha256").update(real).digest("hex").slice(0, 16);
+  return { root, key };
+});
 // ../core/src/model/ci.ts
 var CiGate = Literals(["Pending", "Passed", "Failed", "Unknown"]);
 // ../core/src/transitions/assignment.ts
@@ -8540,10 +8578,10 @@ var reserve = (state, input, context) => gen2(function* () {
     if (!accepted)
       return yield* refuse("DependencyNotAccepted", `${id} is not accepted at revision ${assignment.intent_revision}`);
   }
-  const holder = state.assignments.find((other) => writes && other.state === "Running" && (other.clone_id === undefined || other.clone_id === context.cloneId) && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
+  const holder = state.assignments.find((other) => writes && other.state === "Running" && (other.clone_id === undefined || other.clone_id === context.cloneId) && (other.worktree === undefined || other.worktree === context.worktree) && other.mutability !== "ReadOnly" && anyOverlap(other.metadata.ownership_paths, ownership_paths));
   if (holder !== undefined)
     return yield* refuse("OwnershipConflict", `paths overlap ${holder.id}`);
-  return replaceAssignment(state, { ...assignment, state: "Running" });
+  return replaceAssignment(state, { ...assignment, state: "Running", worktree: context.worktree });
 });
 var bindAgent = (state, input) => gen2(function* () {
   const assignment = yield* findAssignment(state, input.assignment_id);
@@ -11671,19 +11709,21 @@ var assignmentCreate = cmd({
 });
 var assignmentReserve = cmd({
   path: ["assignment", "reserve"],
-  usage: "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]...",
+  usage: "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]... [--worktree <dir>]",
   summary: "revalidate and reserve (Ready to Running); prints the dispatch parameters",
   root: true,
-  flags: { capabilities: "string", root: "list" },
+  flags: { capabilities: "string", root: "list", worktree: "string" },
   positionals: 1,
   run: (args) => gen2(function* () {
     const id = args.positionals[0];
     const given = stringFlag(args, "capabilities");
     const roots = listFlag(args, "root");
+    const worktree = yield* openWorktree(stringFlag(args, "worktree") ?? projectRoot());
     const reserved = yield* change((state, { cloneId }) => gen2(function* () {
       const context = {
-        projectRoot: projectRoot(),
-        writableRoots: roots.length > 0 ? roots : [projectRoot()],
+        projectRoot: worktree.root,
+        writableRoots: roots.length > 0 ? roots : [worktree.root],
+        worktree: worktree.key,
         cloneId: yield* cloneId
       };
       const assignment = yield* findAssignment(state, id ?? "");
@@ -12015,6 +12055,7 @@ var HINTS = {
   UnknownRecord: "List ids with `holyclaude assignment list` or `holyclaude intent show`.",
   InvalidRecord: "Adjust the input to satisfy the rule in the message, then rerun.",
   InvalidPath: "Use relative portable paths such as packages/cli/src.",
+  InvalidWorktree: "Give --worktree an existing directory, such as the path of a git worktree.",
   StaleRevision: "Reread with `holyclaude intent show`, reassess the work at the live revision, then retry.",
   NoRevision: "Set a valid revision with `holyclaude intent update --material`.",
   InvalidTransition: "Check the state with `holyclaude assignment show <id>` and use the command that fits it.",

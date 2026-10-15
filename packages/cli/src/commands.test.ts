@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, truncateSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadState, updateState, type State } from "@holyclaude/core"
+import { loadState, projectRoot, updateState, type State } from "@holyclaude/core"
 import { Effect } from "effect"
 
 import { COMMANDS } from "./commands.ts"
@@ -629,6 +629,134 @@ describe("two first reserves at once", () => {
     )
     expect(running).toHaveLength(1)
   })
+})
+
+describe("reserve in separate worktrees of one repository", () => {
+  const ids = ["assignment-0001", "assignment-0002", "assignment-0003"]
+  let trees: string[] = []
+  const keysFile = () => join(directory, "local", "worktrees.json")
+  const reserveIn = (id: string, worktree?: string) =>
+    runCommand("assignment reserve", [id], {
+      root: ["src"],
+      ...(worktree === undefined ? {} : { worktree }),
+    })
+  const conflict = (id: string, worktree?: string) =>
+    refusal("assignment reserve", [id], {
+      root: ["src"],
+      ...(worktree === undefined ? {} : { worktree }),
+    })
+  const heldKeys = async () => (await Bun.file(keysFile()).json()) as Record<string, string>
+
+  beforeEach(async () => {
+    trees = [0, 1].map(() => mkdtempSync(join(tmpdir(), "holyclaude-tree-")))
+    // Three writers that all own src/a.ts, none reserved yet.
+    const ready = (id: string) => ({ ...reserved.assignments[0]!, id, state: "Ready" as const })
+    await Effect.runPromise(
+      updateState(directory, () =>
+        Effect.succeed({ state: { ...reserved, assignments: ids.map(ready) }, value: 0 }),
+      ),
+    )
+  })
+  afterEach(() => {
+    for (const tree of trees) rmSync(tree, { recursive: true, force: true })
+  })
+
+  test("writers with overlapping paths in one worktree conflict", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    expect(await conflict(ids[1]!, trees[0])).toMatchObject({ reason: "OwnershipConflict" })
+  })
+
+  test("writers with overlapping paths in different worktrees both run", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    const second = await reserveIn(ids[1]!, trees[1])
+    expect(second.value).toMatchObject({ id: ids[1], state: "Running" })
+    const keys = await heldKeys()
+    expect(Object.keys(keys).sort()).toEqual([ids[0]!, ids[1]!])
+    expect(keys[ids[0]!]).not.toBe(keys[ids[1]!])
+  })
+
+  test("a reserve without --worktree keys to the project root", async () => {
+    await reserveIn(ids[0]!)
+    expect((await reserveIn(ids[1]!, trees[0])).value).toMatchObject({ state: "Running" })
+    expect(await conflict(ids[2]!, projectRoot())).toMatchObject({ reason: "OwnershipConflict" })
+  })
+
+  test("--worktree makes the directory the writable root, narrowed by --root", async () => {
+    const inside = await runCommand("assignment reserve", [ids[0]!], { worktree: trees[0] })
+    expect(inside.value).toMatchObject({ state: "Running" })
+    expect(
+      await refusal("assignment reserve", [ids[1]!], { worktree: trees[1], root: ["lib"] }),
+    ).toMatchObject({ reason: "OutsideWritableRoots", detail: "src/a.ts" })
+  })
+
+  test("the key stays out of every record and survives a restart", async () => {
+    await reserveIn(ids[0]!, trees[0])
+    const key = (await heldKeys())[ids[0]!]!
+    expect(key).toMatch(/^[0-9a-f]+$/)
+    const files = await Array.fromAsync(
+      new Bun.Glob("intents/*/assignments/*.json").scan({ cwd: directory }),
+    )
+    expect(files).toHaveLength(ids.length)
+    for (const file of files) {
+      const text = await Bun.file(join(directory, file)).text()
+      expect(text).not.toContain(key)
+      expect(text).not.toContain(trees[0]!)
+      expect(text).not.toContain("worktree")
+    }
+    // A fresh load, as after a restart, finds the key on the Running row.
+    const state = await Effect.runPromise(loadState(directory))
+    expect(state.assignments.find((row) => row.id === ids[0])?.worktree).toBe(key)
+  })
+
+  const releases: ReadonlyArray<readonly [string, (id: string) => Promise<unknown>]> = [
+    ["rollback", (id) => runCommand("assignment rollback", [id])],
+    [
+      "cancel",
+      (id) =>
+        runCommand("assignment bind", [id], { agent: "agent-1", fingerprint: "f" }).then(() =>
+          runCommand("assignment cancel", [id]),
+        ),
+    ],
+    [
+      "finish",
+      (id) =>
+        runCommand("assignment bind", [id], { agent: "agent-1", fingerprint: "f" }).then(() =>
+          runCommand("assignment finish", [id], { outcome: "success" }, '{"result":"done"}'),
+        ),
+    ],
+    ["reconcile resolve --fail", (id) => runCommand("reconcile resolve", [id], { fail: "gone" })],
+  ]
+  test.each(releases)("%s releases the key, so the paths are free again", async (_name, settle) => {
+    await reserveIn(ids[0]!, trees[0])
+    expect(await conflict(ids[1]!, trees[0])).toMatchObject({ reason: "OwnershipConflict" })
+    await settle(ids[0]!)
+    expect(await heldKeys()).toEqual({})
+    expect((await reserveIn(ids[1]!, trees[0])).value).toMatchObject({ state: "Running" })
+  })
+
+  test.each(["missing", "file"])(
+    "refuses a worktree that is %s and reserves nothing",
+    async (kind) => {
+      const target = join(trees[0]!, "nothing")
+      if (kind === "file") await Bun.write(target, "x")
+      expect(await refusal("assignment reserve", [ids[0]!], { worktree: target })).toMatchObject({
+        _tag: "InvalidWorktree",
+      })
+      const state = await Effect.runPromise(loadState(directory))
+      expect(state.assignments.every((row) => row.state === "Ready")).toBe(true)
+    },
+  )
+
+  test.each(["", "  "])(
+    "refuses a blank worktree %j rather than falling back to the current directory",
+    async (blank) => {
+      expect(await refusal("assignment reserve", [ids[0]!], { worktree: blank })).toMatchObject({
+        _tag: "InvalidWorktree",
+      })
+      const state = await Effect.runPromise(loadState(directory))
+      expect(state.assignments.every((row) => row.state === "Ready")).toBe(true)
+    },
+  )
 })
 
 describe("assignment verify", () => {

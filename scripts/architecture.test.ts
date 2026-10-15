@@ -29,6 +29,8 @@ const sourceAllowlist: Allowlist = {
     mkdir: "no Bun equivalent: create a directory tree",
     open: "no Bun equivalent: exclusive create (wx) for the lock file",
     readdir: "no Bun equivalent: list a directory",
+    realpath:
+      "no Bun equivalent: resolve symbolic links so two spellings of one directory share a worktree key",
     rename: "no Bun equivalent: atomic replace of a written temporary file",
     rm: "no Bun equivalent: remove a file or directory tree",
     stat: "no Bun equivalent: file metadata without reading the file",

@@ -34,6 +34,7 @@ import {
   intentInUse,
   isInsideRoots,
   isOpenAssignment,
+  openWorktree,
   projectRoot,
   reconcile,
   readActiveIntent,
@@ -546,22 +547,26 @@ const assignmentCreate = cmd({
 
 const assignmentReserve = cmd({
   path: ["assignment", "reserve"],
-  usage: "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]...",
+  usage:
+    "assignment reserve <id> [--capabilities Write,Shell] [--root <dir>]... [--worktree <dir>]",
   summary: "revalidate and reserve (Ready to Running); prints the dispatch parameters",
   root: true,
-  flags: { capabilities: "string", root: "list" },
+  flags: { capabilities: "string", root: "list", worktree: "string" },
   positionals: 1,
   run: (args) =>
     Effect.gen(function* () {
       const id = args.positionals[0]
       const given = stringFlag(args, "capabilities")
       const roots = listFlag(args, "root")
+      // Without --worktree the writer works in the project root, so existing reserves key alike.
+      const worktree = yield* openWorktree(stringFlag(args, "worktree") ?? projectRoot())
       const reserved = yield* change((state, { cloneId }) =>
         Effect.gen(function* () {
           // Read under the lock: two first-time reserves must not each find no clone id.
           const context = {
-            projectRoot: projectRoot(),
-            writableRoots: roots.length > 0 ? roots : [projectRoot()],
+            projectRoot: worktree.root,
+            writableRoots: roots.length > 0 ? roots : [worktree.root],
+            worktree: worktree.key,
             cloneId: yield* cloneId,
           }
           const assignment = yield* findAssignment(state, id ?? "")
