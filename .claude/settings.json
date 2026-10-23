@@ -1,4 +1,4 @@
 {
-  "attribution": { "commit": "", "pr": "" },
+  "attribution": { "commit": "", "pr": "", "sessionUrl" = false },
   "autoCompactWindow": 450000
 }
